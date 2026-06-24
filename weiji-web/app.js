@@ -690,10 +690,97 @@ function initInteractions() {
   });
 }
 
+/* ===== 登录/注册 ===== */
+let isLoginMode = true;
+
+function showLoginPage() {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const loginPage = document.getElementById('page-login');
+  if (loginPage) loginPage.classList.add('active');
+  const nav = document.querySelector('.bottom-nav');
+  if (nav) nav.style.display = 'none';
+  const sidebar = document.querySelector('.desktop-sidebar');
+  if (sidebar) sidebar.style.display = 'none';
+  lucide.createIcons();
+}
+
+function hideLoginPage() {
+  const nav = document.querySelector('.bottom-nav');
+  if (nav) nav.style.display = '';
+  const sidebar = document.querySelector('.desktop-sidebar');
+  if (sidebar) sidebar.style.display = '';
+  navigateTo('home');
+}
+
+function switchAuthMode(mode) {
+  isLoginMode = mode === 'login';
+  const loginTitle = document.getElementById('auth-title');
+  const loginSubtitle = document.getElementById('auth-subtitle');
+  const nicknameField = document.getElementById('auth-nickname-field');
+  const submitBtn = document.getElementById('auth-submit');
+  const switchText = document.getElementById('auth-switch-text');
+
+  if (isLoginMode) {
+    loginTitle.textContent = '欢迎回来';
+    loginSubtitle.textContent = '登录味记，记录美食时光';
+    if (nicknameField) nicknameField.style.display = 'none';
+    submitBtn.textContent = '登录';
+    switchText.innerHTML = '还没有账号？<span style="color:var(--color-primary);cursor:pointer;" onclick="switchAuthMode(\'register\')">立即注册</span>';
+  } else {
+    loginTitle.textContent = '创建账号';
+    loginSubtitle.textContent = '加入味记，开启美食记录之旅';
+    if (nicknameField) nicknameField.style.display = '';
+    submitBtn.textContent = '注册';
+    switchText.innerHTML = '已有账号？<span style="color:var(--color-primary);cursor:pointer;" onclick="switchAuthMode(\'login\')">去登录</span>';
+  }
+}
+
+async function handleAuthSubmit() {
+  const username = document.getElementById('auth-username').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const nickname = document.getElementById('auth-nickname') ? document.getElementById('auth-nickname').value.trim() : '';
+
+  if (!username || !password) {
+    showToast('请输入用户名和密码');
+    return;
+  }
+
+  const btn = document.getElementById('auth-submit');
+  if (btn) { btn.disabled = true; btn.textContent = isLoginMode ? '登录中...' : '注册中...'; }
+
+  try {
+    if (isLoginMode) {
+      await api.login(username, password);
+      showToast('登录成功！');
+    } else {
+      await api.register(username, password, nickname);
+      showToast('注册成功！');
+    }
+    hideLoginPage();
+  } catch (err) {
+    showToast(err.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = isLoginMode ? '登录' : '注册'; }
+  }
+}
+
+async function handleLogout() {
+  try {
+    await api.logout();
+  } catch (e) {}
+  showToast('已退出登录');
+  showLoginPage();
+}
+
 function init() {
   if (typeof lucide !== 'undefined') lucide.createIcons();
   initInteractions();
-  loadHomeData();
+
+  if (!api.isLoggedIn()) {
+    showLoginPage();
+  } else {
+    loadHomeData();
+  }
 }
 
 if (document.readyState === 'loading') {

@@ -27,3 +27,14 @@
 - [x] 核心闭环验证通过：首页加载 → 拍照识别 → 编辑保存 → 首页列表刷新显示新记录
 - [x] 各页面数据加载无控制台报错
 - [x] 页面交互（筛选、打卡、评分、标签切换）响应正常
+- [x] 前后端同端口部署，前端通过相对路径访问 API，无跨域问题
+- [x] 后端挂载静态文件：index.html、api.js、app.js、assets 目录
+- [x] 用户注册接口 `POST /api/auth/register` 可用
+- [x] 用户登录接口 `POST /api/auth/login` 可用，返回 token 和用户信息
+- [x] 用户登出接口 `POST /api/auth/logout` 可用
+- [x] Token 通过 Authorization: Bearer header 传递
+- [x] 前端登录页面已实现，支持登录/注册模式切换
+- [x] 前端未登录时自动跳转登录页，登录后进入首页
+- [x] 前端个人中心有退出登录入口
+- [x] 登录状态通过 localStorage 持久化（token + 用户信息）
+- [x] 演示账号：demo / 123456

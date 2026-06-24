@@ -1727,10 +1727,65 @@ body {
                         <i data-lucide="chevron-right" style="width: var(--size-icon-sm); height: var(--size-icon-sm); color: var(--neutral-400); flex-shrink: 0;"></i>
                     </div>
 
-                    <div class="menu-item" onclick="showToast('设置功能')">
-                        <i data-lucide="settings" style="width: var(--size-icon-md); height: var(--size-icon-md); color: var(--color-on-surface-variant); flex-shrink: 0;"></i>
-                        <span style="flex: 1; font-size: var(--font-size-body); color: var(--color-on-surface); min-width: 0;">设置</span>
+                    <div class="menu-item" onclick="handleLogout()">
+                        <i data-lucide="log-out" style="width: var(--size-icon-md); height: var(--size-icon-md); color: var(--error-500); flex-shrink: 0;"></i>
+                        <span style="flex: 1; font-size: var(--font-size-body); color: var(--error-500); min-width: 0;">退出登录</span>
                         <i data-lucide="chevron-right" style="width: var(--size-icon-sm); height: var(--size-icon-sm); color: var(--neutral-400); flex-shrink: 0;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="page-login" class="page">
+            <div style="min-height: 100vh; display: flex; flex-direction: column; background: var(--background);">
+                <div style="padding: var(--space-8) var(--space-5) var(--space-6); text-align: center;">
+                    <div style="width: 72px; height: 72px; border-radius: var(--radius-xl); background: var(--color-primary); margin: 0 auto var(--space-4); display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-3);">
+                        <i data-lucide="utensils" style="width: 36px; height: 36px; color: var(--color-on-primary);"></i>
+                    </div>
+                    <h1 id="auth-title" style="font-family: var(--font-heading); font-size: 28px; font-weight: 700; color: var(--color-on-surface); margin-bottom: var(--space-2);">欢迎回来</h1>
+                    <p id="auth-subtitle" style="font-size: var(--font-size-body); color: var(--color-on-surface-variant);">登录味记，记录美食时光</p>
+                </div>
+
+                <div style="padding: 0 var(--space-5); flex: 1;">
+                    <div style="display: flex; flex-direction: column; gap: var(--space-4);">
+                        <div id="auth-nickname-field" style="display: none;">
+                            <label style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant); display: block; margin-bottom: var(--space-2);">昵称</label>
+                            <input type="text" id="auth-nickname" placeholder="请输入昵称"
+                                style="width: 100%; height: 48px; border: 1.5px solid var(--color-border); border-radius: var(--radius-lg); padding: 0 var(--space-4); font-size: var(--font-size-body); font-family: var(--font-body); background: var(--color-card); color: var(--color-on-surface); outline: none; transition: border-color .15s;"
+                                onfocus="this.style.borderColor='var(--color-primary)'"
+                                onblur="this.style.borderColor='var(--color-border)'"
+                            />
+                        </div>
+                        <div>
+                            <label style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant); display: block; margin-bottom: var(--space-2);">用户名</label>
+                            <input type="text" id="auth-username" placeholder="请输入用户名" value="demo"
+                                style="width: 100%; height: 48px; border: 1.5px solid var(--color-border); border-radius: var(--radius-lg); padding: 0 var(--space-4); font-size: var(--font-size-body); font-family: var(--font-body); background: var(--color-card); color: var(--color-on-surface); outline: none; transition: border-color .15s;"
+                                onfocus="this.style.borderColor='var(--color-primary)'"
+                                onblur="this.style.borderColor='var(--color-border)'"
+                            />
+                        </div>
+                        <div>
+                            <label style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant); display: block; margin-bottom: var(--space-2);">密码</label>
+                            <input type="password" id="auth-password" placeholder="请输入密码" value="123456"
+                                style="width: 100%; height: 48px; border: 1.5px solid var(--color-border); border-radius: var(--radius-lg); padding: 0 var(--space-4); font-size: var(--font-size-body); font-family: var(--font-body); background: var(--color-card); color: var(--color-on-surface); outline: none; transition: border-color .15s;"
+                                onfocus="this.style.borderColor='var(--color-primary)'"
+                                onblur="this.style.borderColor='var(--color-border)'"
+                            />
+                        </div>
+                        <button id="auth-submit" class="btn btn-primary btn-lg" style="width: 100%; font-weight: 600; margin-top: var(--space-2);" onclick="handleAuthSubmit()">
+                            登录
+                        </button>
+                    </div>
+
+                    <div style="margin-top: var(--space-6); text-align: center;">
+                        <p id="auth-switch-text" style="font-size: var(--font-size-body); color: var(--color-on-surface-variant);">
+                            还没有账号？<span style="color: var(--color-primary); cursor: pointer;" onclick="switchAuthMode('register')">立即注册</span>
+                        </p>
+                    </div>
+
+                    <div style="margin-top: var(--space-6); padding: var(--space-4); background: var(--surface-container-low); border-radius: var(--radius-lg);">
+                        <p style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant); margin-bottom: var(--space-2);">演示账号</p>
+                        <p style="font-size: var(--font-size-caption); color: var(--color-on-surface);">用户名：demo　密码：123456</p>
                     </div>
                 </div>
             </div>

@@ -1,7 +1,36 @@
-const API_BASE = 'http://localhost:8002';
+const API_BASE = '';
+
+function getToken() {
+  return localStorage.getItem('weiji_token') || '';
+}
+
+function setToken(token) {
+  if (token) {
+    localStorage.setItem('weiji_token', token);
+  } else {
+    localStorage.removeItem('weiji_token');
+  }
+}
+
+function getCurrentUser() {
+  const user = localStorage.getItem('weiji_user');
+  return user ? JSON.parse(user) : null;
+}
+
+function setCurrentUser(user) {
+  if (user) {
+    localStorage.setItem('weiji_user', JSON.stringify(user));
+  } else {
+    localStorage.removeItem('weiji_user');
+  }
+}
 
 async function request(method, path, body, isFormData) {
   const options = { method, headers: {} };
+  const token = getToken();
+  if (token) {
+    options.headers['Authorization'] = 'Bearer ' + token;
+  }
 
   if (body !== undefined && body !== null) {
     if (isFormData) {
@@ -38,6 +67,34 @@ async function request(method, path, body, isFormData) {
 }
 
 const api = {
+  login(username, password) {
+    return request('POST', '/api/auth/login', { username, password }).then(data => {
+      setToken(data.token);
+      setCurrentUser(data.user);
+      return data.user;
+    });
+  },
+  register(username, password, nickname) {
+    return request('POST', '/api/auth/register', { username, password, nickname }).then(data => {
+      setToken(data.token);
+      setCurrentUser(data.user);
+      return data.user;
+    });
+  },
+  logout() {
+    return request('POST', '/api/auth/logout').finally(() => {
+      setToken(null);
+      setCurrentUser(null);
+    });
+  },
+  isLoggedIn() {
+    return !!getToken();
+  },
+  getToken,
+  setToken,
+  getCurrentUser,
+  setCurrentUser,
+
   getRecords(params) {
     let query = '';
     if (params) {
@@ -58,7 +115,7 @@ const api = {
   },
   recognizeFood(file) {
     const fd = new FormData();
-    fd.append('file', file);
+    fd.append('image', file);
     return request('POST', '/api/ai/recognize', fd, true);
   },
   getFamilyRecipes(cat) {
@@ -73,6 +130,9 @@ const api = {
   },
   getLevel() {
     return request('GET', '/api/achievement/level');
+  },
+  getChallenges() {
+    return request('GET', '/api/challenge/list');
   },
   getCheckinStatus() {
     return request('GET', '/api/checkin/status');

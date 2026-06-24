@@ -3,12 +3,15 @@
 提供图片识别、图片美化、菜谱推荐、语音识别等 AI 能力
 以及前后端联调所需的 Mock 业务 CRUD 端点
 """
-from fastapi import FastAPI, File, UploadFile, HTTPException, Query
+from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from typing import Optional, List, Dict, Any
 import uuid
+import hashlib
 import logging
+import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -618,11 +621,157 @@ async def do_checkin():
 
 
 # ============================================================
-# 用户
+# 用户系统（注册/登录/Token）
 # ============================================================
+users: Dict[str, Dict[str, Any]] = {
+    "demo": {
+        "id": "user-001",
+        "username": "demo",
+        "password": hashlib.sha256("123456".encode()).hexdigest(),
+        "nickname": "味记用户",
+        "avatarText": "味",
+        "avatarInitials": "味",
+        "avatarColor": "primary",
+        "avatarBg": "#ffe6d9",
+        "signature": "记录美好食光",
+        "bio": "记录美好食光",
+        "stats": {
+            "recordCount": 128,
+            "recipeCount": 12,
+            "streakDays": 5,
+        },
+    }
+}
+
+tokens: Dict[str, str] = {}
+
+
+def hash_password(pwd: str) -> str:
+    return hashlib.sha256(pwd.encode()).hexdigest()
+
+
+def create_token(user_id: str) -> str:
+    token = str(uuid.uuid4())
+    tokens[token] = user_id
+    return token
+
+
+def get_current_user(authorization: Optional[str] = Header(None)) -> Optional[Dict[str, Any]]:
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    token = authorization.replace("Bearer ", "")
+    user_id = tokens.get(token)
+    if not user_id:
+        return None
+    for u in users.values():
+        if u["id"] == user_id:
+            return u
+    return None
+
+
+@app.post("/api/auth/register")
+async def register(user: dict):
+    """用户注册"""
+    username = user.get("username", "").strip()
+    password = user.get("password", "")
+    nickname = user.get("nickname", "") or username
+
+    if not username or not password:
+        return fail("用户名和密码不能为空", code=400)
+    if len(username) < 2:
+        return fail("用户名至少2个字符", code=400)
+    if len(password) < 6:
+        return fail("密码至少6个字符", code=400)
+    if username in users:
+        return fail("用户名已存在", code=409)
+
+    user_id = str(uuid.uuid4())
+    initial = nickname[0] if nickname else username[0]
+    users[username] = {
+        "id": user_id,
+        "username": username,
+        "password": hash_password(password),
+        "nickname": nickname,
+        "avatarText": initial,
+        "avatarInitials": initial,
+        "avatarColor": "primary",
+        "avatarBg": "#ffe6d9",
+        "signature": "记录美好食光",
+        "bio": "记录美好食光",
+        "stats": {
+            "recordCount": 0,
+            "recipeCount": 0,
+            "streakDays": 0,
+        },
+    }
+
+    token = create_token(user_id)
+    return ok({
+        "token": token,
+        "user": {
+            "id": user_id,
+            "username": username,
+            "nickname": nickname,
+            "avatarInitials": initial,
+            "avatarColor": "primary",
+            "bio": "记录美好食光",
+            "stats": users[username]["stats"],
+        }
+    }, "注册成功")
+
+
+@app.post("/api/auth/login")
+async def login(user: dict):
+    """用户登录"""
+    username = user.get("username", "").strip()
+    password = user.get("password", "")
+
+    if not username or not password:
+        return fail("用户名和密码不能为空", code=400)
+
+    u = users.get(username)
+    if not u:
+        return fail("用户不存在", code=404)
+    if u["password"] != hash_password(password):
+        return fail("密码错误", code=401)
+
+    token = create_token(u["id"])
+    return ok({
+        "token": token,
+        "user": {
+            "id": u["id"],
+            "username": u["username"],
+            "nickname": u["nickname"],
+            "avatarInitials": u["avatarInitials"],
+            "avatarColor": u["avatarColor"],
+            "bio": u["bio"],
+            "stats": u["stats"],
+        }
+    }, "登录成功")
+
+
+@app.post("/api/auth/logout")
+async def logout(authorization: Optional[str] = Header(None)):
+    """用户登出"""
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.replace("Bearer ", "")
+        tokens.pop(token, None)
+    return ok(None, "登出成功")
+
+
 @app.get("/api/user/profile")
-async def get_user_profile():
+async def get_user_profile(authorization: Optional[str] = Header(None)):
     """查询用户信息及统计数据"""
+    user = get_current_user(authorization)
+    if user:
+        return ok({
+            "id": user["id"],
+            "nickname": user["nickname"],
+            "avatarInitials": user["avatarInitials"],
+            "avatarColor": user["avatarColor"],
+            "bio": user["bio"],
+            "stats": user["stats"],
+        })
     return ok(user_profile)
 
 
@@ -633,6 +782,33 @@ async def get_user_profile():
 async def list_challenges():
     """查询挑战赛列表"""
     return ok(challenges)
+
+
+# ============================================================
+# 静态文件服务（挂载前端，同端口避免跨域）
+# ============================================================
+WEB_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "weiji-web")
+
+if os.path.isdir(WEB_DIR):
+    @app.get("/")
+    async def serve_index():
+        return FileResponse(os.path.join(WEB_DIR, "index.html"))
+
+    @app.get("/index.html")
+    async def serve_index_html():
+        return FileResponse(os.path.join(WEB_DIR, "index.html"))
+
+    @app.get("/api.js")
+    async def serve_api_js():
+        return FileResponse(os.path.join(WEB_DIR, "api.js"))
+
+    @app.get("/app.js")
+    async def serve_app_js():
+        return FileResponse(os.path.join(WEB_DIR, "app.js"))
+
+    app.mount("/assets", StaticFiles(directory=os.path.join(WEB_DIR, "assets")), name="assets")
+else:
+    logger.warning(f"Web directory not found: {WEB_DIR}")
 
 
 if __name__ == "__main__":

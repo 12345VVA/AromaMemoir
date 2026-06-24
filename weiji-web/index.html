@@ -1,0 +1,2280 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>味记 - 记录每一顿温暖</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+  --primary-50: #fff5f0;
+  --primary-100: #ffe6d9;
+  --primary-200: #ffc9a8;
+  --primary-300: #ffa06e;
+  --primary-400: #ff7a3d;
+  --primary-500: #ff5e1a;
+  --primary-600: #e64a10;
+  --primary-700: #b83a0e;
+  --primary-800: #8f2d0e;
+  --primary-900: #6e230f;
+  --primary: var(--primary-500);
+  --primary-foreground: #ffffff;
+  
+  --accent-50: #fffbeb;
+  --accent-100: #fff3c4;
+  --accent-200: #ffe588;
+  --accent-300: #ffd24a;
+  --accent-400: #ffbe20;
+  --accent-500: #f5a623;
+  --accent-600: #d48a10;
+  --accent-700: #a86b0d;
+  --accent-800: #7d500f;
+  --accent-900: #5c3c10;
+  --accent: var(--accent-500);
+  --accent-foreground: #ffffff;
+  
+  --success-50: #f0fdf4;
+  --success-100: #dcfce7;
+  --success-200: #bbf7d0;
+  --success-300: #86efac;
+  --success-400: #4ade80;
+  --success-500: #22c55e;
+  --success-600: #16a34a;
+  --success-700: #15803d;
+  --success-800: #166534;
+  --success-900: #14532d;
+  
+  --warning-50: #fffbeb;
+  --warning-100: #fef3c7;
+  --warning-200: #fde68a;
+  --warning-300: #fcd34d;
+  --warning-400: #fbbf24;
+  --warning-500: #f59e0b;
+  --warning-600: #d97706;
+  --warning-700: #b45309;
+  --warning-800: #92400e;
+  --warning-900: #78350f;
+  
+  --error-50: #fef2f2;
+  --error-100: #fee2e2;
+  --error-200: #fecaca;
+  --error-300: #fca5a5;
+  --error-400: #f87171;
+  --error-500: #ef4444;
+  --error-600: #dc2626;
+  --error-700: #b91c1c;
+  --error-800: #991b1b;
+  --error-900: #7f1d1d;
+  
+  --info-50: #eff6ff;
+  --info-100: #dbeafe;
+  --info-200: #bfdbfe;
+  --info-300: #93c5fd;
+  --info-400: #60a5fa;
+  --info-500: #3b82f6;
+  --info-600: #2563eb;
+  --info-700: #1d4ed8;
+  --info-800: #1e40af;
+  --info-900: #1e3a8a;
+  
+  --neutral-50: #faf8f5;
+  --neutral-100: #f5f0e8;
+  --neutral-200: #e8dfd2;
+  --neutral-300: #d4c7b5;
+  --neutral-400: #b8a694;
+  --neutral-500: #9a8b7a;
+  --neutral-600: #7d7064;
+  --neutral-700: #635a50;
+  --neutral-800: #4a443d;
+  --neutral-900: #332f2a;
+  
+  --background: #fffaf5;
+  --surface: #ffffff;
+  --surface-dim: #f5f0e8;
+  --surface-container-low: #faf7f2;
+  --surface-container: #f5f0e8;
+  --surface-container-high: #ebe4da;
+  --surface-container-highest: #e0d7cb;
+  --card: #ffffff;
+  --popover: #ffffff;
+  
+  --foreground: #332f2a;
+  --muted-foreground: #7d7064;
+  --secondary-foreground: #4a443d;
+  
+  --border: #e8dfd2;
+  --ring: var(--primary-500);
+  
+  --bg: var(--background);
+  --fg: var(--foreground);
+  --accent-hover: var(--primary-600);
+  --rule: var(--border);
+  --link: var(--primary-600);
+  --muted: var(--neutral-100);
+  --error: var(--error-500);
+  --error-container: var(--error-100);
+  --on-error: #ffffff;
+  --on-error-container: var(--error-900);
+  
+  --font-display: 'Noto Serif SC', serif;
+  --font-heading: 'Noto Serif SC', serif;
+  --font-body: 'Noto Sans SC', sans-serif;
+  
+  --font-size-h3: 22px;
+  --font-size-h4: 18px;
+  --font-size-body: 15px;
+  --font-size-lead: 17px;
+  --font-size-caption: 12px;
+  
+  --font-weight-h3: 600;
+  --font-weight-h4: 600;
+  --font-weight-body: 400;
+  
+  --line-height-body: 1.6;
+  
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  
+  --size-icon-sm: 16px;
+  --size-icon-md: 20px;
+  --size-icon-lg: 24px;
+  --size-button-sm: 32px;
+  --size-button-md: 40px;
+  --size-button-lg: 48px;
+  --size-bottom-nav: 56px;
+  
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+  
+  --shadow-1: 0 1px 3px rgba(51,47,42,.08), 0 1px 2px rgba(51,47,42,.04);
+  --shadow-2: 0 4px 8px -2px rgba(51,47,42,.10);
+  --shadow-3: 0 8px 24px -6px rgba(51,47,42,.14);
+  --shadow-4: 0 16px 40px -10px rgba(51,47,42,.20);
+  
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+  --color-surface: var(--surface);
+  --color-card: var(--card);
+  --color-on-surface: var(--fg);
+  --color-on-surface-variant: var(--muted-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--accent-hover);
+  --color-on-primary: var(--primary-foreground);
+  --color-primary-container: var(--primary-50);
+  --color-on-primary-container: var(--primary-900);
+  --color-border: var(--rule);
+  --color-success: var(--success-600);
+  --color-outline: var(--rule);
+  --color-surface-container-high: var(--surface-container-high);
+}
+
+body {
+    font-family: var(--font-body);
+    background: var(--background);
+    color: var(--foreground);
+    min-height: 100vh;
+    line-height: var(--line-height-body);
+    -webkit-font-smoothing: antialiased;
+}
+
+.app-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    max-width: 480px;
+    margin: 0 auto;
+    background: var(--background);
+    position: relative;
+}
+
+.status-bar {
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    font-size: var(--font-size-caption);
+    font-weight: 600;
+    color: var(--color-on-surface);
+    background: var(--background);
+    flex-shrink: 0;
+}
+
+.status-bar-icons {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.page-wrapper {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    position: relative;
+}
+
+.page {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+
+.page.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.bottom-nav {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    width: 100%;
+    height: var(--size-bottom-nav);
+    background: var(--color-card);
+    border-top: 1px solid var(--color-border);
+    padding: 0 var(--space-2);
+    padding-bottom: var(--space-2);
+    position: relative;
+    flex-shrink: 0;
+}
+
+.nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    flex: 1;
+    cursor: pointer;
+    transition: all .15s;
+    color: var(--color-muted-foreground);
+    text-decoration: none;
+    border-radius: var(--radius-sm);
+    padding: var(--space-1);
+    background: none;
+    border: none;
+}
+
+.nav-item:hover {
+    background: var(--surface-container-low);
+}
+
+.nav-item.active {
+    color: var(--color-primary);
+}
+
+.nav-item.active .nav-label {
+    font-weight: 600;
+}
+
+.nav-icon {
+    width: var(--size-icon-md);
+    height: var(--size-icon-md);
+    flex-shrink: 0;
+}
+
+.nav-label {
+    font-size: var(--font-size-caption);
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.center-fab {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-full);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-2);
+    cursor: pointer;
+    flex-shrink: 0;
+    margin-top: -16px;
+    border: 3px solid var(--color-card);
+    transition: all .15s;
+    border: none;
+}
+
+.center-fab:hover {
+    background: var(--color-primary-hover);
+    transform: scale(1.05);
+}
+
+.center-fab:active {
+    transform: scale(0.95);
+}
+
+.center-fab-icon {
+    width: var(--size-icon-lg);
+    height: var(--size-icon-lg);
+}
+
+.home-indicator {
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: var(--background);
+}
+
+.home-indicator-bar {
+    width: 134px;
+    height: 5px;
+    border-radius: 3px;
+    background: var(--neutral-300);
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-body);
+    font-weight: var(--font-weight-body);
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all .15s;
+}
+
+.btn:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+}
+
+.btn-primary {
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    border-radius: var(--radius-lg);
+    padding: var(--space-3) var(--space-6);
+    font-size: var(--font-size-body);
+    height: var(--size-button-md);
+}
+
+.btn-primary:hover {
+    background: var(--accent-hover);
+}
+
+.btn-primary:active {
+    filter: brightness(0.92);
+    transform: scale(0.98);
+}
+
+.btn-secondary {
+    background: var(--accent);
+    color: var(--accent-foreground);
+    border-radius: var(--radius-lg);
+    padding: var(--space-3) var(--space-6);
+    font-size: var(--font-size-body);
+    height: var(--size-button-md);
+}
+
+.btn-secondary:hover {
+    filter: brightness(1.08);
+}
+
+.btn-outline {
+    background: transparent;
+    color: var(--color-primary);
+    border: 1.5px solid var(--color-primary);
+    border-radius: var(--radius-lg);
+    padding: var(--space-3) var(--space-6);
+    font-size: var(--font-size-body);
+    height: var(--size-button-md);
+}
+
+.btn-outline:hover {
+    background: var(--color-primary-container);
+}
+
+.btn-ghost {
+    background: transparent;
+    color: var(--color-on-surface-variant);
+    border-radius: var(--radius-md);
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--font-size-caption);
+    height: var(--size-button-sm);
+}
+
+.btn-ghost:hover {
+    background: var(--surface-container);
+}
+
+.btn-sm {
+    height: var(--size-button-sm);
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--font-size-caption);
+}
+
+.btn-lg {
+    height: var(--size-button-lg);
+    padding: var(--space-4) var(--space-6);
+    font-size: var(--font-size-lead);
+}
+
+.avatar {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.avatar-sm { width: 24px; height: 24px; }
+.avatar-md { width: 40px; height: 40px; }
+.avatar-lg { width: 72px; height: 72px; }
+
+.avatar-initials {
+    font-family: var(--font-body);
+    font-weight: 600;
+    pointer-events: none;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.avatar-sm .avatar-initials { font-size: 10px; }
+.avatar-md .avatar-initials { font-size: 14px; }
+.avatar-lg .avatar-initials { font-size: 22px; }
+
+.avatar-badge {
+    position: absolute;
+    border-radius: var(--radius-full);
+    border: 2px solid var(--color-card);
+}
+
+.avatar-online {
+    width: 10px;
+    height: 10px;
+    background: var(--success-500);
+    bottom: 0;
+    right: 0;
+}
+
+.avatar-role {
+    width: 14px;
+    height: 14px;
+    background: var(--warning-500);
+    bottom: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.avatar-profile {
+    border: 3px solid var(--color-card);
+    box-shadow: var(--shadow-2);
+}
+
+.input-search {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    height: var(--size-button-md);
+    background: var(--muted);
+    border: 1.5px solid transparent;
+    border-radius: var(--radius-xl);
+    padding: 0 var(--space-3);
+    flex: 1;
+    min-width: 200px;
+    transition: border-color .15s;
+}
+
+.input-search:focus-within {
+    border-color: var(--color-primary);
+}
+
+.input-search input {
+    border: none;
+    background: transparent;
+    outline: none;
+    flex: 1;
+    font-size: var(--font-size-body);
+    font-family: var(--font-body);
+    color: var(--color-on-surface);
+    min-width: 0;
+}
+
+.input-search input::placeholder {
+    color: var(--color-muted-foreground);
+}
+
+.input-search .ico {
+    flex-shrink: 0;
+    color: var(--color-on-surface-variant);
+    display: flex;
+    align-items: center;
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    border-radius: var(--radius-full);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all .15s;
+    font-family: var(--font-body);
+    flex-shrink: 0;
+    border: none;
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--font-size-caption);
+    font-weight: 500;
+}
+
+.chip.filled {
+    background: var(--color-primary-container);
+    color: var(--color-primary);
+}
+
+.chip.filled:hover {
+    filter: brightness(0.95);
+}
+
+.chip.outline {
+    background: transparent;
+    color: var(--color-on-surface-variant);
+    border: 1px solid var(--color-border);
+}
+
+.chip.outline:hover, .chip.outline.selected {
+    background: var(--color-primary-container);
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.chip.accent {
+    background: var(--accent-50);
+    color: var(--accent);
+    padding: 2px var(--space-2);
+    font-size: 11px;
+}
+
+.chip.selected {
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+}
+
+.food-card {
+    background: var(--color-card);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-2);
+    overflow: hidden;
+    transition: all .15s;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.food-card:hover {
+    box-shadow: var(--shadow-3);
+    transform: translateY(-2px);
+}
+
+.food-card:active {
+    transform: translateY(0);
+}
+
+.food-card--h {
+    display: flex;
+    padding: var(--space-4);
+    gap: var(--space-3);
+}
+
+.food-card--diary .card-img {
+    border-radius: var(--radius-lg);
+}
+
+.food-card--h .card-img {
+    width: 96px;
+    height: 96px;
+    flex-shrink: 0;
+    object-fit: cover;
+}
+
+.food-card--h .card-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+    flex: 1;
+}
+
+.card-title {
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-h4);
+    color: var(--color-on-surface);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.card-tags {
+    display: flex;
+    gap: var(--space-1);
+    flex-wrap: wrap;
+}
+
+.card-time {
+    font-size: var(--font-size-caption);
+    color: var(--color-on-surface-variant);
+    margin-top: auto;
+}
+
+.food-card--v {
+    width: 100%;
+}
+
+.food-card--v .card-img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+}
+
+.food-card--v .card-body {
+    padding: var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px var(--space-2);
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-caption);
+    background: var(--surface-container-high);
+    color: var(--color-on-surface-variant);
+    white-space: nowrap;
+}
+
+.tag--accent {
+    background: var(--color-primary-container);
+    color: var(--color-on-primary-container);
+}
+
+.stars {
+    display: inline-flex;
+    gap: 2px;
+    align-items: center;
+}
+
+.star {
+    width: 14px;
+    height: 14px;
+    color: var(--accent);
+    cursor: pointer;
+    transition: transform .1s;
+}
+
+.star:hover {
+    transform: scale(1.2);
+}
+
+.star--empty {
+    color: var(--neutral-300);
+    fill: none !important;
+}
+
+.rating-num {
+    font-size: var(--font-size-caption);
+    color: var(--color-on-surface-variant);
+    margin-left: 4px;
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px var(--space-2);
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-caption);
+    font-weight: 600;
+    background: var(--color-success);
+    color: #fff;
+    white-space: nowrap;
+}
+
+.page-header {
+    padding: var(--space-4) var(--space-5) var(--space-3);
+    background: var(--background);
+    flex-shrink: 0;
+}
+
+.page-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.page-title {
+    font-family: var(--font-heading);
+    font-size: var(--font-size-h3);
+    font-weight: var(--font-weight-h3);
+    color: var(--color-on-surface);
+}
+
+.page-subtitle {
+    font-size: var(--font-size-caption);
+    color: var(--color-on-surface-variant);
+    margin-top: 2px;
+}
+
+.section-title {
+    font-family: var(--font-heading);
+    font-size: var(--font-size-h4);
+    font-weight: var(--font-weight-h4);
+    color: var(--color-on-surface);
+    padding: var(--space-4) var(--space-5) var(--space-2);
+}
+
+.padding-x {
+    padding-left: var(--space-5);
+    padding-right: var(--space-5);
+}
+
+.padding-bottom {
+    padding-bottom: var(--space-4);
+}
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+.chips-scroll {
+    display: flex;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-5);
+    overflow-x: auto;
+    flex-shrink: 0;
+}
+
+.card-white {
+    background: var(--color-card);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-1);
+}
+
+.checkin-card {
+    padding: var(--space-4);
+    margin: 0 var(--space-5) var(--space-3);
+}
+
+.checkin-days {
+    display: flex;
+    gap: var(--space-1);
+    margin-top: var(--space-3);
+}
+
+.checkin-day {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-size-caption);
+    font-weight: 500;
+    transition: all .2s;
+    cursor: pointer;
+}
+
+.checkin-day.done {
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+}
+
+.checkin-day.today {
+    background: var(--color-primary-container);
+    color: var(--color-on-primary-container);
+    border: 1.5px solid var(--color-primary);
+}
+
+.checkin-day.future {
+    background: var(--surface-container-high);
+    color: var(--color-on-surface-variant);
+}
+
+.food-list {
+    padding: 0 var(--space-5) var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.tabs-bar {
+    display: flex;
+    gap: var(--space-4);
+    padding: var(--space-3) var(--space-5);
+    border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
+    background: var(--background);
+}
+
+.tab-item {
+    font-size: var(--font-size-body);
+    cursor: pointer;
+    padding-bottom: var(--space-2);
+    border-bottom: 2px solid transparent;
+    transition: all .15s;
+    white-space: nowrap;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    color: var(--color-on-surface-variant);
+}
+
+.tab-item.active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+    font-weight: 600;
+}
+
+.family-members {
+    display: flex;
+    gap: var(--space-4);
+    overflow-x: auto;
+    padding-bottom: var(--space-2);
+}
+
+.family-member {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-1);
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: transform .15s;
+}
+
+.family-member:hover {
+    transform: scale(1.05);
+}
+
+.recipe-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-3);
+    padding: 0 var(--space-5) var(--space-4);
+}
+
+.camera-preview {
+    position: relative;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: var(--shadow-2);
+}
+
+.camera-preview img {
+    width: 100%;
+    height: 220px;
+    object-fit: cover;
+    display: block;
+}
+
+.ai-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(51,47,42,0.45);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+    opacity: 0;
+    transition: opacity .3s;
+}
+
+.ai-overlay.show {
+    opacity: 1;
+}
+
+.ai-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(255,255,255,0.3);
+    border-top-color: var(--color-on-primary);
+    border-radius: var(--radius-full);
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.input-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+}
+
+.input-field .field-label {
+    font-size: var(--font-size-caption);
+    color: var(--color-on-surface-variant);
+}
+
+.input-field input {
+    height: 36px;
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px solid transparent;
+    padding: 0 var(--space-2);
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-h4);
+    font-family: var(--font-body);
+    color: var(--color-on-surface);
+    outline: none;
+    transition: border-color .15s;
+}
+
+.input-field input:focus {
+    border-bottom-color: var(--color-primary);
+}
+
+.divider {
+    height: 1px;
+    background: var(--color-border);
+    margin: 0 var(--space-5);
+}
+
+.rating-section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.rating-stars .star {
+    width: 20px;
+    height: 20px;
+}
+
+.action-buttons {
+    padding: var(--space-4) var(--space-5) var(--space-6);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.profile-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--space-5) var(--space-5) var(--space-4);
+    background: var(--background);
+}
+
+.profile-stats {
+    display: flex;
+    gap: var(--space-6);
+    margin-top: var(--space-4);
+}
+
+.profile-stat {
+    text-align: center;
+    cursor: pointer;
+    transition: transform .15s;
+}
+
+.profile-stat:hover {
+    transform: scale(1.05);
+}
+
+.profile-stat-num {
+    font-family: var(--font-heading);
+    font-size: var(--font-size-h3);
+    font-weight: var(--font-weight-h3);
+    color: var(--color-on-surface);
+}
+
+.profile-stat-label {
+    font-size: var(--font-size-caption);
+    color: var(--color-on-surface-variant);
+    margin-top: 2px;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: background .15s;
+}
+
+.menu-item:hover {
+    background: var(--surface-container-low);
+}
+
+.menu-item:active {
+    background: var(--surface-container);
+}
+
+.level-card {
+    margin: 0 var(--space-5) var(--space-4);
+    padding: var(--space-5);
+}
+
+.level-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+}
+
+.level-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-full);
+    background: var(--color-primary-container);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    border-radius: var(--radius-full);
+    background: var(--color-surface-container-high);
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    border-radius: var(--radius-full);
+    background: var(--color-primary);
+    transition: width 0.5s ease;
+}
+
+.stats-row {
+    display: flex;
+    gap: var(--space-3);
+    padding: 0 var(--space-5);
+    margin-bottom: var(--space-5);
+}
+
+.stat-card {
+    flex: 1;
+    text-align: center;
+    background: var(--color-card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-1);
+    padding: var(--space-4) var(--space-2);
+}
+
+.badge-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-4);
+    padding: 0 var(--space-5);
+    margin-bottom: var(--space-5);
+}
+
+.badge-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    cursor: pointer;
+    transition: transform .15s;
+}
+
+.badge-item:hover {
+    transform: scale(1.05);
+}
+
+.badge-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: var(--radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-1);
+}
+
+.badge-icon.locked {
+    background: var(--neutral-100);
+}
+
+.challenge-card {
+    background: var(--color-card);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-1);
+    padding: var(--space-4);
+    transition: all .15s;
+    cursor: pointer;
+}
+
+.challenge-card:hover {
+    box-shadow: var(--shadow-2);
+}
+
+.challenge-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: 0 var(--space-5);
+    margin-bottom: var(--space-5);
+}
+
+.toast {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.9);
+    background: var(--neutral-900);
+    color: #fff;
+    padding: var(--space-3) var(--space-5);
+    border-radius: var(--radius-lg);
+    font-size: var(--font-size-body);
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: all .2s;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.desktop-header {
+    display: none;
+}
+
+.desktop-sidebar {
+    display: none;
+}
+
+@media (min-width: 768px) {
+    .app-container {
+        max-width: 100%;
+        margin: 0;
+        flex-direction: row;
+    }
+
+    .status-bar {
+        display: none;
+    }
+
+    .home-indicator {
+        display: none;
+    }
+
+    .bottom-nav {
+        display: none;
+    }
+
+    .desktop-sidebar {
+        display: flex;
+        flex-direction: column;
+        width: 240px;
+        background: var(--color-card);
+        border-right: 1px solid var(--color-border);
+        padding: var(--space-6) var(--space-4);
+        flex-shrink: 0;
+        height: 100vh;
+        position: sticky;
+        top: 0;
+    }
+
+    .sidebar-logo {
+        font-family: var(--font-heading);
+        font-size: var(--font-size-h3);
+        font-weight: 700;
+        color: var(--color-primary);
+        margin-bottom: var(--space-6);
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+    }
+
+    .sidebar-nav {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+        flex: 1;
+    }
+
+    .sidebar-nav-item {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        padding: var(--space-3) var(--space-4);
+        border-radius: var(--radius-lg);
+        cursor: pointer;
+        transition: all .15s;
+        color: var(--color-on-surface-variant);
+        background: none;
+        border: none;
+        font-size: var(--font-size-body);
+        font-family: var(--font-body);
+        text-align: left;
+        width: 100%;
+    }
+
+    .sidebar-nav-item:hover {
+        background: var(--surface-container-low);
+        color: var(--color-on-surface);
+    }
+
+    .sidebar-nav-item.active {
+        background: var(--color-primary-container);
+        color: var(--color-primary);
+        font-weight: 500;
+    }
+
+    .sidebar-nav-item i {
+        width: var(--size-icon-md);
+        height: var(--size-icon-md);
+    }
+
+    .sidebar-camera-btn {
+        margin-top: auto;
+        width: 100%;
+    }
+
+    .page-wrapper {
+        flex: 1;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: var(--space-6);
+        height: 100vh;
+        overflow-y: auto;
+    }
+
+    .page-header {
+        padding: 0 0 var(--space-5);
+    }
+
+    .food-list {
+        padding: 0;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--space-4);
+    }
+
+    .recipe-grid {
+        padding: 0;
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--space-4);
+    }
+
+    .checkin-card {
+        margin: 0;
+    }
+
+    .chips-scroll {
+        padding: var(--space-2) 0;
+    }
+
+    .padding-x {
+        padding-left: 0;
+        padding-right: 0;
+    }
+
+    .section-title {
+        padding: var(--space-5) 0 var(--space-2);
+    }
+
+    .stats-row {
+        padding: 0;
+    }
+
+    .level-card {
+        margin: 0 0 var(--space-4);
+    }
+
+    .badge-grid {
+        padding: 0;
+    }
+
+    .challenge-list {
+        padding: 0;
+    }
+
+    .action-buttons {
+        padding: var(--space-4) 0 var(--space-6);
+    }
+
+    .divider {
+        margin: 0;
+    }
+
+    .food-card--v .card-img {
+        height: 180px;
+    }
+
+    .camera-preview img {
+        height: 300px;
+    }
+
+    .profile-header {
+        padding: var(--space-5) 0 var(--space-4);
+    }
+
+    .profile-stats {
+        gap: var(--space-8);
+    }
+}
+
+@media (min-width: 1024px) {
+    .page-wrapper {
+        max-width: 900px;
+    }
+
+    .food-list {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .recipe-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+.back-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-full);
+    background: var(--surface-container-low);
+    border: none;
+    cursor: pointer;
+    color: var(--color-on-surface);
+    transition: all .15s;
+}
+
+.back-btn:hover {
+    background: var(--surface-container);
+}
+
+.page-header-with-back {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="desktop-sidebar">
+            <div class="sidebar-logo">
+                <i data-lucide="utensils"></i>
+                味记
+            </div>
+            <nav class="sidebar-nav">
+                <button class="sidebar-nav-item active" data-page="home">
+                    <i data-lucide="home"></i>
+                    <span>首页</span>
+                </button>
+                <button class="sidebar-nav-item" data-page="records">
+                    <i data-lucide="book-open"></i>
+                    <span>记录</span>
+                </button>
+                <button class="sidebar-nav-item" data-page="family">
+                    <i data-lucide="users"></i>
+                    <span>家庭菜谱</span>
+                </button>
+                <button class="sidebar-nav-item" data-page="achievements">
+                    <i data-lucide="trophy"></i>
+                    <span>成就徽章</span>
+                </button>
+                <button class="sidebar-nav-item" data-page="profile">
+                    <i data-lucide="user"></i>
+                    <span>我的</span>
+                </button>
+            </nav>
+            <button class="btn btn-primary sidebar-camera-btn" onclick="navigateTo('records')">
+                <i data-lucide="camera" style="margin-right: 8px; width: 20px; height: 20px;"></i>
+                拍照记录
+            </button>
+        </div>
+
+        <div class="status-bar">
+            <span>9:41</span>
+            <div class="status-bar-icons">
+                <i data-lucide="signal" style="width: 14px; height: 14px;"></i>
+                <i data-lucide="wifi" style="width: 14px; height: 14px;"></i>
+                <i data-lucide="battery-full" style="width: 14px; height: 14px;"></i>
+            </div>
+        </div>
+
+        <div class="page-wrapper">
+            <div id="page-home" class="page active">
+                <div class="page-header">
+                    <div class="page-header-row">
+                        <div>
+                            <h1 class="page-title">今日美食</h1>
+                            <p class="page-subtitle">记录每一顿温暖</p>
+                        </div>
+                        <div class="avatar avatar-md avatar-profile" style="background: var(--primary-100); cursor: pointer;" onclick="navigateTo('profile')">
+                            <span class="avatar-initials" style="color: var(--primary-700);">味</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="padding-x padding-bottom">
+                    <div class="input-search">
+                        <span class="ico"><i data-lucide="search" style="width: 20px; height: 20px;"></i></span>
+                        <input type="text" placeholder="搜索菜谱或食材" id="home-search" />
+                        <span class="ico" style="cursor: pointer;" onclick="showToast('语音搜索功能')">
+                            <i data-lucide="mic" style="width: 20px; height: 20px;"></i>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="chips-scroll no-scrollbar" id="home-chips">
+                    <span class="chip filled selected" data-filter="all">全部</span>
+                    <span class="chip filled" data-filter="home">家的味道</span>
+                    <span class="chip filled" data-filter="festival">节日美食</span>
+                    <span class="chip filled" data-filter="diary">下厨日记</span>
+                    <span class="chip outline" data-filter="lunch">工作日午餐</span>
+                    <span class="chip outline" data-filter="healthy">健康轻食</span>
+                </div>
+
+                <div class="card-white checkin-card">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <div style="font-weight: 600; font-size: var(--font-size-body); color: var(--color-on-surface);">连续打卡</div>
+                            <div style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant); margin-top: 2px;" id="checkin-text">已坚持 5 天</div>
+                        </div>
+                        <button class="btn btn-primary btn-sm" id="checkin-btn" onclick="doCheckin()">今日打卡</button>
+                    </div>
+                    <div class="checkin-days" id="checkin-days">
+                        <div class="checkin-day done" data-day="1">一</div>
+                        <div class="checkin-day done" data-day="2">二</div>
+                        <div class="checkin-day done" data-day="3">三</div>
+                        <div class="checkin-day done" data-day="4">四</div>
+                        <div class="checkin-day done" data-day="5">五</div>
+                        <div class="checkin-day today" data-day="6">六</div>
+                        <div class="checkin-day future" data-day="7">日</div>
+                    </div>
+                </div>
+
+                <div class="section-title">美食日记</div>
+                <div class="food-list" id="food-diary-list">
+                    <div class="food-card food-card--h food-card--diary" data-tags="home,festival">
+                        <img class="card-img" src="assets/food-hongshaorou.jpg" alt="红烧肉" />
+                        <div class="card-body">
+                            <div class="card-title">红烧肉</div>
+                            <div class="stars" data-rating="5">
+                                <i data-lucide="star" class="star" style="width: 14px; height: 14px; fill: var(--accent);"></i>
+                                <i data-lucide="star" class="star" style="width: 14px; height: 14px; fill: var(--accent);"></i>
+                                <i data-lucide="star" class="star" style="width: 14px; height: 14px; fill: var(--accent);"></i>
+                                <i data-lucide="star" class="star" style="width: 14px; height: 14px; fill: var(--accent);"></i>
+                                <i data-lucide="star" class="star" style="width: 14px; height: 14px; fill: var(--accent);"></i>
+                                <span class="rating-num">5.0</span>
+                            </div>
+                            <div class="card-tags">
+                                <span class="chip accent">午餐</span>
+                                <span class="chip filled">家的味道</span>
+                            </div>
+                            <div class="card-time">今天 12:30</div>
+                        </div>
+                    </div>
+
+                    <div class="food-card food-card--h food-card--diary" data-tags="diary,breakfast">
+                        <img class="card-img" src="assets/food-tomato-noodle.jpg" alt="番茄鸡蛋面" />
+                        <div class="card-body">
+                            <div class="card-title">番茄鸡蛋面</div>
+                            <div class="stars" data-rating="4">
+                                <i data-lucide="star" class="star" style="width: 14px; height: 14px; fill: var(--accent);"></i>
+                                <i data-lucide="star" class="star" style="width: 14px; height: 14px; fill: var(--accent);"></i>
+                                <i data-lucide="star" class="star" style="width: 14px; height: 14px; fill: var(--accent);"></i>
+                                <i data-lucide="star" class="star" style="width: 14px; height: 14px; fill: var(--accent);"></i>
+                                <i data-lucide="star" class="star star--empty" style="width: 14px; height: 14px;"></i>
+                                <span class="rating-num">4.0</span>
+                            </div>
+                            <div class="card-tags">
+                                <span class="chip accent">早餐</span>
+                                <span class="chip filled">下厨日记</span>
+                            </div>
+                            <div class="card-time">今天 08:15</div>
+                        </div>
+                    </div>
+
+                    <div class="food-card food-card--h food-card--diary" data-tags="festival,dinner">
+                        <img class="card-img" src="assets/food-sweet-ribs.jpg" alt="糖醋排骨" />
+                        <div class="card-body">
+                            <div class="card-title">糖醋排骨</div>
+                            <div class="stars" data-rating="4">
+                                <i data-lucide="star" class="star" style="width: 14px; height: 14px; fill: var(--accent);"></i>
+                                <i data-lucide="star" class="star" style="width: 14px; height: 14px; fill: var(--accent);"></i>
+                                <i data-lucide="star" class="star" style="width: 14px; height: 14px; fill: var(--accent);"></i>
+                                <i data-lucide="star" class="star" style="width: 14px; height: 14px; fill: var(--accent);"></i>
+                                <i data-lucide="star" class="star star--empty" style="width: 14px; height: 14px;"></i>
+                                <span class="rating-num">4.0</span>
+                            </div>
+                            <div class="card-tags">
+                                <span class="chip accent">晚餐</span>
+                                <span class="chip filled">节日美食</span>
+                            </div>
+                            <div class="card-time">昨天 18:45</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="page-family" class="page">
+                <div class="page-header">
+                    <h1 class="page-title">家庭菜谱</h1>
+                    <p class="page-subtitle">和家人一起分享美味</p>
+                </div>
+
+                <div class="padding-x padding-bottom">
+                    <div class="input-search">
+                        <span class="ico"><i data-lucide="search" style="width: 20px; height: 20px;"></i></span>
+                        <input type="text" placeholder="搜索家庭菜谱" id="family-search" />
+                    </div>
+                </div>
+
+                <div class="tabs-bar" id="recipe-tabs">
+                    <button class="tab-item active" data-tab="all">全部</button>
+                    <button class="tab-item" data-tab="home">家常菜</button>
+                    <button class="tab-item" data-tab="soup">汤品</button>
+                    <button class="tab-item" data-tab="dessert">甜品</button>
+                </div>
+
+                <div style="padding: var(--space-4) var(--space-5);">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-3);">
+                        <span style="font-weight: 600; font-size: var(--font-size-body); color: var(--color-on-surface);">家人</span>
+                        <button class="btn btn-ghost" onclick="showToast('邀请家人功能')">邀请家人</button>
+                    </div>
+                    <div class="family-members no-scrollbar">
+                        <div class="family-member">
+                            <div class="avatar avatar-md" style="background: var(--primary-100);">
+                                <span class="avatar-initials" style="color: var(--primary-700);">味</span>
+                                <span class="avatar-badge avatar-online"></span>
+                            </div>
+                            <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">我</span>
+                        </div>
+                        <div class="family-member">
+                            <div class="avatar avatar-md" style="background: var(--accent-50);">
+                                <span class="avatar-initials" style="color: var(--accent-700);">妈</span>
+                                <span class="avatar-badge avatar-online"></span>
+                            </div>
+                            <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">妈妈</span>
+                        </div>
+                        <div class="family-member">
+                            <div class="avatar avatar-md" style="background: var(--success-50);">
+                                <span class="avatar-initials" style="color: var(--success-700);">爸</span>
+                                <span class="avatar-badge avatar-role">
+                                    <i data-lucide="crown" style="width: 8px; height: 8px; color: #fff;"></i>
+                                </span>
+                            </div>
+                            <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">爸爸</span>
+                        </div>
+                        <div class="family-member">
+                            <div class="avatar avatar-md" style="background: var(--info-50);">
+                                <span class="avatar-initials" style="color: var(--info-700);">姐</span>
+                            </div>
+                            <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">姐姐</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-title">推荐菜谱</div>
+                <div class="recipe-grid" id="recipe-grid">
+                    <div class="food-card food-card--v" data-category="home">
+                        <img class="card-img" src="assets/recipe-mapo-tofu.jpg" alt="麻婆豆腐" />
+                        <div class="card-body">
+                            <div class="card-title">麻婆豆腐</div>
+                            <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                <span class="tag tag--accent">简单</span>
+                                <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">25分钟</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: var(--space-1); margin-top: var(--space-2);">
+                                <div class="avatar avatar-sm" style="background: var(--accent-50); width: 20px; height: 20px;">
+                                    <span class="avatar-initials" style="color: var(--accent-700); font-size: 8px;">妈</span>
+                                </div>
+                                <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">妈妈</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="food-card food-card--v" data-category="dessert">
+                        <img class="card-img" src="assets/recipe-guihua-gao.jpg" alt="桂花糕" />
+                        <div class="card-body">
+                            <div class="card-title">桂花糕</div>
+                            <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                <span class="tag">中等</span>
+                                <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">60分钟</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: var(--space-1); margin-top: var(--space-2);">
+                                <div class="avatar avatar-sm" style="background: var(--success-50); width: 20px; height: 20px;">
+                                    <span class="avatar-initials" style="color: var(--success-700); font-size: 8px;">爸</span>
+                                </div>
+                                <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">爸爸</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="food-card food-card--v" data-category="home">
+                        <img class="card-img" src="assets/recipe-broccoli.jpg" alt="蒜蓉西兰花" />
+                        <div class="card-body">
+                            <div class="card-title">蒜蓉西兰花</div>
+                            <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                <span class="tag tag--accent">简单</span>
+                                <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">15分钟</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: var(--space-1); margin-top: var(--space-2);">
+                                <div class="avatar avatar-sm" style="background: var(--primary-100); width: 20px; height: 20px;">
+                                    <span class="avatar-initials" style="color: var(--primary-700); font-size: 8px;">味</span>
+                                </div>
+                                <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">我</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="food-card food-card--v" data-category="home">
+                        <img class="card-img" src="assets/recipe-egg-fried-rice.jpg" alt="蛋炒饭" />
+                        <div class="card-body">
+                            <div class="card-title">蛋炒饭</div>
+                            <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                <span class="tag tag--accent">简单</span>
+                                <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">10分钟</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: var(--space-1); margin-top: var(--space-2);">
+                                <div class="avatar avatar-sm" style="background: var(--info-50); width: 20px; height: 20px;">
+                                    <span class="avatar-initials" style="color: var(--info-700); font-size: 8px;">姐</span>
+                                </div>
+                                <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">姐姐</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="page-records" class="page">
+                <div class="page-header">
+                    <h1 class="page-title">记录美食</h1>
+                    <p class="page-subtitle">拍照识别，一键记录</p>
+                </div>
+
+                <div class="padding-x padding-bottom">
+                    <div class="camera-preview">
+                        <img src="assets/food-camera-preview.jpg" alt="Food photo preview" id="camera-img" />
+                        <div class="ai-overlay" id="ai-overlay">
+                            <div class="ai-spinner"></div>
+                            <span style="font-size: var(--font-size-body); color: #fff; font-weight: 500;">AI识别中...</span>
+                        </div>
+                        <div style="position: absolute; top: var(--space-3); right: var(--space-3);">
+                            <span class="badge" style="background: var(--success-500); color: #fff; padding: 4px var(--space-3); display: none;" id="recognize-badge">
+                                <i data-lucide="check-circle" style="width: 12px; height: 12px; margin-right: 4px;"></i>
+                                识别完成
+                            </span>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: var(--space-2); margin-top: var(--space-3);">
+                        <button class="btn btn-outline" style="flex: 1;" onclick="retakePhoto()">
+                            <i data-lucide="camera" style="width: 18px; height: 18px; margin-right: 6px;"></i>
+                            重新拍照
+                        </button>
+                        <button class="btn btn-secondary" style="flex: 1;" onclick="startRecognize()">
+                            <i data-lucide="sparkles" style="width: 18px; height: 18px; margin-right: 6px;"></i>
+                            AI识别
+                        </button>
+                    </div>
+                </div>
+
+                <div class="padding-x padding-bottom">
+                    <div class="food-card food-card--h" style="width: 100%; box-shadow: var(--shadow-1);">
+                        <div class="card-img" style="width: 96px; height: 96px; flex-shrink: 0; border-radius: var(--radius-lg); overflow: hidden;">
+                            <img src="assets/food-camera-preview.jpg" alt="Food thumbnail" style="width: 100%; height: 100%; object-fit: cover;">
+                        </div>
+                        <div class="card-body">
+                            <div class="input-field">
+                                <label class="field-label">菜品名称</label>
+                                <input type="text" value="红烧牛肉面" id="dish-name" />
+                            </div>
+                            <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                <i data-lucide="sparkles" style="width: var(--size-icon-sm); height: var(--size-icon-sm); color: var(--color-primary);"></i>
+                                <span style="font-size: var(--font-size-caption); color: var(--color-primary); font-weight: 500;">置信度 96%</span>
+                            </div>
+                            <div class="card-tags">
+                                <span class="chip filled" onclick="toggleIngredient(this)">牛肉</span>
+                                <span class="chip filled" onclick="toggleIngredient(this)">面条</span>
+                                <span class="chip filled" onclick="toggleIngredient(this)">青菜</span>
+                                <span class="chip filled" onclick="toggleIngredient(this)">辣椒</span>
+                            </div>
+                            <div class="card-tags" style="margin-top: auto;">
+                                <span class="tag tag--accent">汤面</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="padding-x padding-bottom">
+                    <div class="rating-section">
+                        <span style="font-size: var(--font-size-body); font-weight: var(--font-weight-h4); color: var(--color-on-surface);">给这道菜打个分</span>
+                        <div class="stars rating-stars" id="rating-stars" data-rating="4">
+                            <i data-lucide="star" class="star" style="width: 20px; height: 20px; fill: var(--accent);" data-star="1"></i>
+                            <i data-lucide="star" class="star" style="width: 20px; height: 20px; fill: var(--accent);" data-star="2"></i>
+                            <i data-lucide="star" class="star" style="width: 20px; height: 20px; fill: var(--accent);" data-star="3"></i>
+                            <i data-lucide="star" class="star" style="width: 20px; height: 20px; fill: var(--accent);" data-star="4"></i>
+                            <i data-lucide="star" class="star star--empty" style="width: 20px; height: 20px;" data-star="5"></i>
+                            <span class="rating-num" id="rating-value" style="margin-left: var(--space-2); font-size: var(--font-size-body); font-weight: 500;">4.0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div style="padding: var(--space-4) var(--space-5);">
+                    <span style="font-size: var(--font-size-body); font-weight: var(--font-weight-h4); color: var(--color-on-surface); display: block; margin-bottom: var(--space-3);">标签</span>
+                    <div style="display: flex; flex-wrap: wrap; gap: var(--space-2);" id="record-tags">
+                        <span class="chip selected" onclick="toggleRecordTag(this)">工作日午餐</span>
+                        <span class="chip filled" onclick="toggleRecordTag(this)">家的味道</span>
+                        <span class="chip outline" onclick="toggleRecordTag(this)">值得复刻</span>
+                        <span class="chip outline" onclick="toggleRecordTag(this)">健康轻食</span>
+                        <span class="chip outline" onclick="toggleRecordTag(this)">节日美食</span>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button class="btn btn-primary btn-lg" style="width: 100%; font-weight: 600;" onclick="saveRecord()">
+                        <i data-lucide="check" style="width: 20px; height: 20px; margin-right: 8px;"></i>
+                        保存记录
+                    </button>
+                    <button class="btn btn-ghost" style="width: 100%;" onclick="navigateTo('home')">放弃</button>
+                </div>
+            </div>
+
+            <div id="page-achievements" class="page">
+                <div class="page-header">
+                    <div class="page-header-with-back">
+                        <button class="back-btn" onclick="navigateTo('profile')">
+                            <i data-lucide="chevron-left" style="width: 20px; height: 20px;"></i>
+                        </button>
+                        <div>
+                            <h1 class="page-title" style="font-size: var(--font-size-h4);">成就徽章</h1>
+                            <p class="page-subtitle">记录美食，解锁成就</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-white level-card">
+                    <div class="level-header">
+                        <div class="level-icon">
+                            <i data-lucide="chef-hat" style="width: var(--size-icon-lg); height: var(--size-icon-lg); color: var(--color-primary);"></i>
+                        </div>
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="font-family: var(--font-heading); font-size: var(--font-size-h4); font-weight: var(--font-weight-h4); color: var(--color-on-surface);">美食家 Lv.12</div>
+                            <div style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant); margin-top: 2px;">2,450 / 3,000 经验</div>
+                        </div>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-bar-fill" style="width: 81.7%;"></div>
+                    </div>
+                    <div style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant); margin-top: var(--space-2);">距下一级还需 550 经验</div>
+                </div>
+
+                <div class="stats-row">
+                    <div class="stat-card">
+                        <div class="profile-stat-num">128</div>
+                        <div class="profile-stat-label">美食记录</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="profile-stat-num">12</div>
+                        <div class="profile-stat-label">家庭菜谱</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="profile-stat-num">5</div>
+                        <div class="profile-stat-label">连续打卡</div>
+                    </div>
+                </div>
+
+                <div class="section-title">我的徽章</div>
+                <div class="badge-grid">
+                    <div class="badge-item" onclick="showToast('首次记录：记录你的第一道菜')">
+                        <div class="badge-icon" style="background: var(--primary-50);">
+                            <i data-lucide="pen-line" style="width: 24px; height: 24px; color: var(--color-primary);"></i>
+                        </div>
+                        <span style="font-size: var(--font-size-caption); color: var(--color-on-surface); text-align: center;">首次记录</span>
+                    </div>
+                    <div class="badge-item" onclick="showToast('连续7天：坚持打卡一周')">
+                        <div class="badge-icon" style="background: var(--accent-50);">
+                            <i data-lucide="flame" style="width: 24px; height: 24px; color: var(--accent);"></i>
+                        </div>
+                        <span style="font-size: var(--font-size-caption); color: var(--color-on-surface); text-align: center;">连续7天</span>
+                    </div>
+                    <div class="badge-item" onclick="showToast('百道菜品：记录100道菜')">
+                        <div class="badge-icon" style="background: var(--success-50);">
+                            <i data-lucide="utensils" style="width: 24px; height: 24px; color: var(--success-600);"></i>
+                        </div>
+                        <span style="font-size: var(--font-size-caption); color: var(--color-on-surface); text-align: center;">百道菜品</span>
+                    </div>
+                    <div class="badge-item" onclick="showToast('菜系大师：尝遍各大菜系')">
+                        <div class="badge-icon" style="background: var(--info-50);">
+                            <i data-lucide="award" style="width: 24px; height: 24px; color: var(--info-500);"></i>
+                        </div>
+                        <span style="font-size: var(--font-size-caption); color: var(--color-on-surface); text-align: center;">菜系大师</span>
+                    </div>
+                    <div class="badge-item" onclick="showToast('家庭贡献：分享10道家庭菜谱（未解锁）')">
+                        <div class="badge-icon locked">
+                            <i data-lucide="heart" style="width: 24px; height: 24px; color: var(--neutral-400);"></i>
+                        </div>
+                        <span style="font-size: var(--font-size-caption); color: var(--color-muted-foreground); text-align: center;">家庭贡献</span>
+                    </div>
+                    <div class="badge-item" onclick="showToast('连续30天：坚持打卡一个月（未解锁）')">
+                        <div class="badge-icon locked">
+                            <i data-lucide="calendar-check" style="width: 24px; height: 24px; color: var(--neutral-400);"></i>
+                        </div>
+                        <span style="font-size: var(--font-size-caption); color: var(--color-muted-foreground); text-align: center;">连续30天</span>
+                    </div>
+                </div>
+
+                <div class="section-title">美食挑战</div>
+                <div class="challenge-list">
+                    <div class="challenge-card" onclick="showToast('一周素食挑战进行中！')">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2);">
+                            <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                <i data-lucide="salad" style="width: var(--size-icon-md); height: var(--size-icon-md); color: var(--success-600);"></i>
+                                <span style="font-size: var(--font-size-body); font-weight: var(--font-weight-h4); color: var(--color-on-surface);">一周素食</span>
+                            </div>
+                            <span class="chip filled" style="background: var(--success-50); color: var(--success-600);">进行中</span>
+                        </div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2);">
+                            <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">3/7 天</span>
+                            <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">43%</span>
+                        </div>
+                        <div class="progress-bar" style="height: 6px;">
+                            <div class="progress-bar-fill" style="width: 43%; background: var(--success-500);"></div>
+                        </div>
+                    </div>
+
+                    <div class="challenge-card" onclick="startChallenge('环球美食月')">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2);">
+                            <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                <i data-lucide="globe" style="width: var(--size-icon-md); height: var(--size-icon-md); color: var(--color-on-surface-variant);"></i>
+                                <span style="font-size: var(--font-size-body); font-weight: var(--font-weight-h4); color: var(--color-on-surface);">环球美食月</span>
+                            </div>
+                            <span class="chip outline">未开始</span>
+                        </div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2);">
+                            <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">0/30 天</span>
+                            <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">0%</span>
+                        </div>
+                        <div class="progress-bar" style="height: 6px;">
+                            <div class="progress-bar-fill" style="width: 0%;"></div>
+                        </div>
+                    </div>
+
+                    <div class="challenge-card">
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                <i data-lucide="trophy" style="width: var(--size-icon-md); height: var(--size-icon-md); color: var(--accent);"></i>
+                                <span style="font-size: var(--font-size-body); font-weight: var(--font-weight-h4); color: var(--color-on-surface);">家庭厨艺大赛</span>
+                            </div>
+                            <span class="chip outline" style="border-color: var(--accent-300); color: var(--accent);">即将开始</span>
+                        </div>
+                        <div style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant); margin-top: var(--space-2);">6月28日开启</div>
+                    </div>
+                </div>
+
+                <div style="padding: 0 var(--space-5) var(--space-6);">
+                    <button class="btn btn-primary btn-lg" style="width: 100%; font-weight: 500;" onclick="showToast('挑战功能即将上线！')">
+                        <i data-lucide="plus" style="width: 18px; height: 18px; margin-right: 6px;"></i>
+                        参与挑战
+                    </button>
+                </div>
+            </div>
+
+            <div id="page-profile" class="page">
+                <div class="profile-header">
+                    <div class="avatar avatar-lg avatar-profile" style="background: var(--primary-100); cursor: pointer;" onclick="showToast('头像设置')">
+                        <span class="avatar-initials" style="color: var(--primary-700);">味</span>
+                    </div>
+                    <div style="margin-top: var(--space-3); text-align: center;">
+                        <div style="font-family: var(--font-heading); font-size: var(--font-size-h4); font-weight: 600; color: var(--color-on-surface);">味记用户</div>
+                        <div class="caption" style="color: var(--color-on-surface-variant); margin-top: 2px;">记录美好食光</div>
+                    </div>
+
+                    <div class="profile-stats">
+                        <div class="profile-stat" onclick="navigateTo('home')">
+                            <div class="profile-stat-num">128</div>
+                            <div class="profile-stat-label">美食记录</div>
+                        </div>
+                        <div class="profile-stat" onclick="navigateTo('family')">
+                            <div class="profile-stat-num">12</div>
+                            <div class="profile-stat-label">家庭菜谱</div>
+                        </div>
+                        <div class="profile-stat" onclick="navigateTo('achievements')">
+                            <div class="profile-stat-num">5</div>
+                            <div class="profile-stat-label">连续打卡</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="padding: var(--space-4) var(--space-5) var(--space-2);">
+                    <div style="display: flex; gap: var(--space-3);">
+                        <button class="btn btn-primary" style="flex: 1;" onclick="navigateTo('records')">
+                            <i data-lucide="camera" style="width: 18px; height: 18px; margin-right: 6px;"></i>
+                            记录美食
+                        </button>
+                        <button class="btn btn-outline" style="flex: 1;" onclick="navigateTo('family')">
+                            <i data-lucide="book-open" style="width: 18px; height: 18px; margin-right: 6px;"></i>
+                            编辑菜谱
+                        </button>
+                    </div>
+                </div>
+
+                <div style="padding: 0 var(--space-5) var(--space-4);">
+                    <div style="display: flex; gap: var(--space-3);">
+                        <button class="btn btn-secondary" style="flex: 1;" onclick="showToast('邀请家人')">
+                            <i data-lucide="users" style="width: 18px; height: 18px; margin-right: 6px;"></i>
+                            邀请家人
+                        </button>
+                        <button class="btn btn-ghost" style="flex: 1; background: var(--surface-container-low);" onclick="navigateTo('achievements')">
+                            <i data-lucide="trophy" style="width: 18px; height: 18px; margin-right: 6px;"></i>
+                            成就徽章
+                        </button>
+                    </div>
+                </div>
+
+                <div class="section-title">我的功能</div>
+                <div style="padding: 0 var(--space-5) var(--space-6);">
+                    <div class="menu-item" onclick="navigateTo('home')">
+                        <i data-lucide="book-open" style="width: var(--size-icon-md); height: var(--size-icon-md); color: var(--color-on-surface-variant); flex-shrink: 0;"></i>
+                        <span style="flex: 1; font-size: var(--font-size-body); color: var(--color-on-surface); min-width: 0;">我的日记</span>
+                        <i data-lucide="chevron-right" style="width: var(--size-icon-sm); height: var(--size-icon-sm); color: var(--neutral-400); flex-shrink: 0;"></i>
+                    </div>
+
+                    <div class="menu-item" onclick="navigateTo('family')">
+                        <i data-lucide="users" style="width: var(--size-icon-md); height: var(--size-icon-md); color: var(--color-on-surface-variant); flex-shrink: 0;"></i>
+                        <span style="flex: 1; font-size: var(--font-size-body); color: var(--color-on-surface); min-width: 0;">家庭菜谱</span>
+                        <i data-lucide="chevron-right" style="width: var(--size-icon-sm); height: var(--size-icon-sm); color: var(--neutral-400); flex-shrink: 0;"></i>
+                    </div>
+
+                    <div class="menu-item" onclick="showToast('购物清单功能')">
+                        <i data-lucide="shopping-cart" style="width: var(--size-icon-md); height: var(--size-icon-md); color: var(--color-on-surface-variant); flex-shrink: 0;"></i>
+                        <span style="flex: 1; font-size: var(--font-size-body); color: var(--color-on-surface); min-width: 0;">购物清单</span>
+                        <i data-lucide="chevron-right" style="width: var(--size-icon-sm); height: var(--size-icon-sm); color: var(--neutral-400); flex-shrink: 0;"></i>
+                    </div>
+
+                    <div class="menu-item" onclick="navigateTo('achievements')">
+                        <i data-lucide="trophy" style="width: var(--size-icon-md); height: var(--size-icon-md); color: var(--color-on-surface-variant); flex-shrink: 0;"></i>
+                        <span style="flex: 1; font-size: var(--font-size-body); color: var(--color-on-surface); min-width: 0;">成就徽章</span>
+                        <i data-lucide="chevron-right" style="width: var(--size-icon-sm); height: var(--size-icon-sm); color: var(--neutral-400); flex-shrink: 0;"></i>
+                    </div>
+
+                    <div class="menu-item" onclick="showToast('推荐菜谱功能')">
+                        <i data-lucide="sparkles" style="width: var(--size-icon-md); height: var(--size-icon-md); color: var(--color-on-surface-variant); flex-shrink: 0;"></i>
+                        <span style="flex: 1; font-size: var(--font-size-body); color: var(--color-on-surface); min-width: 0;">推荐菜谱</span>
+                        <i data-lucide="chevron-right" style="width: var(--size-icon-sm); height: var(--size-icon-sm); color: var(--neutral-400); flex-shrink: 0;"></i>
+                    </div>
+
+                    <div class="menu-item" onclick="showToast('设置功能')">
+                        <i data-lucide="settings" style="width: var(--size-icon-md); height: var(--size-icon-md); color: var(--color-on-surface-variant); flex-shrink: 0;"></i>
+                        <span style="flex: 1; font-size: var(--font-size-body); color: var(--color-on-surface); min-width: 0;">设置</span>
+                        <i data-lucide="chevron-right" style="width: var(--size-icon-sm); height: var(--size-icon-sm); color: var(--neutral-400); flex-shrink: 0;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <nav class="bottom-nav">
+            <button class="nav-item active" data-page="home" onclick="navigateTo('home')">
+                <i data-lucide="home" class="nav-icon"></i>
+                <span class="nav-label">首页</span>
+            </button>
+            <button class="nav-item" data-page="records" onclick="navigateTo('records')">
+                <i data-lucide="book-open" class="nav-icon"></i>
+                <span class="nav-label">记录</span>
+            </button>
+            <button class="center-fab" onclick="navigateTo('records')">
+                <i data-lucide="camera" class="center-fab-icon"></i>
+            </button>
+            <button class="nav-item" data-page="family" onclick="navigateTo('family')">
+                <i data-lucide="users" class="nav-icon"></i>
+                <span class="nav-label">家庭</span>
+            </button>
+            <button class="nav-item" data-page="profile" onclick="navigateTo('profile')">
+                <i data-lucide="user" class="nav-icon"></i>
+                <span class="nav-label">我的</span>
+            </button>
+        </nav>
+
+        <div class="home-indicator">
+            <div class="home-indicator-bar"></div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        let currentPage = 'home';
+        let checkedInDays = 5;
+        let isCheckedIn = false;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            lucide.createIcons();
+            initInteractions();
+        });
+
+        function navigateTo(page) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.querySelectorAll('.sidebar-nav-item').forEach(n => n.classList.remove('active'));
+
+            const targetPage = document.getElementById('page-' + page);
+            if (targetPage) {
+                targetPage.classList.add('active');
+            }
+
+            document.querySelectorAll(`.nav-item[data-page="${page}"]`).forEach(n => n.classList.add('active'));
+            document.querySelectorAll(`.sidebar-nav-item[data-page="${page}"]`).forEach(n => n.classList.add('active'));
+
+            currentPage = page;
+            window.scrollTo(0, 0);
+            document.querySelector('.page-wrapper').scrollTop = 0;
+
+            lucide.createIcons();
+        }
+
+        function initInteractions() {
+            document.querySelectorAll('#home-chips .chip').forEach(chip => {
+                chip.addEventListener('click', function() {
+                    document.querySelectorAll('#home-chips .chip').forEach(c => {
+                        c.classList.remove('selected');
+                    });
+                    this.classList.add('selected');
+                    filterFood(this.dataset.filter);
+                });
+            });
+
+            document.querySelectorAll('#recipe-tabs .tab-item').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    document.querySelectorAll('#recipe-tabs .tab-item').forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    filterRecipes(this.dataset.tab);
+                });
+            });
+
+            initRatingStars();
+        }
+
+        function filterFood(filter) {
+            const cards = document.querySelectorAll('#food-diary-list .food-card');
+            cards.forEach(card => {
+                if (filter === 'all') {
+                    card.style.display = 'flex';
+                } else {
+                    const tags = card.dataset.tags || '';
+                    if (tags.includes(filter)) {
+                        card.style.display = 'flex';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                }
+            });
+            showToast(filter === 'all' ? '显示全部' : '筛选：' + this.textContent);
+        }
+
+        function filterRecipes(category) {
+            const cards = document.querySelectorAll('#recipe-grid .food-card');
+            cards.forEach(card => {
+                if (category === 'all') {
+                    card.style.display = 'block';
+                } else {
+                    if (card.dataset.category === category) {
+                        card.style.display = 'block';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                }
+            });
+        }
+
+        function doCheckin() {
+            if (isCheckedIn) {
+                showToast('今日已打卡！');
+                return;
+            }
+
+            isCheckedIn = true;
+            checkedInDays = 6;
+
+            const todayDot = document.querySelector('.checkin-day.today');
+            if (todayDot) {
+                todayDot.classList.remove('today');
+                todayDot.classList.add('done');
+            }
+
+            const futureDots = document.querySelectorAll('.checkin-day.future');
+            if (futureDots.length > 0) {
+                futureDots[0].classList.remove('future');
+                futureDots[0].classList.add('today');
+            }
+
+            const btn = document.getElementById('checkin-btn');
+            btn.textContent = '已打卡';
+            btn.disabled = true;
+            btn.style.opacity = '0.6';
+
+            document.getElementById('checkin-text').textContent = '已坚持 6 天';
+
+            showToast('打卡成功！🔥');
+        }
+
+        function initRatingStars() {
+            const starsContainer = document.getElementById('rating-stars');
+            if (!starsContainer) return;
+
+            const stars = starsContainer.querySelectorAll('.star');
+            stars.forEach((star, index) => {
+                star.addEventListener('click', function() {
+                    const rating = index + 1;
+                    setRating(rating);
+                });
+
+                star.addEventListener('mouseenter', function() {
+                    highlightStars(index + 1);
+                });
+            });
+
+            starsContainer.addEventListener('mouseleave', function() {
+                const currentRating = parseInt(starsContainer.dataset.rating);
+                highlightStars(currentRating);
+            });
+        }
+
+        function setRating(rating) {
+            const starsContainer = document.getElementById('rating-stars');
+            starsContainer.dataset.rating = rating;
+            highlightStars(rating);
+            document.getElementById('rating-value').textContent = rating.toFixed(1);
+        }
+
+        function highlightStars(rating) {
+            const starsContainer = document.getElementById('rating-stars');
+            const stars = starsContainer.querySelectorAll('.star');
+            stars.forEach((star, index) => {
+                if (index < rating) {
+                    star.style.fill = 'var(--accent)';
+                    star.classList.remove('star--empty');
+                } else {
+                    star.style.fill = 'none';
+                    star.classList.add('star--empty');
+                }
+            });
+        }
+
+        function toggleIngredient(el) {
+            if (el.classList.contains('filled')) {
+                el.classList.remove('filled');
+                el.classList.add('outline');
+            } else {
+                el.classList.remove('outline');
+                el.classList.add('filled');
+            }
+        }
+
+        function toggleRecordTag(el) {
+            if (el.classList.contains('selected')) {
+                el.classList.remove('selected');
+                el.classList.add('filled');
+            } else if (el.classList.contains('filled')) {
+                el.classList.remove('filled');
+                el.classList.add('outline');
+            } else {
+                el.classList.remove('outline');
+                el.classList.add('selected');
+            }
+        }
+
+        function startRecognize() {
+            const overlay = document.getElementById('ai-overlay');
+            const badge = document.getElementById('recognize-badge');
+            overlay.classList.add('show');
+
+            setTimeout(() => {
+                overlay.classList.remove('show');
+                badge.style.display = 'inline-flex';
+                showToast('AI识别完成！');
+            }, 2000);
+        }
+
+        function retakePhoto() {
+            const badge = document.getElementById('recognize-badge');
+            badge.style.display = 'none';
+            showToast('请重新拍照');
+        }
+
+        function saveRecord() {
+            const dishName = document.getElementById('dish-name').value;
+            showToast(`"${dishName}" 保存成功！`);
+            setTimeout(() => {
+                navigateTo('home');
+            }, 800);
+        }
+
+        function startChallenge(name) {
+            showToast(`即将开始"${name}"挑战！`);
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2000);
+        }
+
+        document.getElementById('home-search').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                showToast('搜索：' + this.value);
+            }
+        });
+
+        document.getElementById('family-search').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                showToast('搜索：' + this.value);
+            }
+        });
+
+        document.querySelectorAll('.food-card').forEach(card => {
+            card.addEventListener('click', function(e) {
+                if (e.target.closest('.chip') || e.target.closest('.star')) return;
+                const title = this.querySelector('.card-title');
+                if (title) {
+                    showToast('查看：' + title.textContent);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

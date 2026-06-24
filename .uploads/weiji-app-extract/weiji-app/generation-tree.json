@@ -1,0 +1,69 @@
+{
+  "root": {
+    "nodeId": "gen-project-shell",
+    "kind": "project-shell",
+    "pageIds": ["page-home", "page-ai-record", "page-family-recipes", "page-achievements", "page-profile"],
+    "output": "partials/project-shell.html",
+    "sharedRegions": ["status-bar", "bottom-nav", "page-background", "brand-css"],
+    "privateRegions": [],
+    "mutableSlots": ["activeNavItem", "pageTitle", "pageContent"],
+    "status": "planned",
+    "children": [
+      {
+        "nodeId": "gen-page-home",
+        "kind": "page-leaf",
+        "pageIds": ["page-home"],
+        "output": "pages/home.html",
+        "sharedRegions": [],
+        "privateRegions": ["search-bar", "chip-filters", "checkin-card", "food-diary-list"],
+        "mutableSlots": [],
+        "status": "planned",
+        "children": []
+      },
+      {
+        "nodeId": "gen-page-ai-record",
+        "kind": "page-leaf",
+        "pageIds": ["page-ai-record"],
+        "output": "pages/ai-record.html",
+        "sharedRegions": [],
+        "privateRegions": ["camera-preview", "ai-result-panel", "rating-tags", "save-actions"],
+        "mutableSlots": [],
+        "status": "planned",
+        "children": []
+      },
+      {
+        "nodeId": "gen-page-family-recipes",
+        "kind": "page-leaf",
+        "pageIds": ["page-family-recipes"],
+        "output": "pages/family-recipes.html",
+        "sharedRegions": [],
+        "privateRegions": ["family-members", "recipe-grid", "tab-bar"],
+        "mutableSlots": [],
+        "status": "planned",
+        "children": []
+      },
+      {
+        "nodeId": "gen-page-achievements",
+        "kind": "page-leaf",
+        "pageIds": ["page-achievements"],
+        "output": "pages/achievements.html",
+        "sharedRegions": [],
+        "privateRegions": ["level-progress", "badge-grid", "streak-tracker", "challenge-list"],
+        "mutableSlots": [],
+        "status": "planned",
+        "children": []
+      },
+      {
+        "nodeId": "gen-page-profile",
+        "kind": "page-leaf",
+        "pageIds": ["page-profile"],
+        "output": "pages/profile.html",
+        "sharedRegions": [],
+        "privateRegions": ["profile-header", "stats-row", "action-buttons", "menu-list"],
+        "mutableSlots": [],
+        "status": "planned",
+        "children": []
+      }
+    ]
+  }
+}

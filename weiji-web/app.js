@@ -3,6 +3,10 @@ let currentPage = 'home';
 let currentRating = 0;
 let selectedTags = [];
 let currentRecognizeData = null;
+let currentBeautifiedUrl = null;
+let currentOriginalUrl = null;
+let selectedImageVersion = 'original';
+let currentRecommendations = [];
 
 /* ===== 静态挑战数据（无对应后端接口，作为前端兜底） ===== */
 const CHALLENGES = [
@@ -147,12 +151,18 @@ async function loadHomeData() {
   const listEl = document.getElementById('food-diary-list');
   showLoading(listEl);
   try {
-    const [recordsRes, checkin] = await Promise.all([
+    const [recordsRes, checkin, recommendations] = await Promise.all([
       api.getRecords(),
-      api.getCheckinStatus()
+      api.getCheckinStatus(),
+      api.getRecommendations().catch(() => null)
     ]);
     renderRecords((recordsRes && recordsRes.list) || []);
     renderCheckin(checkin);
+    if (recommendations && recommendations.length) {
+      renderRecommendations(recommendations);
+    } else {
+      hideRecommendSection();
+    }
   } catch (err) {
     hideLoading(listEl);
     showToast(err.message);
@@ -232,6 +242,107 @@ function renderRecords(list) {
   lucide.createIcons();
 }
 
+function hideRecommendSection() {
+  const section = document.getElementById('recommend-section');
+  if (section) section.style.display = 'none';
+  currentRecommendations = [];
+}
+
+function difficultyClass(diff) {
+  if (diff === '简单') return 'difficulty--easy';
+  if (diff === '中等') return 'difficulty--medium';
+  if (diff === '困难') return 'difficulty--hard';
+  return 'difficulty--easy';
+}
+
+function matchScoreToPercent(score) {
+  const n = Number(score) || 0;
+  if (n > 1) return Math.min(100, Math.round(n));
+  return Math.round(n * 100);
+}
+
+function renderRecommendations(list) {
+  const section = document.getElementById('recommend-section');
+  const container = document.getElementById('recommend-list');
+  if (!section || !container) return;
+  if (!list || list.length === 0) {
+    section.style.display = 'none';
+    currentRecommendations = [];
+    return;
+  }
+  currentRecommendations = list;
+  section.style.display = '';
+  container.innerHTML = list.map((r, idx) => {
+    const diff = r.difficulty || '简单';
+    const matchPercent = matchScoreToPercent(r.matchScore);
+    const cookTime = (r.cookTime !== undefined && r.cookTime !== null && r.cookTime !== '') ? r.cookTime : '';
+    const timeHTML = cookTime !== ''
+      ? '<span class="recommend-time">' +
+          '<i data-lucide="clock" style="width:12px;height:12px;"></i>' +
+          '<span>' + escapeHTML(cookTime) + '分钟</span>' +
+        '</span>'
+      : '';
+    return '<div class="recommend-card" data-idx="' + idx + '">' +
+      '<img class="card-img" src="' + escapeAttr(r.coverUrl || '') + '" alt="' + escapeAttr(r.name || '') + '" />' +
+      '<div class="card-body">' +
+        '<div class="card-title">' + escapeHTML(r.name || '') + '</div>' +
+        '<div class="recommend-meta">' +
+          '<span class="difficulty-tag ' + difficultyClass(diff) + '">' + escapeHTML(diff) + '</span>' +
+          timeHTML +
+        '</div>' +
+        '<div class="match-score">' +
+          '<div class="match-score-bar"><div class="match-score-fill" style="width:' + matchPercent + '%;"></div></div>' +
+          '<span class="match-score-text">匹配 ' + matchPercent + '%</span>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+  lucide.createIcons();
+}
+
+function showRecommendDetail(item) {
+  const modal = document.getElementById('recommend-modal');
+  if (!modal || !item) return;
+
+  const img = document.getElementById('recommend-modal-img');
+  if (img) img.src = item.coverUrl || '';
+
+  const title = document.getElementById('recommend-modal-title');
+  if (title) title.textContent = item.name || '';
+
+  const meta = document.getElementById('recommend-modal-meta');
+  if (meta) {
+    const diff = item.difficulty || '';
+    const matchPercent = matchScoreToPercent(item.matchScore);
+    const cookTime = (item.cookTime !== undefined && item.cookTime !== null && item.cookTime !== '') ? item.cookTime : '';
+    meta.innerHTML =
+      (diff ? '<span class="difficulty-tag ' + difficultyClass(diff) + '">' + escapeHTML(diff) + '</span>' : '') +
+      (cookTime !== '' ? '<span class="recommend-time"><i data-lucide="clock" style="width:12px;height:12px;"></i><span>' + escapeHTML(cookTime) + '分钟</span></span>' : '') +
+      '<span class="match-score-text">匹配度 ' + matchPercent + '%</span>';
+  }
+
+  const ingEl = document.getElementById('recommend-modal-ingredients');
+  if (ingEl) {
+    const ingredients = item.ingredients || [];
+    if (ingredients.length === 0) {
+      ingEl.innerHTML = '<span style="font-size:var(--font-size-caption);color:var(--color-on-surface-variant);">暂无食材信息</span>';
+    } else {
+      ingEl.innerHTML = ingredients.map(i => {
+        const name = typeof i === 'string' ? i : (i.name || '');
+        return '<span class="chip filled">' + escapeHTML(name) + '</span>';
+      }).join('');
+    }
+  }
+
+  modal.classList.add('show');
+  lucide.createIcons();
+}
+
+function closeRecommendModal() {
+  const modal = document.getElementById('recommend-modal');
+  if (modal) modal.classList.remove('show');
+}
+
 function renderCheckin(data) {
   if (!data) return;
   const text = document.getElementById('checkin-text');
@@ -284,6 +395,9 @@ function renderRecipes(list) {
           '</div>' +
           '<span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">' + escapeHTML(r.uploaderName || '') + '</span>' +
         '</div>' +
+        '<button class="btn btn-outline btn-sm add-menu-btn" onclick="showAddToMenuDialog(\'' + escapeAttr(String(r.id)) + '\')">' +
+          '<i data-lucide="plus" style="width:14px;height:14px;margin-right:4px;"></i>加入菜单' +
+        '</button>' +
       '</div>' +
     '</div>';
   }).join('');
@@ -447,6 +561,13 @@ async function startRecognize() {
     showToast('请先选择照片');
     return;
   }
+  // Reset beautify & nutrition state
+  currentBeautifiedUrl = null;
+  selectedImageVersion = 'original';
+  const switcher = document.getElementById('image-version-switcher');
+  if (switcher) switcher.style.display = 'none';
+  renderNutrition(null);
+
   const overlay = document.getElementById('ai-overlay');
   const badge = document.getElementById('recognize-badge');
   if (overlay) overlay.classList.add('show');
@@ -482,6 +603,14 @@ async function startRecognize() {
       if (thumb) thumb.src = result.imageUrl;
     }
 
+    const cameraImgEl = document.getElementById('camera-img');
+    currentOriginalUrl = result.imageUrl || (cameraImgEl ? cameraImgEl.src : '');
+
+    renderNutrition(result.nutrition);
+
+    // Start beautify asynchronously (don't block user editing)
+    startBeautify(file);
+
     if (badge) badge.style.display = 'inline-flex';
     showToast('AI识别完成！');
     lucide.createIcons();
@@ -495,6 +624,67 @@ async function startRecognize() {
 function retakePhoto() {
   const fileInput = document.getElementById('file-input');
   if (fileInput) fileInput.click();
+}
+
+/* ===== 图片美化 ===== */
+async function startBeautify(file) {
+  try {
+    const result = await api.beautifyImage(file);
+    if (result && result.beautifiedUrl) {
+      currentBeautifiedUrl = result.beautifiedUrl;
+      const switcher = document.getElementById('image-version-switcher');
+      if (switcher) switcher.style.display = 'flex';
+      switchImageVersion('beautified');
+      showToast('图片美化完成');
+    }
+  } catch (err) {
+    showToast('美化失败，将使用原图');
+  }
+}
+
+function switchImageVersion(version) {
+  selectedImageVersion = version;
+  const url = (version === 'beautified' && currentBeautifiedUrl) ? currentBeautifiedUrl : currentOriginalUrl;
+  if (!url) return;
+  const cameraImg = document.getElementById('camera-img');
+  if (cameraImg) cameraImg.src = url;
+  const thumb = document.getElementById('dish-thumbnail');
+  if (thumb) thumb.src = url;
+  document.querySelectorAll('#image-version-switcher .version-btn').forEach(btn => {
+    if (btn.dataset.version === version) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+}
+
+/* ===== 营养分析 ===== */
+function renderNutrition(nutrition) {
+  const container = document.getElementById('nutrition-cards');
+  if (!container) return;
+  if (!nutrition) {
+    container.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
+  const items = [
+    { icon: 'flame', label: '热量', value: nutrition.calories, unit: 'kcal', color: 'var(--color-primary)', bg: 'var(--primary-50)' },
+    { icon: 'egg', label: '蛋白质', value: nutrition.protein, unit: 'g', color: 'var(--info-500)', bg: 'var(--info-50)' },
+    { icon: 'droplet', label: '脂肪', value: nutrition.fat, unit: 'g', color: 'var(--accent-500)', bg: 'var(--accent-50)' },
+    { icon: 'wheat', label: '碳水', value: nutrition.carbs, unit: 'g', color: 'var(--success-500)', bg: 'var(--success-50)' }
+  ];
+  container.innerHTML = items.map(it => {
+    const val = (it.value === undefined || it.value === null) ? '--' : escapeHTML(it.value);
+    return '<div style="flex: 1; min-width: 0; background: ' + it.bg + '; border-radius: var(--radius-md); padding: var(--space-2) var(--space-1); text-align: center;">' +
+      '<i data-lucide="' + it.icon + '" style="width: 16px; height: 16px; color: ' + it.color + ';"></i>' +
+      '<div style="font-size: var(--font-size-body); font-weight: 600; color: var(--color-on-surface); margin-top: var(--space-1);">' + val + '</div>' +
+      '<div style="font-size: 10px; color: var(--color-on-surface-variant);">' + it.unit + '</div>' +
+      '<div style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant); margin-top: 2px;">' + it.label + '</div>' +
+    '</div>';
+  }).join('');
+  container.style.display = 'flex';
+  lucide.createIcons();
 }
 
 async function saveRecord() {
@@ -514,7 +704,9 @@ async function saveRecord() {
     tags: tags,
     mealType: '',
     note: '',
-    imageUrl: currentRecognizeData ? (currentRecognizeData.imageUrl || '') : '',
+    imageUrl: (selectedImageVersion === 'beautified' && currentBeautifiedUrl)
+      ? currentBeautifiedUrl
+      : (currentRecognizeData ? (currentRecognizeData.imageUrl || '') : ''),
     aiConfidence: currentRecognizeData ? (currentRecognizeData.confidence != null ? currentRecognizeData.confidence : null) : null
   };
   try {
@@ -550,6 +742,335 @@ async function filterRecipes(category) {
     renderRecipes(data || []);
   } catch (err) {
     hideLoading(gridEl);
+    showToast(err.message);
+  }
+}
+
+/* ===== 本周菜单 ===== */
+const WEEKLY_DAYS = [
+  { value: 1, label: '周一' },
+  { value: 2, label: '周二' },
+  { value: 3, label: '周三' },
+  { value: 4, label: '周四' },
+  { value: 5, label: '周五' },
+  { value: 6, label: '周六' },
+  { value: 7, label: '周日' }
+];
+const WEEKLY_MEALS = ['早餐', '午餐', '晚餐'];
+
+function switchFamilyTab(view) {
+  const recipeView = document.getElementById('recipe-view');
+  const weeklyView = document.getElementById('weekly-menu-view');
+  const shoppingSection = document.getElementById('shopping-section');
+  document.querySelectorAll('#family-view-tabs .tab-item').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#family-view-tabs .tab-item[data-view="' + view + '"]').forEach(t => t.classList.add('active'));
+  if (view === 'weekly') {
+    if (recipeView) recipeView.style.display = 'none';
+    if (weeklyView) weeklyView.style.display = '';
+    if (shoppingSection) shoppingSection.style.display = '';
+    loadWeeklyMenu();
+    loadShoppingList();
+  } else {
+    if (recipeView) recipeView.style.display = '';
+    if (weeklyView) weeklyView.style.display = 'none';
+    if (shoppingSection) shoppingSection.style.display = 'none';
+  }
+}
+
+/* ===== 购物清单 ===== */
+const SHOPPING_CATEGORY_ICONS = {
+  '蔬菜': 'carrot',
+  '肉类': 'beef',
+  '水产': 'fish',
+  '调料': 'leaf',
+  '乳制品': 'milk',
+  '其他': 'shopping-basket'
+};
+
+async function loadShoppingList() {
+  const container = document.getElementById('shopping-list');
+  if (!container) return;
+  showLoading(container);
+  try {
+    const data = await api.getShoppingList();
+    renderShoppingList(data || {});
+  } catch (err) {
+    hideLoading(container);
+    showToast(err.message);
+  }
+}
+
+function renderShoppingList(groupedItems) {
+  const container = document.getElementById('shopping-list');
+  if (!container) return;
+
+  const categories = Object.keys(groupedItems || {});
+  let total = 0, checked = 0;
+  categories.forEach(cat => {
+    (groupedItems[cat] || []).forEach(item => {
+      total++;
+      if (item.checked) checked++;
+    });
+  });
+
+  if (total === 0) {
+    container.innerHTML =
+      '<div class="shopping-empty">' +
+        '<div class="shopping-empty-icon"><i data-lucide="shopping-cart"></i></div>' +
+        '<div class="shopping-empty-text">购物清单是空的</div>' +
+      '</div>';
+    lucide.createIcons();
+    return;
+  }
+
+  const percent = Math.round((checked / total) * 100);
+  let html =
+    '<div class="shopping-progress">' +
+      '<span class="shopping-progress-text">已购买 ' + checked + '/' + total + '</span>' +
+      '<div class="shopping-progress-bar">' +
+        '<div class="shopping-progress-fill" style="width: ' + percent + '%;"></div>' +
+      '</div>' +
+    '</div>';
+
+  categories.forEach(cat => {
+    const items = groupedItems[cat] || [];
+    if (items.length === 0) return;
+    const icon = SHOPPING_CATEGORY_ICONS[cat] || 'shopping-basket';
+    html +=
+      '<div class="shopping-category">' +
+        '<div class="shopping-category-title">' +
+          '<i data-lucide="' + escapeAttr(icon) + '"></i>' +
+          '<span>' + escapeHTML(cat) + '</span>' +
+        '</div>' +
+        '<div class="shopping-items">' +
+          items.map(item => {
+            const isChecked = !!item.checked;
+            return '<div class="shopping-item' + (isChecked ? ' checked' : '') + '" data-id="' + escapeAttr(String(item.id)) + '">' +
+              '<button class="shopping-checkbox" onclick="handleToggleShopping(\'' + escapeAttr(String(item.id)) + '\', ' + isChecked + ')">' +
+                '<i data-lucide="check"></i>' +
+              '</button>' +
+              '<span class="shopping-item-name">' + escapeHTML(item.name || '') + '</span>' +
+              '<span class="shopping-item-quantity">' + escapeHTML(item.quantity || '') + '</span>' +
+              '<button class="shopping-delete-btn" onclick="handleDeleteShoppingItem(\'' + escapeAttr(String(item.id)) + '\')">' +
+                '<i data-lucide="trash-2"></i>' +
+              '</button>' +
+            '</div>';
+          }).join('') +
+        '</div>' +
+      '</div>';
+  });
+
+  container.innerHTML = html;
+  lucide.createIcons();
+}
+
+async function handleToggleShopping(itemId, checked) {
+  try {
+    await api.toggleShoppingItem(itemId, !checked);
+    showToast(checked ? '已取消勾选' : '已购买');
+    loadShoppingList();
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+function handleAddShoppingItem() {
+  const modal = document.getElementById('shopping-modal');
+  if (!modal) return;
+  const nameInput = document.getElementById('shopping-name');
+  const qtyInput = document.getElementById('shopping-quantity');
+  if (nameInput) nameInput.value = '';
+  if (qtyInput) qtyInput.value = '';
+  modal.style.display = 'flex';
+  lucide.createIcons();
+  if (nameInput) setTimeout(() => nameInput.focus(), 100);
+}
+
+function closeShoppingModal() {
+  const modal = document.getElementById('shopping-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function confirmAddShoppingItem() {
+  const nameInput = document.getElementById('shopping-name');
+  const catInput = document.getElementById('shopping-category');
+  const qtyInput = document.getElementById('shopping-quantity');
+  const name = nameInput ? nameInput.value.trim() : '';
+  const category = catInput ? catInput.value : '其他';
+  const quantity = qtyInput ? qtyInput.value.trim() : '';
+
+  if (!name) {
+    showToast('请输入物品名称');
+    return;
+  }
+
+  try {
+    await api.addShoppingItem({ name: name, category: category, quantity: quantity || '1' });
+    showToast('添加成功');
+    closeShoppingModal();
+    loadShoppingList();
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+async function handleDeleteShoppingItem(itemId) {
+  try {
+    await api.deleteShoppingItem(itemId);
+    showToast('已删除');
+    loadShoppingList();
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+async function loadWeeklyMenu() {
+  const viewEl = document.getElementById('weekly-menu-view');
+  if (!viewEl) return;
+  showLoading(viewEl);
+  try {
+    const menuList = await api.getWeeklyMenu();
+    renderWeeklyMenu(menuList || []);
+  } catch (err) {
+    hideLoading(viewEl);
+    showToast(err.message);
+  }
+}
+
+function renderWeeklyMenu(menuList) {
+  const container = document.getElementById('weekly-menu-view');
+  if (!container) return;
+  if (!menuList || menuList.length === 0) {
+    container.innerHTML = '<div class="weekly-empty">本周暂无菜单安排，去「菜谱」中加入吧～</div>';
+    return;
+  }
+  container.innerHTML = '<div class="weekly-menu-list">' + WEEKLY_DAYS.map(day => {
+    const dayItems = menuList.filter(m => m.dayOfWeek === day.value);
+    const mealsHTML = WEEKLY_MEALS.map(mealType => {
+      const items = dayItems.filter(m => m.mealType === mealType);
+      let content;
+      if (items.length === 0) {
+        content = '<div class="weekly-meal-empty">暂无安排</div>';
+      } else {
+        content = items.map(item => renderMenuItemCard(item)).join('');
+      }
+      return '<div class="weekly-meal">' +
+        '<div class="weekly-meal-label">' + escapeHTML(mealType) + '</div>' +
+        '<div class="weekly-meal-content">' + content + '</div>' +
+      '</div>';
+    }).join('');
+    return '<div class="weekly-day">' +
+      '<div class="weekly-day-title">' + escapeHTML(day.label) + '</div>' +
+      '<div class="weekly-meals">' + mealsHTML + '</div>' +
+    '</div>';
+  }).join('') + '</div>';
+  lucide.createIcons();
+}
+
+function renderMenuItemCard(item) {
+  return '<div class="menu-item-card" data-id="' + escapeAttr(String(item.id)) + '">' +
+    '<img class="menu-item-img" src="' + escapeAttr(item.coverUrl || '') + '" alt="' + escapeAttr(item.recipeName || '') + '" />' +
+    '<div class="menu-item-info">' +
+      '<div class="menu-item-name">' + escapeHTML(item.recipeName || '') + '</div>' +
+      '<div class="menu-item-votes">' +
+        '<button class="vote-btn" onclick="handleVote(\'' + escapeAttr(String(item.id)) + '\', \'up\')">' +
+          '<i data-lucide="thumbs-up" style="width:14px;height:14px;"></i>' +
+          '<span class="up-count">' + escapeHTML(String(item.upCount || 0)) + '</span>' +
+        '</button>' +
+        '<button class="vote-btn" onclick="handleVote(\'' + escapeAttr(String(item.id)) + '\', \'down\')">' +
+          '<i data-lucide="thumbs-down" style="width:14px;height:14px;"></i>' +
+          '<span class="down-count">' + escapeHTML(String(item.downCount || 0)) + '</span>' +
+        '</button>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function showAddToMenuDialog(recipeId) {
+  const existing = document.getElementById('add-menu-dialog');
+  if (existing) existing.remove();
+
+  let selectedDay = 1;
+  let selectedMeal = '早餐';
+
+  const overlay = document.createElement('div');
+  overlay.id = 'add-menu-dialog';
+  overlay.className = 'dialog-overlay';
+  overlay.innerHTML =
+    '<div class="dialog">' +
+      '<div class="dialog-title">加入本周菜单</div>' +
+      '<div class="dialog-section">' +
+        '<div class="dialog-label">选择日期</div>' +
+        '<div class="dialog-options" id="dialog-days">' +
+          WEEKLY_DAYS.map(d =>
+            '<button class="chip outline' + (d.value === selectedDay ? ' selected' : '') + '" data-day="' + d.value + '">' + escapeHTML(d.label) + '</button>'
+          ).join('') +
+        '</div>' +
+      '</div>' +
+      '<div class="dialog-section">' +
+        '<div class="dialog-label">选择餐次</div>' +
+        '<div class="dialog-options" id="dialog-meals">' +
+          WEEKLY_MEALS.map(m =>
+            '<button class="chip outline' + (m === selectedMeal ? ' selected' : '') + '" data-meal="' + escapeAttr(m) + '">' + escapeHTML(m) + '</button>'
+          ).join('') +
+        '</div>' +
+      '</div>' +
+      '<div class="dialog-actions">' +
+        '<button class="btn btn-ghost" id="dialog-cancel">取消</button>' +
+        '<button class="btn btn-primary" id="dialog-confirm">确认</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  lucide.createIcons();
+
+  overlay.querySelectorAll('#dialog-days .chip').forEach(chip => {
+    chip.addEventListener('click', function() {
+      overlay.querySelectorAll('#dialog-days .chip').forEach(c => c.classList.remove('selected'));
+      this.classList.add('selected');
+      selectedDay = parseInt(this.dataset.day, 10);
+    });
+  });
+  overlay.querySelectorAll('#dialog-meals .chip').forEach(chip => {
+    chip.addEventListener('click', function() {
+      overlay.querySelectorAll('#dialog-meals .chip').forEach(c => c.classList.remove('selected'));
+      this.classList.add('selected');
+      selectedMeal = this.dataset.meal;
+    });
+  });
+  overlay.querySelector('#dialog-cancel').addEventListener('click', function() { overlay.remove(); });
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+
+  const confirmBtn = overlay.querySelector('#dialog-confirm');
+  confirmBtn.addEventListener('click', async function() {
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = '提交中...';
+    try {
+      await api.addToMenu({ dayOfWeek: selectedDay, mealType: selectedMeal, recipeId: recipeId });
+      showToast('已加入本周菜单！');
+      overlay.remove();
+      if (document.getElementById('weekly-menu-view') && document.getElementById('weekly-menu-view').style.display !== 'none') {
+        loadWeeklyMenu();
+      }
+    } catch (err) {
+      showToast(err.message);
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = '确认';
+    }
+  });
+}
+
+async function handleVote(menuId, vote) {
+  try {
+    await api.voteMenuItem(menuId, vote, 'user-001');
+    showToast(vote === 'up' ? '点赞成功！' : '已踩');
+    const card = document.querySelector('.menu-item-card[data-id="' + menuId + '"]');
+    if (card) {
+      const countEl = card.querySelector(vote === 'up' ? '.up-count' : '.down-count');
+      if (countEl) {
+        countEl.textContent = (parseInt(countEl.textContent, 10) || 0) + 1;
+      }
+    }
+  } catch (err) {
     showToast(err.message);
   }
 }
@@ -638,6 +1159,13 @@ function initFileInput() {
         if (badge) badge.style.display = 'none';
         const thumb = document.getElementById('dish-thumbnail');
         if (thumb) thumb.src = URL.createObjectURL(file);
+        // Reset beautify & nutrition state
+        currentBeautifiedUrl = null;
+        currentOriginalUrl = null;
+        selectedImageVersion = 'original';
+        const switcher = document.getElementById('image-version-switcher');
+        if (switcher) switcher.style.display = 'none';
+        renderNutrition(null);
       }
     });
   }
@@ -658,6 +1186,12 @@ function initInteractions() {
       document.querySelectorAll('#recipe-tabs .tab-item').forEach(t => t.classList.remove('active'));
       this.classList.add('active');
       filterRecipes(this.dataset.tab);
+    });
+  });
+
+  document.querySelectorAll('#family-view-tabs .tab-item').forEach(tab => {
+    tab.addEventListener('click', function() {
+      switchFamilyTab(this.dataset.view);
     });
   });
 
@@ -682,12 +1216,26 @@ function initInteractions() {
   }
 
   document.addEventListener('click', function(e) {
+    const recCard = e.target.closest('.recommend-card');
+    if (recCard) {
+      const idx = parseInt(recCard.dataset.idx, 10);
+      const item = currentRecommendations[idx];
+      if (item) showRecommendDetail(item);
+      return;
+    }
     const card = e.target.closest('.food-card');
-    if (card && !e.target.closest('.chip') && !e.target.closest('.star')) {
+    if (card && !e.target.closest('.chip') && !e.target.closest('.star') && !e.target.closest('.add-menu-btn')) {
       const title = card.querySelector('.card-title');
       if (title) showToast('查看：' + title.textContent);
     }
   });
+
+  const shoppingModal = document.getElementById('shopping-modal');
+  if (shoppingModal) {
+    shoppingModal.addEventListener('click', function(e) {
+      if (e.target === this) closeShoppingModal();
+    });
+  }
 }
 
 /* ===== 登录/注册 ===== */

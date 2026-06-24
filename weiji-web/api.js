@@ -143,4 +143,33 @@ const api = {
   getUserProfile() {
     return request('GET', '/api/user/profile');
   },
+  beautifyImage(file) {
+    const fd = new FormData();
+    fd.append('image', file);
+    return request('POST', '/api/ai/beautify', fd, true);
+  },
+  getRecommendations(dishName) {
+    return request('POST', '/api/ai/recommend', { dishName: dishName || '' }).then(data => data.recipes || data || []);
+  },
+  getWeeklyMenu() {
+    return request('GET', '/api/family/menu');
+  },
+  addToMenu(data) {
+    return request('POST', '/api/family/menu', data);
+  },
+  voteMenuItem(menuId, vote, userId) {
+    return request('POST', '/api/family/menu/' + menuId + '/vote', { vote, userId });
+  },
+  getShoppingList() {
+    return request('GET', '/api/family/shopping');
+  },
+  addShoppingItem(data) {
+    return request('POST', '/api/family/shopping', data);
+  },
+  toggleShoppingItem(itemId, checked) {
+    return request('PATCH', '/api/family/shopping/' + itemId, { checked });
+  },
+  deleteShoppingItem(itemId) {
+    return request('DELETE', '/api/family/shopping/' + itemId);
+  },
 };

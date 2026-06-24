@@ -195,6 +195,192 @@ family_members: List[Dict[str, Any]] = [
     },
 ]
 
+# 周菜单（协作菜单）
+weekly_menu: List[Dict[str, Any]] = [
+    {
+        "id": "menu-001",
+        "dayOfWeek": 1,
+        "mealType": "早餐",
+        "recipeId": "recipe-004",
+        "recipeName": "蛋炒饭",
+        "coverUrl": "assets/recipe-egg-fried-rice.jpg",
+        "votes": {"up": ["user-001"], "down": []},
+    },
+    {
+        "id": "menu-002",
+        "dayOfWeek": 1,
+        "mealType": "午餐",
+        "recipeId": "recipe-001",
+        "recipeName": "麻婆豆腐",
+        "coverUrl": "assets/recipe-mapo-tofu.jpg",
+        "votes": {"up": ["user-001"], "down": []},
+    },
+    {
+        "id": "menu-003",
+        "dayOfWeek": 1,
+        "mealType": "晚餐",
+        "recipeId": "recipe-003",
+        "recipeName": "蒜蓉西兰花",
+        "coverUrl": "assets/recipe-broccoli.jpg",
+        "votes": {"up": [], "down": []},
+    },
+    {
+        "id": "menu-004",
+        "dayOfWeek": 2,
+        "mealType": "早餐",
+        "recipeId": "recipe-004",
+        "recipeName": "蛋炒饭",
+        "coverUrl": "assets/recipe-egg-fried-rice.jpg",
+        "votes": {"up": [], "down": []},
+    },
+    {
+        "id": "menu-005",
+        "dayOfWeek": 2,
+        "mealType": "午餐",
+        "recipeId": "recipe-001",
+        "recipeName": "麻婆豆腐",
+        "coverUrl": "assets/recipe-mapo-tofu.jpg",
+        "votes": {"up": ["user-001"], "down": []},
+    },
+    {
+        "id": "menu-006",
+        "dayOfWeek": 3,
+        "mealType": "晚餐",
+        "recipeId": "recipe-002",
+        "recipeName": "桂花糕",
+        "coverUrl": "assets/recipe-guihua-gao.jpg",
+        "votes": {"up": [], "down": []},
+    },
+    {
+        "id": "menu-007",
+        "dayOfWeek": 4,
+        "mealType": "午餐",
+        "recipeId": "recipe-001",
+        "recipeName": "麻婆豆腐",
+        "coverUrl": "assets/recipe-mapo-tofu.jpg",
+        "votes": {"up": [], "down": []},
+    },
+    {
+        "id": "menu-008",
+        "dayOfWeek": 5,
+        "mealType": "晚餐",
+        "recipeId": "recipe-003",
+        "recipeName": "蒜蓉西兰花",
+        "coverUrl": "assets/recipe-broccoli.jpg",
+        "votes": {"up": ["user-001"], "down": []},
+    },
+    {
+        "id": "menu-009",
+        "dayOfWeek": 6,
+        "mealType": "午餐",
+        "recipeId": "recipe-004",
+        "recipeName": "蛋炒饭",
+        "coverUrl": "assets/recipe-egg-fried-rice.jpg",
+        "votes": {"up": [], "down": []},
+    },
+    {
+        "id": "menu-010",
+        "dayOfWeek": 7,
+        "mealType": "晚餐",
+        "recipeId": "recipe-002",
+        "recipeName": "桂花糕",
+        "coverUrl": "assets/recipe-guihua-gao.jpg",
+        "votes": {"up": [], "down": []},
+    },
+]
+
+# 购物清单
+shopping_items: List[Dict[str, Any]] = [
+    {
+        "id": "shop-001",
+        "name": "番茄",
+        "category": "蔬菜",
+        "quantity": "500g",
+        "checked": False,
+        "checkedBy": None,
+    },
+    {
+        "id": "shop-002",
+        "name": "鸡蛋",
+        "category": "蔬菜",
+        "quantity": "10个",
+        "checked": True,
+        "checkedBy": "user-001",
+    },
+    {
+        "id": "shop-003",
+        "name": "西兰花",
+        "category": "蔬菜",
+        "quantity": "2个",
+        "checked": False,
+        "checkedBy": None,
+    },
+    {
+        "id": "shop-004",
+        "name": "五花肉",
+        "category": "肉类",
+        "quantity": "500g",
+        "checked": False,
+        "checkedBy": None,
+    },
+    {
+        "id": "shop-005",
+        "name": "牛腩",
+        "category": "肉类",
+        "quantity": "1kg",
+        "checked": False,
+        "checkedBy": None,
+    },
+    {
+        "id": "shop-006",
+        "name": "排骨",
+        "category": "肉类",
+        "quantity": "800g",
+        "checked": True,
+        "checkedBy": "user-001",
+    },
+    {
+        "id": "shop-007",
+        "name": "生抽",
+        "category": "调料",
+        "quantity": "1瓶",
+        "checked": False,
+        "checkedBy": None,
+    },
+    {
+        "id": "shop-008",
+        "name": "老抽",
+        "category": "调料",
+        "quantity": "1瓶",
+        "checked": False,
+        "checkedBy": None,
+    },
+    {
+        "id": "shop-009",
+        "name": "花椒",
+        "category": "调料",
+        "quantity": "100g",
+        "checked": True,
+        "checkedBy": "user-001",
+    },
+    {
+        "id": "shop-010",
+        "name": "鲜虾",
+        "category": "水产",
+        "quantity": "500g",
+        "checked": False,
+        "checkedBy": None,
+    },
+    {
+        "id": "shop-011",
+        "name": "鲈鱼",
+        "category": "水产",
+        "quantity": "1条",
+        "checked": False,
+        "checkedBy": None,
+    },
+]
+
 # 成就徽章
 achievements: List[Dict[str, Any]] = [
     {
@@ -569,6 +755,168 @@ async def list_family_recipes(category: Optional[str] = Query(None)):
 async def list_family_members():
     """查询家庭成员列表"""
     return ok(family_members)
+
+
+# ============================================================
+# 周菜单（协作菜单）
+# ============================================================
+# 餐次排序权重，便于按 早餐 < 午餐 < 晚餐 排序
+_MEAL_ORDER = {"早餐": 1, "午餐": 2, "晚餐": 3}
+
+
+@app.get("/api/family/menu")
+async def list_weekly_menu():
+    """查询周菜单列表，按 dayOfWeek 和 mealType 排序，返回投票计数"""
+    sorted_menu = sorted(
+        weekly_menu,
+        key=lambda m: (m.get("dayOfWeek", 0), _MEAL_ORDER.get(m.get("mealType", ""), 99)),
+    )
+    result = []
+    for m in sorted_menu:
+        votes = m.get("votes", {"up": [], "down": []})
+        up_list = votes.get("up", [])
+        down_list = votes.get("down", [])
+        result.append({
+            "id": m["id"],
+            "dayOfWeek": m["dayOfWeek"],
+            "mealType": m["mealType"],
+            "recipeId": m["recipeId"],
+            "recipeName": m["recipeName"],
+            "coverUrl": m["coverUrl"],
+            "upCount": len(up_list),
+            "downCount": len(down_list),
+            "votes": {
+                "up": up_list,
+                "down": down_list,
+            },
+        })
+    return ok(result)
+
+
+@app.post("/api/family/menu")
+async def create_menu_item(item: dict):
+    """创建周菜单项，根据 recipeId 从 family_recipes 查找菜谱信息"""
+    day_of_week = item.get("dayOfWeek")
+    meal_type = item.get("mealType")
+    recipe_id = item.get("recipeId")
+
+    if not day_of_week or not meal_type or not recipe_id:
+        return fail("dayOfWeek、mealType、recipeId 不能为空", code=400)
+
+    recipe = next((r for r in family_recipes if r["id"] == recipe_id), None)
+    if not recipe:
+        return fail("菜谱不存在", code=404)
+
+    new_menu = {
+        "id": f"menu-{uuid.uuid4().hex[:8]}",
+        "dayOfWeek": day_of_week,
+        "mealType": meal_type,
+        "recipeId": recipe["id"],
+        "recipeName": recipe.get("name", ""),
+        "coverUrl": recipe.get("coverUrl", recipe.get("imageUrl", "")),
+        "votes": {"up": [], "down": []},
+    }
+    weekly_menu.append(new_menu)
+    return ok(new_menu, "菜单项创建成功")
+
+
+@app.post("/api/family/menu/{menu_id}/vote")
+async def vote_menu_item(menu_id: str, body: dict):
+    """对菜单项投票，若已投过则切换投票"""
+    menu = next((m for m in weekly_menu if m["id"] == menu_id), None)
+    if not menu:
+        return fail("菜单项不存在", code=404)
+
+    vote = body.get("vote")
+    user_id = body.get("userId")
+    if vote not in ("up", "down") or not user_id:
+        return fail("vote 必须为 up/down 且 userId 不能为空", code=400)
+
+    votes = menu.setdefault("votes", {"up": [], "down": []})
+    up_list = votes.setdefault("up", [])
+    down_list = votes.setdefault("down", [])
+
+    # 先从两个列表中移除该用户的已有投票
+    if user_id in up_list:
+        up_list.remove(user_id)
+    if user_id in down_list:
+        down_list.remove(user_id)
+
+    # 若用户原本不在目标列表中，则加入（即切换/新增投票）
+    if vote == "up":
+        up_list.append(user_id)
+    else:
+        down_list.append(user_id)
+
+    return ok({
+        "id": menu["id"],
+        "upCount": len(up_list),
+        "downCount": len(down_list),
+        "votes": {
+            "up": up_list,
+            "down": down_list,
+        },
+    }, "投票成功")
+
+
+# ============================================================
+# 购物清单
+# ============================================================
+@app.get("/api/family/shopping")
+async def list_shopping_items():
+    """查询购物清单，按 category 分组返回"""
+    grouped: Dict[str, List[Dict[str, Any]]] = {}
+    for item in shopping_items:
+        grouped.setdefault(item["category"], []).append(item)
+    return ok(grouped)
+
+
+@app.post("/api/family/shopping")
+async def create_shopping_item(item: dict):
+    """创建购物项"""
+    name = item.get("name")
+    category = item.get("category")
+    quantity = item.get("quantity")
+    if not name or not category:
+        return fail("name 和 category 不能为空", code=400)
+
+    new_item = {
+        "id": f"shop-{uuid.uuid4().hex[:8]}",
+        "name": name,
+        "category": category,
+        "quantity": quantity or "",
+        "checked": False,
+        "checkedBy": None,
+    }
+    shopping_items.append(new_item)
+    return ok(new_item, "购物项创建成功")
+
+
+@app.patch("/api/family/shopping/{item_id}")
+async def update_shopping_item(item_id: str, body: dict):
+    """更新购物项勾选状态"""
+    item = next((s for s in shopping_items if s["id"] == item_id), None)
+    if not item:
+        return fail("购物项不存在", code=404)
+
+    checked = body.get("checked")
+    if checked is None:
+        return fail("checked 不能为空", code=400)
+
+    item["checked"] = bool(checked)
+    item["checkedBy"] = "user-001" if item["checked"] else None
+    return ok(item, "更新成功")
+
+
+@app.delete("/api/family/shopping/{item_id}")
+async def delete_shopping_item(item_id: str):
+    """删除购物项"""
+    global shopping_items
+    idx = next((i for i, s in enumerate(shopping_items) if s["id"] == item_id), None)
+    if idx is None:
+        return fail("购物项不存在", code=404)
+    shopping_items.pop(idx)
+    return ok(None, "删除成功")
 
 
 # ============================================================

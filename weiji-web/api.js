@@ -1,0 +1,86 @@
+const API_BASE = 'http://localhost:8002';
+
+async function request(method, path, body, isFormData) {
+  const options = { method, headers: {} };
+
+  if (body !== undefined && body !== null) {
+    if (isFormData) {
+      options.body = body;
+    } else {
+      options.headers['Content-Type'] = 'application/json';
+      options.body = JSON.stringify(body);
+    }
+  }
+
+  let response;
+  try {
+    response = await fetch(API_BASE + path, options);
+  } catch (err) {
+    throw new Error('网络异常，请稍后重试');
+  }
+
+  if (!response.ok) {
+    throw new Error('网络异常，请稍后重试');
+  }
+
+  let result;
+  try {
+    result = await response.json();
+  } catch (err) {
+    throw new Error('网络异常，请稍后重试');
+  }
+
+  if (!result || result.code !== 0) {
+    throw new Error((result && result.message) || '请求失败');
+  }
+
+  return result.data;
+}
+
+const api = {
+  getRecords(params) {
+    let query = '';
+    if (params) {
+      const sp = new URLSearchParams();
+      Object.keys(params).forEach(k => {
+        const v = params[k];
+        if (v !== undefined && v !== null && v !== '') {
+          sp.append(k, v);
+        }
+      });
+      const qs = sp.toString();
+      if (qs) query = '?' + qs;
+    }
+    return request('GET', '/api/record/list' + query);
+  },
+  saveRecord(data) {
+    return request('POST', '/api/record', data);
+  },
+  recognizeFood(file) {
+    const fd = new FormData();
+    fd.append('file', file);
+    return request('POST', '/api/ai/recognize', fd, true);
+  },
+  getFamilyRecipes(cat) {
+    const query = cat && cat !== 'all' ? '?category=' + encodeURIComponent(cat) : '';
+    return request('GET', '/api/family/recipes' + query);
+  },
+  getFamilyMembers() {
+    return request('GET', '/api/family/members');
+  },
+  getAchievements() {
+    return request('GET', '/api/achievement/list');
+  },
+  getLevel() {
+    return request('GET', '/api/achievement/level');
+  },
+  getCheckinStatus() {
+    return request('GET', '/api/checkin/status');
+  },
+  doCheckin() {
+    return request('POST', '/api/checkin');
+  },
+  getUserProfile() {
+    return request('GET', '/api/user/profile');
+  },
+};

@@ -1471,79 +1471,11 @@ body {
                         </div>
                         <button class="btn btn-primary btn-sm" id="checkin-btn" onclick="doCheckin()">今日打卡</button>
                     </div>
-                    <div class="checkin-days" id="checkin-days">
-                        <div class="checkin-day done" data-day="1">一</div>
-                        <div class="checkin-day done" data-day="2">二</div>
-                        <div class="checkin-day done" data-day="3">三</div>
-                        <div class="checkin-day done" data-day="4">四</div>
-                        <div class="checkin-day done" data-day="5">五</div>
-                        <div class="checkin-day today" data-day="6">六</div>
-                        <div class="checkin-day future" data-day="7">日</div>
-                    </div>
+                    <div class="checkin-days" id="checkin-days"></div>
                 </div>
 
                 <div class="section-title">美食日记</div>
-                <div class="food-list" id="food-diary-list">
-                    <div class="food-card food-card--h food-card--diary" data-tags="home,festival">
-                        <img class="card-img" src="assets/food-hongshaorou.jpg" alt="红烧肉" />
-                        <div class="card-body">
-                            <div class="card-title">红烧肉</div>
-                            <div class="stars" data-rating="5">
-                                <i data-lucide="star" class="star" style="width: 14px; height: 14px; fill: var(--accent);"></i>
-                                <i data-lucide="star" class="star" style="width: 14px; height: 14px; fill: var(--accent);"></i>
-                                <i data-lucide="star" class="star" style="width: 14px; height: 14px; fill: var(--accent);"></i>
-                                <i data-lucide="star" class="star" style="width: 14px; height: 14px; fill: var(--accent);"></i>
-                                <i data-lucide="star" class="star" style="width: 14px; height: 14px; fill: var(--accent);"></i>
-                                <span class="rating-num">5.0</span>
-                            </div>
-                            <div class="card-tags">
-                                <span class="chip accent">午餐</span>
-                                <span class="chip filled">家的味道</span>
-                            </div>
-                            <div class="card-time">今天 12:30</div>
-                        </div>
-                    </div>
-
-                    <div class="food-card food-card--h food-card--diary" data-tags="diary,breakfast">
-                        <img class="card-img" src="assets/food-tomato-noodle.jpg" alt="番茄鸡蛋面" />
-                        <div class="card-body">
-                            <div class="card-title">番茄鸡蛋面</div>
-                            <div class="stars" data-rating="4">
-                                <i data-lucide="star" class="star" style="width: 14px; height: 14px; fill: var(--accent);"></i>
-                                <i data-lucide="star" class="star" style="width: 14px; height: 14px; fill: var(--accent);"></i>
-                                <i data-lucide="star" class="star" style="width: 14px; height: 14px; fill: var(--accent);"></i>
-                                <i data-lucide="star" class="star" style="width: 14px; height: 14px; fill: var(--accent);"></i>
-                                <i data-lucide="star" class="star star--empty" style="width: 14px; height: 14px;"></i>
-                                <span class="rating-num">4.0</span>
-                            </div>
-                            <div class="card-tags">
-                                <span class="chip accent">早餐</span>
-                                <span class="chip filled">下厨日记</span>
-                            </div>
-                            <div class="card-time">今天 08:15</div>
-                        </div>
-                    </div>
-
-                    <div class="food-card food-card--h food-card--diary" data-tags="festival,dinner">
-                        <img class="card-img" src="assets/food-sweet-ribs.jpg" alt="糖醋排骨" />
-                        <div class="card-body">
-                            <div class="card-title">糖醋排骨</div>
-                            <div class="stars" data-rating="4">
-                                <i data-lucide="star" class="star" style="width: 14px; height: 14px; fill: var(--accent);"></i>
-                                <i data-lucide="star" class="star" style="width: 14px; height: 14px; fill: var(--accent);"></i>
-                                <i data-lucide="star" class="star" style="width: 14px; height: 14px; fill: var(--accent);"></i>
-                                <i data-lucide="star" class="star" style="width: 14px; height: 14px; fill: var(--accent);"></i>
-                                <i data-lucide="star" class="star star--empty" style="width: 14px; height: 14px;"></i>
-                                <span class="rating-num">4.0</span>
-                            </div>
-                            <div class="card-tags">
-                                <span class="chip accent">晚餐</span>
-                                <span class="chip filled">节日美食</span>
-                            </div>
-                            <div class="card-time">昨天 18:45</div>
-                        </div>
-                    </div>
-                </div>
+                <div class="food-list" id="food-diary-list"></div>
             </div>
 
             <div id="page-family" class="page">
@@ -1571,109 +1503,11 @@ body {
                         <span style="font-weight: 600; font-size: var(--font-size-body); color: var(--color-on-surface);">家人</span>
                         <button class="btn btn-ghost" onclick="showToast('邀请家人功能')">邀请家人</button>
                     </div>
-                    <div class="family-members no-scrollbar">
-                        <div class="family-member">
-                            <div class="avatar avatar-md" style="background: var(--primary-100);">
-                                <span class="avatar-initials" style="color: var(--primary-700);">味</span>
-                                <span class="avatar-badge avatar-online"></span>
-                            </div>
-                            <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">我</span>
-                        </div>
-                        <div class="family-member">
-                            <div class="avatar avatar-md" style="background: var(--accent-50);">
-                                <span class="avatar-initials" style="color: var(--accent-700);">妈</span>
-                                <span class="avatar-badge avatar-online"></span>
-                            </div>
-                            <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">妈妈</span>
-                        </div>
-                        <div class="family-member">
-                            <div class="avatar avatar-md" style="background: var(--success-50);">
-                                <span class="avatar-initials" style="color: var(--success-700);">爸</span>
-                                <span class="avatar-badge avatar-role">
-                                    <i data-lucide="crown" style="width: 8px; height: 8px; color: #fff;"></i>
-                                </span>
-                            </div>
-                            <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">爸爸</span>
-                        </div>
-                        <div class="family-member">
-                            <div class="avatar avatar-md" style="background: var(--info-50);">
-                                <span class="avatar-initials" style="color: var(--info-700);">姐</span>
-                            </div>
-                            <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">姐姐</span>
-                        </div>
-                    </div>
+                    <div class="family-members no-scrollbar" id="family-members"></div>
                 </div>
 
                 <div class="section-title">推荐菜谱</div>
-                <div class="recipe-grid" id="recipe-grid">
-                    <div class="food-card food-card--v" data-category="home">
-                        <img class="card-img" src="assets/recipe-mapo-tofu.jpg" alt="麻婆豆腐" />
-                        <div class="card-body">
-                            <div class="card-title">麻婆豆腐</div>
-                            <div style="display: flex; align-items: center; gap: var(--space-2);">
-                                <span class="tag tag--accent">简单</span>
-                                <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">25分钟</span>
-                            </div>
-                            <div style="display: flex; align-items: center; gap: var(--space-1); margin-top: var(--space-2);">
-                                <div class="avatar avatar-sm" style="background: var(--accent-50); width: 20px; height: 20px;">
-                                    <span class="avatar-initials" style="color: var(--accent-700); font-size: 8px;">妈</span>
-                                </div>
-                                <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">妈妈</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="food-card food-card--v" data-category="dessert">
-                        <img class="card-img" src="assets/recipe-guihua-gao.jpg" alt="桂花糕" />
-                        <div class="card-body">
-                            <div class="card-title">桂花糕</div>
-                            <div style="display: flex; align-items: center; gap: var(--space-2);">
-                                <span class="tag">中等</span>
-                                <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">60分钟</span>
-                            </div>
-                            <div style="display: flex; align-items: center; gap: var(--space-1); margin-top: var(--space-2);">
-                                <div class="avatar avatar-sm" style="background: var(--success-50); width: 20px; height: 20px;">
-                                    <span class="avatar-initials" style="color: var(--success-700); font-size: 8px;">爸</span>
-                                </div>
-                                <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">爸爸</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="food-card food-card--v" data-category="home">
-                        <img class="card-img" src="assets/recipe-broccoli.jpg" alt="蒜蓉西兰花" />
-                        <div class="card-body">
-                            <div class="card-title">蒜蓉西兰花</div>
-                            <div style="display: flex; align-items: center; gap: var(--space-2);">
-                                <span class="tag tag--accent">简单</span>
-                                <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">15分钟</span>
-                            </div>
-                            <div style="display: flex; align-items: center; gap: var(--space-1); margin-top: var(--space-2);">
-                                <div class="avatar avatar-sm" style="background: var(--primary-100); width: 20px; height: 20px;">
-                                    <span class="avatar-initials" style="color: var(--primary-700); font-size: 8px;">味</span>
-                                </div>
-                                <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">我</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="food-card food-card--v" data-category="home">
-                        <img class="card-img" src="assets/recipe-egg-fried-rice.jpg" alt="蛋炒饭" />
-                        <div class="card-body">
-                            <div class="card-title">蛋炒饭</div>
-                            <div style="display: flex; align-items: center; gap: var(--space-2);">
-                                <span class="tag tag--accent">简单</span>
-                                <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">10分钟</span>
-                            </div>
-                            <div style="display: flex; align-items: center; gap: var(--space-1); margin-top: var(--space-2);">
-                                <div class="avatar avatar-sm" style="background: var(--info-50); width: 20px; height: 20px;">
-                                    <span class="avatar-initials" style="color: var(--info-700); font-size: 8px;">姐</span>
-                                </div>
-                                <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">姐姐</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <div class="recipe-grid" id="recipe-grid"></div>
             </div>
 
             <div id="page-records" class="page">
@@ -1683,7 +1517,8 @@ body {
                 </div>
 
                 <div class="padding-x padding-bottom">
-                    <div class="camera-preview">
+                    <input type="file" id="file-input" accept="image/*" style="display:none;" />
+                    <div class="camera-preview" style="cursor:pointer;" onclick="document.getElementById('file-input').click()">
                         <img src="assets/food-camera-preview.jpg" alt="Food photo preview" id="camera-img" />
                         <div class="ai-overlay" id="ai-overlay">
                             <div class="ai-spinner"></div>
@@ -1711,26 +1546,19 @@ body {
                 <div class="padding-x padding-bottom">
                     <div class="food-card food-card--h" style="width: 100%; box-shadow: var(--shadow-1);">
                         <div class="card-img" style="width: 96px; height: 96px; flex-shrink: 0; border-radius: var(--radius-lg); overflow: hidden;">
-                            <img src="assets/food-camera-preview.jpg" alt="Food thumbnail" style="width: 100%; height: 100%; object-fit: cover;">
+                            <img src="assets/food-camera-preview.jpg" alt="Food thumbnail" id="dish-thumbnail" style="width: 100%; height: 100%; object-fit: cover;">
                         </div>
                         <div class="card-body">
                             <div class="input-field">
                                 <label class="field-label">菜品名称</label>
-                                <input type="text" value="红烧牛肉面" id="dish-name" />
+                                <input type="text" value="" id="dish-name" placeholder="点击AI识别或输入菜名" />
                             </div>
                             <div style="display: flex; align-items: center; gap: var(--space-2);">
                                 <i data-lucide="sparkles" style="width: var(--size-icon-sm); height: var(--size-icon-sm); color: var(--color-primary);"></i>
-                                <span style="font-size: var(--font-size-caption); color: var(--color-primary); font-weight: 500;">置信度 96%</span>
+                                <span style="font-size: var(--font-size-caption); color: var(--color-primary); font-weight: 500;" id="recognize-confidence">等待识别</span>
                             </div>
-                            <div class="card-tags">
-                                <span class="chip filled" onclick="toggleIngredient(this)">牛肉</span>
-                                <span class="chip filled" onclick="toggleIngredient(this)">面条</span>
-                                <span class="chip filled" onclick="toggleIngredient(this)">青菜</span>
-                                <span class="chip filled" onclick="toggleIngredient(this)">辣椒</span>
-                            </div>
-                            <div class="card-tags" style="margin-top: auto;">
-                                <span class="tag tag--accent">汤面</span>
-                            </div>
+                            <div class="card-tags" id="ingredient-list"></div>
+                            <div class="card-tags" style="margin-top: auto;" id="cooking-method-tag"></div>
                         </div>
                     </div>
                 </div>
@@ -1738,13 +1566,13 @@ body {
                 <div class="padding-x padding-bottom">
                     <div class="rating-section">
                         <span style="font-size: var(--font-size-body); font-weight: var(--font-weight-h4); color: var(--color-on-surface);">给这道菜打个分</span>
-                        <div class="stars rating-stars" id="rating-stars" data-rating="4">
-                            <i data-lucide="star" class="star" style="width: 20px; height: 20px; fill: var(--accent);" data-star="1"></i>
-                            <i data-lucide="star" class="star" style="width: 20px; height: 20px; fill: var(--accent);" data-star="2"></i>
-                            <i data-lucide="star" class="star" style="width: 20px; height: 20px; fill: var(--accent);" data-star="3"></i>
-                            <i data-lucide="star" class="star" style="width: 20px; height: 20px; fill: var(--accent);" data-star="4"></i>
+                        <div class="stars rating-stars" id="rating-stars" data-rating="0">
+                            <i data-lucide="star" class="star star--empty" style="width: 20px; height: 20px;" data-star="1"></i>
+                            <i data-lucide="star" class="star star--empty" style="width: 20px; height: 20px;" data-star="2"></i>
+                            <i data-lucide="star" class="star star--empty" style="width: 20px; height: 20px;" data-star="3"></i>
+                            <i data-lucide="star" class="star star--empty" style="width: 20px; height: 20px;" data-star="4"></i>
                             <i data-lucide="star" class="star star--empty" style="width: 20px; height: 20px;" data-star="5"></i>
-                            <span class="rating-num" id="rating-value" style="margin-left: var(--space-2); font-size: var(--font-size-body); font-weight: 500;">4.0</span>
+                            <span class="rating-num" id="rating-value" style="margin-left: var(--space-2); font-size: var(--font-size-body); font-weight: 500;">0.0</span>
                         </div>
                     </div>
                 </div>
@@ -1784,124 +1612,28 @@ body {
                     </div>
                 </div>
 
-                <div class="card-white level-card">
-                    <div class="level-header">
-                        <div class="level-icon">
-                            <i data-lucide="chef-hat" style="width: var(--size-icon-lg); height: var(--size-icon-lg); color: var(--color-primary);"></i>
-                        </div>
-                        <div style="flex: 1; min-width: 0;">
-                            <div style="font-family: var(--font-heading); font-size: var(--font-size-h4); font-weight: var(--font-weight-h4); color: var(--color-on-surface);">美食家 Lv.12</div>
-                            <div style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant); margin-top: 2px;">2,450 / 3,000 经验</div>
-                        </div>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-bar-fill" style="width: 81.7%;"></div>
-                    </div>
-                    <div style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant); margin-top: var(--space-2);">距下一级还需 550 经验</div>
-                </div>
+                <div class="card-white level-card"></div>
 
                 <div class="stats-row">
                     <div class="stat-card">
-                        <div class="profile-stat-num">128</div>
+                        <div class="profile-stat-num">--</div>
                         <div class="profile-stat-label">美食记录</div>
                     </div>
                     <div class="stat-card">
-                        <div class="profile-stat-num">12</div>
+                        <div class="profile-stat-num">--</div>
                         <div class="profile-stat-label">家庭菜谱</div>
                     </div>
                     <div class="stat-card">
-                        <div class="profile-stat-num">5</div>
+                        <div class="profile-stat-num">--</div>
                         <div class="profile-stat-label">连续打卡</div>
                     </div>
                 </div>
 
                 <div class="section-title">我的徽章</div>
-                <div class="badge-grid">
-                    <div class="badge-item" onclick="showToast('首次记录：记录你的第一道菜')">
-                        <div class="badge-icon" style="background: var(--primary-50);">
-                            <i data-lucide="pen-line" style="width: 24px; height: 24px; color: var(--color-primary);"></i>
-                        </div>
-                        <span style="font-size: var(--font-size-caption); color: var(--color-on-surface); text-align: center;">首次记录</span>
-                    </div>
-                    <div class="badge-item" onclick="showToast('连续7天：坚持打卡一周')">
-                        <div class="badge-icon" style="background: var(--accent-50);">
-                            <i data-lucide="flame" style="width: 24px; height: 24px; color: var(--accent);"></i>
-                        </div>
-                        <span style="font-size: var(--font-size-caption); color: var(--color-on-surface); text-align: center;">连续7天</span>
-                    </div>
-                    <div class="badge-item" onclick="showToast('百道菜品：记录100道菜')">
-                        <div class="badge-icon" style="background: var(--success-50);">
-                            <i data-lucide="utensils" style="width: 24px; height: 24px; color: var(--success-600);"></i>
-                        </div>
-                        <span style="font-size: var(--font-size-caption); color: var(--color-on-surface); text-align: center;">百道菜品</span>
-                    </div>
-                    <div class="badge-item" onclick="showToast('菜系大师：尝遍各大菜系')">
-                        <div class="badge-icon" style="background: var(--info-50);">
-                            <i data-lucide="award" style="width: 24px; height: 24px; color: var(--info-500);"></i>
-                        </div>
-                        <span style="font-size: var(--font-size-caption); color: var(--color-on-surface); text-align: center;">菜系大师</span>
-                    </div>
-                    <div class="badge-item" onclick="showToast('家庭贡献：分享10道家庭菜谱（未解锁）')">
-                        <div class="badge-icon locked">
-                            <i data-lucide="heart" style="width: 24px; height: 24px; color: var(--neutral-400);"></i>
-                        </div>
-                        <span style="font-size: var(--font-size-caption); color: var(--color-muted-foreground); text-align: center;">家庭贡献</span>
-                    </div>
-                    <div class="badge-item" onclick="showToast('连续30天：坚持打卡一个月（未解锁）')">
-                        <div class="badge-icon locked">
-                            <i data-lucide="calendar-check" style="width: 24px; height: 24px; color: var(--neutral-400);"></i>
-                        </div>
-                        <span style="font-size: var(--font-size-caption); color: var(--color-muted-foreground); text-align: center;">连续30天</span>
-                    </div>
-                </div>
+                <div class="badge-grid" id="badge-grid"></div>
 
                 <div class="section-title">美食挑战</div>
-                <div class="challenge-list">
-                    <div class="challenge-card" onclick="showToast('一周素食挑战进行中！')">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2);">
-                            <div style="display: flex; align-items: center; gap: var(--space-2);">
-                                <i data-lucide="salad" style="width: var(--size-icon-md); height: var(--size-icon-md); color: var(--success-600);"></i>
-                                <span style="font-size: var(--font-size-body); font-weight: var(--font-weight-h4); color: var(--color-on-surface);">一周素食</span>
-                            </div>
-                            <span class="chip filled" style="background: var(--success-50); color: var(--success-600);">进行中</span>
-                        </div>
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2);">
-                            <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">3/7 天</span>
-                            <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">43%</span>
-                        </div>
-                        <div class="progress-bar" style="height: 6px;">
-                            <div class="progress-bar-fill" style="width: 43%; background: var(--success-500);"></div>
-                        </div>
-                    </div>
-
-                    <div class="challenge-card" onclick="startChallenge('环球美食月')">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2);">
-                            <div style="display: flex; align-items: center; gap: var(--space-2);">
-                                <i data-lucide="globe" style="width: var(--size-icon-md); height: var(--size-icon-md); color: var(--color-on-surface-variant);"></i>
-                                <span style="font-size: var(--font-size-body); font-weight: var(--font-weight-h4); color: var(--color-on-surface);">环球美食月</span>
-                            </div>
-                            <span class="chip outline">未开始</span>
-                        </div>
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2);">
-                            <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">0/30 天</span>
-                            <span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">0%</span>
-                        </div>
-                        <div class="progress-bar" style="height: 6px;">
-                            <div class="progress-bar-fill" style="width: 0%;"></div>
-                        </div>
-                    </div>
-
-                    <div class="challenge-card">
-                        <div style="display: flex; align-items: center; justify-content: space-between;">
-                            <div style="display: flex; align-items: center; gap: var(--space-2);">
-                                <i data-lucide="trophy" style="width: var(--size-icon-md); height: var(--size-icon-md); color: var(--accent);"></i>
-                                <span style="font-size: var(--font-size-body); font-weight: var(--font-weight-h4); color: var(--color-on-surface);">家庭厨艺大赛</span>
-                            </div>
-                            <span class="chip outline" style="border-color: var(--accent-300); color: var(--accent);">即将开始</span>
-                        </div>
-                        <div style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant); margin-top: var(--space-2);">6月28日开启</div>
-                    </div>
-                </div>
+                <div class="challenge-list" id="challenge-list"></div>
 
                 <div style="padding: 0 var(--space-5) var(--space-6);">
                     <button class="btn btn-primary btn-lg" style="width: 100%; font-weight: 500;" onclick="showToast('挑战功能即将上线！')">
@@ -1913,25 +1645,25 @@ body {
 
             <div id="page-profile" class="page">
                 <div class="profile-header">
-                    <div class="avatar avatar-lg avatar-profile" style="background: var(--primary-100); cursor: pointer;" onclick="showToast('头像设置')">
-                        <span class="avatar-initials" style="color: var(--primary-700);">味</span>
+                    <div class="avatar avatar-lg avatar-profile" id="profile-avatar" style="background: var(--primary-100); cursor: pointer;" onclick="showToast('头像设置')">
+                        <span class="avatar-initials" style="color: var(--primary-700);"></span>
                     </div>
                     <div style="margin-top: var(--space-3); text-align: center;">
-                        <div style="font-family: var(--font-heading); font-size: var(--font-size-h4); font-weight: 600; color: var(--color-on-surface);">味记用户</div>
-                        <div class="caption" style="color: var(--color-on-surface-variant); margin-top: 2px;">记录美好食光</div>
+                        <div id="profile-name" style="font-family: var(--font-heading); font-size: var(--font-size-h4); font-weight: 600; color: var(--color-on-surface);"></div>
+                        <div class="caption" id="profile-bio" style="color: var(--color-on-surface-variant); margin-top: 2px;"></div>
                     </div>
 
                     <div class="profile-stats">
                         <div class="profile-stat" onclick="navigateTo('home')">
-                            <div class="profile-stat-num">128</div>
+                            <div class="profile-stat-num" id="profile-stat-records">--</div>
                             <div class="profile-stat-label">美食记录</div>
                         </div>
                         <div class="profile-stat" onclick="navigateTo('family')">
-                            <div class="profile-stat-num">12</div>
+                            <div class="profile-stat-num" id="profile-stat-recipes">--</div>
                             <div class="profile-stat-label">家庭菜谱</div>
                         </div>
                         <div class="profile-stat" onclick="navigateTo('achievements')">
-                            <div class="profile-stat-num">5</div>
+                            <div class="profile-stat-num" id="profile-stat-streak">--</div>
                             <div class="profile-stat-label">连续打卡</div>
                         </div>
                     </div>
@@ -2033,248 +1765,7 @@ body {
 
     <div class="toast" id="toast"></div>
 
-    <script>
-        let currentPage = 'home';
-        let checkedInDays = 5;
-        let isCheckedIn = false;
-
-        document.addEventListener('DOMContentLoaded', function() {
-            lucide.createIcons();
-            initInteractions();
-        });
-
-        function navigateTo(page) {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            document.querySelectorAll('.sidebar-nav-item').forEach(n => n.classList.remove('active'));
-
-            const targetPage = document.getElementById('page-' + page);
-            if (targetPage) {
-                targetPage.classList.add('active');
-            }
-
-            document.querySelectorAll(`.nav-item[data-page="${page}"]`).forEach(n => n.classList.add('active'));
-            document.querySelectorAll(`.sidebar-nav-item[data-page="${page}"]`).forEach(n => n.classList.add('active'));
-
-            currentPage = page;
-            window.scrollTo(0, 0);
-            document.querySelector('.page-wrapper').scrollTop = 0;
-
-            lucide.createIcons();
-        }
-
-        function initInteractions() {
-            document.querySelectorAll('#home-chips .chip').forEach(chip => {
-                chip.addEventListener('click', function() {
-                    document.querySelectorAll('#home-chips .chip').forEach(c => {
-                        c.classList.remove('selected');
-                    });
-                    this.classList.add('selected');
-                    filterFood(this.dataset.filter);
-                });
-            });
-
-            document.querySelectorAll('#recipe-tabs .tab-item').forEach(tab => {
-                tab.addEventListener('click', function() {
-                    document.querySelectorAll('#recipe-tabs .tab-item').forEach(t => t.classList.remove('active'));
-                    this.classList.add('active');
-                    filterRecipes(this.dataset.tab);
-                });
-            });
-
-            initRatingStars();
-        }
-
-        function filterFood(filter) {
-            const cards = document.querySelectorAll('#food-diary-list .food-card');
-            cards.forEach(card => {
-                if (filter === 'all') {
-                    card.style.display = 'flex';
-                } else {
-                    const tags = card.dataset.tags || '';
-                    if (tags.includes(filter)) {
-                        card.style.display = 'flex';
-                    } else {
-                        card.style.display = 'none';
-                    }
-                }
-            });
-            showToast(filter === 'all' ? '显示全部' : '筛选：' + this.textContent);
-        }
-
-        function filterRecipes(category) {
-            const cards = document.querySelectorAll('#recipe-grid .food-card');
-            cards.forEach(card => {
-                if (category === 'all') {
-                    card.style.display = 'block';
-                } else {
-                    if (card.dataset.category === category) {
-                        card.style.display = 'block';
-                    } else {
-                        card.style.display = 'none';
-                    }
-                }
-            });
-        }
-
-        function doCheckin() {
-            if (isCheckedIn) {
-                showToast('今日已打卡！');
-                return;
-            }
-
-            isCheckedIn = true;
-            checkedInDays = 6;
-
-            const todayDot = document.querySelector('.checkin-day.today');
-            if (todayDot) {
-                todayDot.classList.remove('today');
-                todayDot.classList.add('done');
-            }
-
-            const futureDots = document.querySelectorAll('.checkin-day.future');
-            if (futureDots.length > 0) {
-                futureDots[0].classList.remove('future');
-                futureDots[0].classList.add('today');
-            }
-
-            const btn = document.getElementById('checkin-btn');
-            btn.textContent = '已打卡';
-            btn.disabled = true;
-            btn.style.opacity = '0.6';
-
-            document.getElementById('checkin-text').textContent = '已坚持 6 天';
-
-            showToast('打卡成功！🔥');
-        }
-
-        function initRatingStars() {
-            const starsContainer = document.getElementById('rating-stars');
-            if (!starsContainer) return;
-
-            const stars = starsContainer.querySelectorAll('.star');
-            stars.forEach((star, index) => {
-                star.addEventListener('click', function() {
-                    const rating = index + 1;
-                    setRating(rating);
-                });
-
-                star.addEventListener('mouseenter', function() {
-                    highlightStars(index + 1);
-                });
-            });
-
-            starsContainer.addEventListener('mouseleave', function() {
-                const currentRating = parseInt(starsContainer.dataset.rating);
-                highlightStars(currentRating);
-            });
-        }
-
-        function setRating(rating) {
-            const starsContainer = document.getElementById('rating-stars');
-            starsContainer.dataset.rating = rating;
-            highlightStars(rating);
-            document.getElementById('rating-value').textContent = rating.toFixed(1);
-        }
-
-        function highlightStars(rating) {
-            const starsContainer = document.getElementById('rating-stars');
-            const stars = starsContainer.querySelectorAll('.star');
-            stars.forEach((star, index) => {
-                if (index < rating) {
-                    star.style.fill = 'var(--accent)';
-                    star.classList.remove('star--empty');
-                } else {
-                    star.style.fill = 'none';
-                    star.classList.add('star--empty');
-                }
-            });
-        }
-
-        function toggleIngredient(el) {
-            if (el.classList.contains('filled')) {
-                el.classList.remove('filled');
-                el.classList.add('outline');
-            } else {
-                el.classList.remove('outline');
-                el.classList.add('filled');
-            }
-        }
-
-        function toggleRecordTag(el) {
-            if (el.classList.contains('selected')) {
-                el.classList.remove('selected');
-                el.classList.add('filled');
-            } else if (el.classList.contains('filled')) {
-                el.classList.remove('filled');
-                el.classList.add('outline');
-            } else {
-                el.classList.remove('outline');
-                el.classList.add('selected');
-            }
-        }
-
-        function startRecognize() {
-            const overlay = document.getElementById('ai-overlay');
-            const badge = document.getElementById('recognize-badge');
-            overlay.classList.add('show');
-
-            setTimeout(() => {
-                overlay.classList.remove('show');
-                badge.style.display = 'inline-flex';
-                showToast('AI识别完成！');
-            }, 2000);
-        }
-
-        function retakePhoto() {
-            const badge = document.getElementById('recognize-badge');
-            badge.style.display = 'none';
-            showToast('请重新拍照');
-        }
-
-        function saveRecord() {
-            const dishName = document.getElementById('dish-name').value;
-            showToast(`"${dishName}" 保存成功！`);
-            setTimeout(() => {
-                navigateTo('home');
-            }, 800);
-        }
-
-        function startChallenge(name) {
-            showToast(`即将开始"${name}"挑战！`);
-        }
-
-        function showToast(message) {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.classList.add('show');
-
-            setTimeout(() => {
-                toast.classList.remove('show');
-            }, 2000);
-        }
-
-        document.getElementById('home-search').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                showToast('搜索：' + this.value);
-            }
-        });
-
-        document.getElementById('family-search').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                showToast('搜索：' + this.value);
-            }
-        });
-
-        document.querySelectorAll('.food-card').forEach(card => {
-            card.addEventListener('click', function(e) {
-                if (e.target.closest('.chip') || e.target.closest('.star')) return;
-                const title = this.querySelector('.card-title');
-                if (title) {
-                    showToast('查看：' + title.textContent);
-                }
-            });
-        });
-    </script>
+    <script src="api.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>

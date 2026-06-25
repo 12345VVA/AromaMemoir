@@ -12,6 +12,9 @@ import uuid
 import hashlib
 import logging
 import os
+import random
+import string
+from datetime import datetime, timezone, timedelta
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -102,6 +105,9 @@ family_recipes: List[Dict[str, Any]] = [
         "uploaderInitials": "妈",
         "uploaderAvatarColor": "accent",
         "description": "麻辣鲜香，下饭神器。",
+        "visibility": "family",
+        "familyId": "family-001",
+        "authorId": "user-002",
     },
     {
         "id": "recipe-002",
@@ -116,6 +122,9 @@ family_recipes: List[Dict[str, Any]] = [
         "uploaderInitials": "爸",
         "uploaderAvatarColor": "success",
         "description": "清甜软糯，桂花飘香。",
+        "visibility": "private",
+        "familyId": "family-001",
+        "authorId": "user-003",
     },
     {
         "id": "recipe-003",
@@ -130,6 +139,9 @@ family_recipes: List[Dict[str, Any]] = [
         "uploaderInitials": "味",
         "uploaderAvatarColor": "primary",
         "description": "清爽健康，颜色翠绿。",
+        "visibility": "family",
+        "familyId": "family-001",
+        "authorId": "user-001",
     },
     {
         "id": "recipe-004",
@@ -144,6 +156,19 @@ family_recipes: List[Dict[str, Any]] = [
         "uploaderInitials": "姐",
         "uploaderAvatarColor": "info",
         "description": "粒粒分明，金黄诱人。",
+        "visibility": "family",
+        "familyId": "family-001",
+        "authorId": "user-004",
+    },
+]
+
+# 家庭组
+families: List[Dict[str, Any]] = [
+    {
+        "id": "family-001",
+        "name": "味记之家",
+        "ownerId": "user-001",
+        "createdAt": "2024-01-01T00:00:00Z",
     },
 ]
 
@@ -158,7 +183,10 @@ family_members: List[Dict[str, Any]] = [
         "avatarColor": "primary",
         "avatarBg": "#ffe6d9",
         "online": True,
-        "role": "member",
+        "role": "owner",
+        "familyId": "family-001",
+        "userId": "user-001",
+        "joinedAt": "2024-01-01T00:00:00Z",
     },
     {
         "id": "member-002",
@@ -169,7 +197,10 @@ family_members: List[Dict[str, Any]] = [
         "avatarColor": "accent",
         "avatarBg": "#fffbeb",
         "online": True,
-        "role": "member",
+        "role": "admin",
+        "familyId": "family-001",
+        "userId": "user-002",
+        "joinedAt": "2024-01-01T00:00:00Z",
     },
     {
         "id": "member-003",
@@ -180,7 +211,10 @@ family_members: List[Dict[str, Any]] = [
         "avatarColor": "success",
         "avatarBg": "#dcfce7",
         "online": False,
-        "role": "admin",
+        "role": "member",
+        "familyId": "family-001",
+        "userId": "user-003",
+        "joinedAt": "2024-01-01T00:00:00Z",
     },
     {
         "id": "member-004",
@@ -192,6 +226,23 @@ family_members: List[Dict[str, Any]] = [
         "avatarBg": "#dbeafe",
         "online": False,
         "role": "member",
+        "familyId": "family-001",
+        "userId": "user-004",
+        "joinedAt": "2024-01-01T00:00:00Z",
+    },
+]
+
+# 家庭邀请
+invitations: List[Dict[str, Any]] = [
+    {
+        "id": "inv-001",
+        "familyId": "family-001",
+        "code": "WX4K9P",
+        "createdBy": "user-001",
+        "createdAt": "2024-06-20T10:00:00Z",
+        "expiresAt": "2024-06-21T10:00:00Z",
+        "used": False,
+        "usedBy": None,
     },
 ]
 
@@ -743,11 +794,21 @@ async def get_record(record_id: str):
 # 家庭
 # ============================================================
 @app.get("/api/family/recipes")
-async def list_family_recipes(category: Optional[str] = Query(None)):
-    """查询家庭菜谱列表，支持按分类筛选"""
+async def list_family_recipes(
+    category: Optional[str] = Query(None),
+    visibility: Optional[str] = Query(None),
+    authorId: Optional[str] = Query(None),
+):
+    """查询家庭菜谱列表，支持按分类、可见性、作者筛选"""
     result = list(family_recipes)
     if category:
         result = [r for r in result if r.get("category") == category]
+    if visibility == "family":
+        result = [r for r in result if r.get("visibility") == "family"]
+    elif visibility == "private":
+        result = [r for r in result if r.get("visibility") == "private" and r.get("authorId") == "user-001"]
+    if authorId:
+        result = [r for r in result if r.get("authorId") == authorId]
     return ok(result)
 
 
@@ -755,6 +816,198 @@ async def list_family_recipes(category: Optional[str] = Query(None)):
 async def list_family_members():
     """查询家庭成员列表"""
     return ok(family_members)
+
+
+# ============================================================
+# 家庭组管理
+# ============================================================
+@app.get("/api/family")
+async def get_family():
+    """返回当前用户所属家庭组信息"""
+    family = next((f for f in families if f.get("ownerId") == "user-001"), None)
+    if not family:
+        return fail("未找到家庭组", code=404)
+    member_count = len([m for m in family_members if m.get("familyId") == family["id"]])
+    return ok({
+        "id": family["id"],
+        "name": family["name"],
+        "ownerId": family["ownerId"],
+        "memberCount": member_count,
+        "createdAt": family["createdAt"],
+    })
+
+
+@app.post("/api/family")
+async def create_family(body: dict):
+    """创建家庭组"""
+    family_id = "family-" + uuid.uuid4().hex[:8]
+    created_at = datetime.now(timezone.utc).isoformat()
+    new_family = {
+        "id": family_id,
+        "name": body.get("name", ""),
+        "ownerId": "user-001",
+        "createdAt": created_at,
+    }
+    families.append(new_family)
+    # 将当前用户加入 family_members（如果不在的话）
+    existing = next(
+        (m for m in family_members
+         if m.get("userId") == "user-001" and m.get("familyId") == family_id),
+        None,
+    )
+    if not existing:
+        family_members.append({
+            "id": "member-" + uuid.uuid4().hex[:8],
+            "name": "我",
+            "nickname": "我",
+            "avatarText": "味",
+            "avatarInitials": "味",
+            "avatarColor": "primary",
+            "avatarBg": "#ffe6d9",
+            "online": True,
+            "role": "owner",
+            "familyId": family_id,
+            "userId": "user-001",
+            "joinedAt": created_at,
+        })
+    return ok(new_family, "家庭组创建成功")
+
+
+@app.patch("/api/family/members/{member_id}")
+async def update_member_role(member_id: str, body: dict):
+    """更新成员角色"""
+    member = next((m for m in family_members if m.get("id") == member_id), None)
+    if not member:
+        return fail("成员不存在", code=404)
+    current = next((m for m in family_members if m.get("userId") == "user-001"), None)
+    if not current or current.get("role") not in ("owner", "admin"):
+        return fail("权限不足", code=403)
+    member["role"] = body.get("role")
+    return ok(member, "更新成功")
+
+
+@app.delete("/api/family/members/{member_id}")
+async def delete_member(member_id: str):
+    """移除成员"""
+    member = next((m for m in family_members if m.get("id") == member_id), None)
+    if not member:
+        return fail("成员不存在", code=404)
+    if member.get("role") == "owner":
+        return fail("不能移除家庭组创建者", code=400)
+    family_members.remove(member)
+    return ok(None, "移除成功")
+
+
+# ============================================================
+# 成员邀请
+# ============================================================
+@app.post("/api/family/invitations")
+async def create_invitation():
+    """生成邀请码"""
+    family = next((f for f in families if f.get("ownerId") == "user-001"), None)
+    code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(hours=24)
+    new_invitation = {
+        "id": "inv-" + uuid.uuid4().hex[:8],
+        "familyId": family["id"] if family else "family-001",
+        "code": code,
+        "createdBy": "user-001",
+        "createdAt": now.isoformat(),
+        "expiresAt": expires_at.isoformat(),
+        "used": False,
+        "usedBy": None,
+    }
+    invitations.append(new_invitation)
+    return ok({
+        "id": new_invitation["id"],
+        "code": new_invitation["code"],
+        "createdAt": new_invitation["createdAt"],
+        "expiresAt": new_invitation["expiresAt"],
+    }, "邀请码生成成功")
+
+
+@app.get("/api/family/invitations")
+async def list_invitations():
+    """返回未过期的邀请列表"""
+    now = datetime.now(timezone.utc)
+    result = []
+    for inv in invitations:
+        try:
+            expires_at = datetime.fromisoformat(inv["expiresAt"].replace("Z", "+00:00"))
+            if expires_at < now:
+                continue
+        except Exception:
+            continue
+        result.append({
+            "id": inv["id"],
+            "code": inv["code"],
+            "createdAt": inv["createdAt"],
+            "expiresAt": inv["expiresAt"],
+            "used": inv.get("used", False),
+        })
+    return ok(result)
+
+
+@app.post("/api/family/join")
+async def join_family(body: dict):
+    """通过邀请码加入家庭"""
+    code = body.get("code")
+    if not code:
+        return fail("code 不能为空", code=400)
+    invitation = next((i for i in invitations if i.get("code") == code), None)
+    if not invitation:
+        return fail("邀请码无效", code=400)
+    if invitation.get("used"):
+        return fail("邀请码已使用", code=400)
+    now = datetime.now(timezone.utc)
+    try:
+        expires_at = datetime.fromisoformat(invitation["expiresAt"].replace("Z", "+00:00"))
+        if expires_at < now:
+            return fail("邀请码已过期", code=400)
+    except Exception:
+        return fail("邀请码已过期", code=400)
+    family_id = invitation["familyId"]
+    existing = next(
+        (m for m in family_members
+         if m.get("userId") == "user-001" and m.get("familyId") == family_id),
+        None,
+    )
+    if existing:
+        return fail("已是家庭成员", code=400)
+    family_members.append({
+        "id": "member-" + uuid.uuid4().hex[:8],
+        "name": "我",
+        "nickname": "我",
+        "avatarText": "味",
+        "avatarInitials": "味",
+        "avatarColor": "primary",
+        "avatarBg": "#ffe6d9",
+        "online": True,
+        "role": "member",
+        "familyId": family_id,
+        "userId": "user-001",
+        "joinedAt": now.isoformat(),
+    })
+    invitation["used"] = True
+    invitation["usedBy"] = "user-001"
+    family = next((f for f in families if f["id"] == family_id), None)
+    return ok(family, "加入成功")
+
+
+# ============================================================
+# 菜谱可见性
+# ============================================================
+@app.patch("/api/family/recipes/{recipe_id}/visibility")
+async def update_recipe_visibility(recipe_id: str, body: dict):
+    """更新菜谱可见性"""
+    recipe = next((r for r in family_recipes if r.get("id") == recipe_id), None)
+    if not recipe:
+        return fail("菜谱不存在", code=404)
+    if recipe.get("authorId") != "user-001":
+        return fail("权限不足", code=403)
+    recipe["visibility"] = body.get("visibility")
+    return ok(recipe, "更新成功")
 
 
 # ============================================================

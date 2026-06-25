@@ -7,6 +7,7 @@ let currentBeautifiedUrl = null;
 let currentOriginalUrl = null;
 let selectedImageVersion = 'original';
 let currentRecommendations = [];
+let currentRecipeVisibility = null;
 
 /* ===== 静态挑战数据（无对应后端接口，作为前端兜底） ===== */
 const CHALLENGES = [
@@ -170,6 +171,7 @@ async function loadHomeData() {
 }
 
 async function loadFamilyData() {
+  currentRecipeVisibility = null;
   const gridEl = document.getElementById('recipe-grid');
   const membersEl = document.getElementById('family-members');
   showLoading(gridEl);
@@ -381,8 +383,14 @@ function renderRecipes(list) {
     const diffTag = r.difficulty
       ? '<span class="tag ' + (r.difficulty === '简单' ? 'tag--accent' : '') + '">' + escapeHTML(r.difficulty) + '</span>'
       : '';
-    return '<div class="food-card food-card--v" data-category="' + escapeAttr(r.category || '') + '" data-id="' + escapeAttr(r.id) + '">' +
+    const visibility = r.visibility || 'family';
+    const visIcon = visibility === 'private' ? 'lock' : 'users';
+    const visTitle = visibility === 'private' ? '切换为家庭共享' : '切换为私厨';
+    return '<div class="food-card food-card--v" data-category="' + escapeAttr(r.category || '') + '" data-id="' + escapeAttr(r.id) + '" data-visibility="' + escapeAttr(visibility) + '">' +
       '<img class="card-img" src="' + escapeAttr(r.coverUrl) + '" alt="' + escapeAttr(r.name) + '" />' +
+      '<button class="visibility-btn" title="' + escapeAttr(visTitle) + '" onclick="toggleRecipeVisibility(\'' + escapeAttr(String(r.id)) + '\', \'' + escapeAttr(visibility) + '\')">' +
+        '<i data-lucide="' + visIcon + '" style="width:14px;height:14px;"></i>' +
+      '</button>' +
       '<div class="card-body">' +
         '<div class="card-title">' + escapeHTML(r.name) + '</div>' +
         '<div style="display: flex; align-items: center; gap: var(--space-2);">' +
@@ -404,6 +412,18 @@ function renderRecipes(list) {
   lucide.createIcons();
 }
 
+function memberRoleTagHTML(role) {
+  let label = '', bg = '', color = '';
+  if (role === 'owner') {
+    label = '群主'; bg = 'var(--warning-100)'; color = 'var(--warning-700)';
+  } else if (role === 'admin') {
+    label = '管理员'; bg = 'var(--info-100)'; color = 'var(--info-700)';
+  } else {
+    label = '成员'; bg = 'var(--surface-container-high)'; color = 'var(--color-on-surface-variant)';
+  }
+  return '<span class="member-role-tag" style="background:' + bg + ';color:' + color + ';">' + escapeHTML(label) + '</span>';
+}
+
 function renderMembers(list) {
   const container = document.getElementById('family-members');
   if (!container) return;
@@ -423,7 +443,8 @@ function renderMembers(list) {
         '<span class="avatar-initials" style="color: ' + colors.text + ';">' + escapeHTML(m.avatarInitials || '') + '</span>' +
         badge +
       '</div>' +
-      '<span style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant);">' + escapeHTML(m.nickname || '') + '</span>' +
+      '<span style="font-size: var(--font-size-caption); color: var(--color-on-surface); font-weight: 500;">' + escapeHTML(m.nickname || '') + '</span>' +
+      memberRoleTagHTML(m.role) +
     '</div>';
   }).join('');
   lucide.createIcons();
@@ -735,6 +756,7 @@ async function filterFood(filter) {
 }
 
 async function filterRecipes(category) {
+  currentRecipeVisibility = null;
   const gridEl = document.getElementById('recipe-grid');
   showLoading(gridEl);
   try {
@@ -742,6 +764,47 @@ async function filterRecipes(category) {
     renderRecipes(data || []);
   } catch (err) {
     hideLoading(gridEl);
+    showToast(err.message);
+  }
+}
+
+async function filterRecipesByVisibility(visibility) {
+  currentRecipeVisibility = visibility || null;
+  const gridEl = document.getElementById('recipe-grid');
+  showLoading(gridEl);
+  try {
+    const data = visibility
+      ? await api.getRecipesFiltered({ visibility: visibility })
+      : await api.getFamilyRecipes();
+    renderRecipes(data || []);
+  } catch (err) {
+    hideLoading(gridEl);
+    showToast(err.message);
+  }
+}
+
+async function reloadFamilyRecipes() {
+  const gridEl = document.getElementById('recipe-grid');
+  if (!gridEl) return;
+  showLoading(gridEl);
+  try {
+    const data = currentRecipeVisibility
+      ? await api.getRecipesFiltered({ visibility: currentRecipeVisibility })
+      : await api.getFamilyRecipes();
+    renderRecipes(data || []);
+  } catch (err) {
+    hideLoading(gridEl);
+    showToast(err.message);
+  }
+}
+
+async function toggleRecipeVisibility(recipeId, currentVisibility) {
+  const newVisibility = currentVisibility === 'private' ? 'family' : 'private';
+  try {
+    await api.updateRecipeVisibility(recipeId, newVisibility);
+    showToast(newVisibility === 'family' ? '已切换为家庭共享' : '已切换为私厨');
+    reloadFamilyRecipes();
+  } catch (err) {
     showToast(err.message);
   }
 }
@@ -1059,6 +1122,60 @@ function showAddToMenuDialog(recipeId) {
   });
 }
 
+async function showInvitationDialog() {
+  const existing = document.getElementById('invitation-dialog');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'invitation-dialog';
+  overlay.className = 'dialog-overlay';
+  overlay.innerHTML =
+    '<div class="dialog">' +
+      '<div class="dialog-title">邀请家人</div>' +
+      '<div class="dialog-section">' +
+        '<div class="dialog-label">邀请码</div>' +
+        '<div id="invitation-code" class="invitation-code">生成中...</div>' +
+        '<div style="font-size:var(--font-size-caption);color:var(--color-on-surface-variant);margin-top:var(--space-2);">将邀请码分享给家人，他们注册后即可加入家庭。</div>' +
+      '</div>' +
+      '<div class="dialog-actions">' +
+        '<button class="btn btn-ghost" id="invitation-cancel">关闭</button>' +
+        '<button class="btn btn-primary" id="invitation-copy" disabled>复制邀请码</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  lucide.createIcons();
+
+  const codeEl = overlay.querySelector('#invitation-code');
+  const copyBtn = overlay.querySelector('#invitation-copy');
+  const cancelBtn = overlay.querySelector('#invitation-cancel');
+
+  cancelBtn.addEventListener('click', function() { overlay.remove(); });
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+
+  try {
+    const data = await api.createInvitation();
+    const code = (data && (data.code || data.invitationCode)) || '';
+    if (codeEl) codeEl.textContent = code || '暂无邀请码';
+    if (copyBtn) copyBtn.disabled = !code;
+    if (copyBtn && code) {
+      copyBtn.addEventListener('click', function() {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(code).then(function() {
+            showToast('邀请码已复制');
+          }).catch(function() {
+            showToast('复制失败，请手动复制');
+          });
+        } else {
+          showToast('当前环境不支持复制');
+        }
+      });
+    }
+  } catch (err) {
+    if (codeEl) codeEl.textContent = '生成失败';
+    showToast(err.message);
+  }
+}
+
 async function handleVote(menuId, vote) {
   try {
     await api.voteMenuItem(menuId, vote, 'user-001');
@@ -1185,7 +1302,12 @@ function initInteractions() {
     tab.addEventListener('click', function() {
       document.querySelectorAll('#recipe-tabs .tab-item').forEach(t => t.classList.remove('active'));
       this.classList.add('active');
-      filterRecipes(this.dataset.tab);
+      const visibility = this.dataset.visibility;
+      if (visibility !== undefined) {
+        filterRecipesByVisibility(visibility);
+      } else {
+        filterRecipes(this.dataset.tab);
+      }
     });
   });
 
@@ -1224,7 +1346,7 @@ function initInteractions() {
       return;
     }
     const card = e.target.closest('.food-card');
-    if (card && !e.target.closest('.chip') && !e.target.closest('.star') && !e.target.closest('.add-menu-btn')) {
+    if (card && !e.target.closest('.chip') && !e.target.closest('.star') && !e.target.closest('.add-menu-btn') && !e.target.closest('.visibility-btn')) {
       const title = card.querySelector('.card-title');
       if (title) showToast('查看：' + title.textContent);
     }

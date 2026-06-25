@@ -1,0 +1,22 @@
+# Checklist
+
+- [x] 后端新增 `families` 列表，包含家庭组实体（id、名称、ownerId、创建时间）
+- [x] `family_members` 每个成员增加 familyId、role、joinedAt、userId 字段
+- [x] `family_recipes` 每项增加 visibility、familyId、authorId 字段
+- [x] 后端新增 `invitations` 列表，含邀请码、创建时间、过期时间、是否已使用
+- [x] `GET /api/family` 返回当前用户所属家庭组信息
+- [x] `POST /api/family` 创建家庭组，创建者自动成为 owner
+- [x] `GET /api/family/members` 返回成员角色、加入时间等新字段
+- [x] `PATCH /api/family/members/{memberId}` 可更新成员角色，非 owner/admin 返回 403
+- [x] `DELETE /api/family/members/{memberId}` 可移除成员，owner 不能移除自己
+- [x] `POST /api/family/invitations` 生成 6 位邀请码，有效期 24 小时
+- [x] `GET /api/family/invitations` 返回未过期的邀请列表
+- [x] `POST /api/family/join` 通过邀请码加入家庭，无效/过期邀请码返回 400
+- [x] `GET /api/family/recipes` 支持 visibility 和 authorId 查询参数筛选
+- [x] `PATCH /api/family/recipes/{recipeId}/visibility` 可更新菜谱可见性，非作者返回 403
+- [x] 前端 api.js 包含家庭管理、邀请、菜谱可见性方法
+- [x] 家庭菜谱页成员栏展示角色标签（owner/admin/member）
+- [x] 邀请入口按钮可弹出邀请码弹窗，展示邀请码和复制功能
+- [x] 菜谱卡片展示可见性图标，点击可切换可见性
+- [x] 菜谱分类标签支持"全部/家庭共享/我的私厨"筛选切换
+- [x] 核心闭环验证：查询家庭→生成邀请码→加入家庭→成员角色管理→菜谱可见性切换

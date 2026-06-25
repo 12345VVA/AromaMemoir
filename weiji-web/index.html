@@ -647,6 +647,7 @@ body {
 
 .food-card--v {
     width: 100%;
+    position: relative;
 }
 
 .food-card--v .card-img {
@@ -660,6 +661,28 @@ body {
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
+}
+
+.visibility-btn {
+    position: absolute;
+    top: var(--space-2);
+    right: var(--space-2);
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-full);
+    border: none;
+    background: rgba(51, 47, 42, 0.5);
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+    transition: background .15s;
+}
+
+.visibility-btn:hover {
+    background: rgba(51, 47, 42, 0.75);
 }
 
 .tag {
@@ -875,6 +898,17 @@ body {
     transform: scale(1.05);
 }
 
+.member-role-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px var(--space-2);
+    border-radius: var(--radius-full);
+    font-size: 10px;
+    line-height: 1.4;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
 .recipe-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -1072,6 +1106,24 @@ body {
     font-size: var(--font-size-caption);
     color: var(--color-on-surface-variant);
     margin-bottom: var(--space-2);
+}
+
+.invitation-code {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px dashed var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-3);
+    font-family: var(--font-heading);
+    font-size: var(--font-size-h4);
+    font-weight: var(--font-weight-h4);
+    color: var(--color-primary);
+    letter-spacing: 2px;
+    background: var(--color-primary-container);
+    word-break: break-all;
+    text-align: center;
 }
 
 .dialog-options {
@@ -2362,12 +2414,17 @@ body {
                         <button class="tab-item" data-tab="home">家常菜</button>
                         <button class="tab-item" data-tab="soup">汤品</button>
                         <button class="tab-item" data-tab="dessert">甜品</button>
+                        <button class="tab-item" data-visibility="family">家庭共享</button>
+                        <button class="tab-item" data-visibility="private">我的私厨</button>
                     </div>
 
                     <div style="padding: var(--space-4) var(--space-5);">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-3);">
                             <span style="font-weight: 600; font-size: var(--font-size-body); color: var(--color-on-surface);">家人</span>
-                            <button class="btn btn-ghost" onclick="showToast('邀请家人功能')">邀请家人</button>
+                            <button class="btn btn-ghost" onclick="showInvitationDialog()">
+                                <i data-lucide="user-plus" style="width: 16px; height: 16px; margin-right: 4px;"></i>
+                                邀请家人
+                            </button>
                         </div>
                         <div class="family-members no-scrollbar" id="family-members"></div>
                     </div>

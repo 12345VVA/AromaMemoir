@@ -1,0 +1,40 @@
+# Checklist
+
+- [x] 后端 CORS 中间件已配置，前端可跨域访问
+- [x] 后端内存数据存储层已创建，包含与设计稿一致的种子数据
+- [x] `POST /api/ai/recognize` 返回符合 MVP手册契约的识别结果（含 dishName、ingredients、confidence、nutrition）
+- [x] `GET /api/record/list` 返回分页格式的美食日记列表（含 list、total、page、pageSize）
+- [x] `POST /api/record` 可保存记录，后续列表查询可查到新记录
+- [x] `GET /api/family/recipes` 返回家庭菜谱列表，支持 category 筛选
+- [x] `GET /api/family/members` 返回家庭成员列表
+- [x] `GET /api/achievement/list` 返回成就徽章列表（含已解锁/未解锁状态）
+- [x] `GET /api/achievement/level` 返回用户等级、经验值、进度条数据
+- [x] `GET /api/checkin/status` 返回连续打卡天数和打卡日历状态
+- [x] `POST /api/checkin` 打卡成功后更新状态，重复打卡返回提示
+- [x] `GET /api/user/profile` 返回用户信息和统计数据（记录数、菜谱数、连续打卡天数）
+- [x] 所有后端响应统一为 `{ code, data, message }` 格式
+- [x] 前端 api.js 已封装所有 API 方法，支持 baseURL 配置
+- [x] 前端网络错误时显示 Toast 提示，不崩溃页面
+- [x] 前端接口返回错误码时展示后端 message
+- [x] 首页美食日记通过 API 动态加载，无硬编码数据
+- [x] 首页打卡状态通过 API 加载，打卡按钮调用真实接口
+- [x] 家庭菜谱页菜谱和成员通过 API 动态加载
+- [x] AI记录页识别功能调用真实后端接口，结果填充到表单
+- [x] AI记录页保存记录调用 `POST /api/record`，成功后跳转首页并刷新列表
+- [x] 成就页等级、徽章、挑战数据通过 API 动态加载
+- [x] 个人中心用户信息和统计数据通过 API 动态加载
+- [x] 各页面数据加载时显示 Loading 状态
+- [x] 核心闭环验证通过：首页加载 → 拍照识别 → 编辑保存 → 首页列表刷新显示新记录
+- [x] 各页面数据加载无控制台报错
+- [x] 页面交互（筛选、打卡、评分、标签切换）响应正常
+- [x] 前后端同端口部署，前端通过相对路径访问 API，无跨域问题
+- [x] 后端挂载静态文件：index.html、api.js、app.js、assets 目录
+- [x] 用户注册接口 `POST /api/auth/register` 可用
+- [x] 用户登录接口 `POST /api/auth/login` 可用，返回 token 和用户信息
+- [x] 用户登出接口 `POST /api/auth/logout` 可用
+- [x] Token 通过 Authorization: Bearer header 传递
+- [x] 前端登录页面已实现，支持登录/注册模式切换
+- [x] 前端未登录时自动跳转登录页，登录后进入首页
+- [x] 前端个人中心有退出登录入口
+- [x] 登录状态通过 localStorage 持久化（token + 用户信息）
+- [x] 演示账号：demo / 123456

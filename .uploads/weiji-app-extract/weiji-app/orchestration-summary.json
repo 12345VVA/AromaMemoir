@@ -1,0 +1,242 @@
+{
+  "project": {
+    "name": "味记App",
+    "operation": "create",
+    "operatingMode": "library-bound",
+    "deviceType": "mobile",
+    "designRead": "mobile app / 家庭美食爱好者 / 温暖亲切家庭感 / showcase+information-dense / 避免冷色调和过度装饰",
+    "designDials": { "layoutVariance": 3, "motionIntensity": 2, "visualDensity": 3 },
+    "styleDefinitionBrief": null,
+    "sharedProjectShellContract": {
+      "navigationType": "bottom-nav-with-center-fab",
+      "primaryColor": "var(--primary)",
+      "cardRadius": "var(--radius-xl)",
+      "surfaceBackground": "var(--background)",
+      "typographyTitle": "var(--font-heading)",
+      "typographyBody": "var(--font-body)",
+      "shadowModel": "warm-tinted-5-level"
+    },
+    "generationTree": {
+      "root": {
+        "nodeId": "gen-project-shell",
+        "kind": "project-shell",
+        "pageIds": ["page-home", "page-ai-record", "page-family-recipes", "page-achievements", "page-profile"],
+        "output": "partials/project-shell.html",
+        "sharedRegions": ["status-bar", "bottom-nav", "page-background", "brand-css"],
+        "privateRegions": [],
+        "mutableSlots": ["activeNavItem", "pageTitle", "pageContent"],
+        "status": "planned",
+        "children": [
+          {
+            "nodeId": "gen-page-home",
+            "kind": "page-leaf",
+            "pageIds": ["page-home"],
+            "output": "pages/home.html",
+            "sharedRegions": [],
+            "privateRegions": ["search-bar", "chip-filters", "checkin-card", "food-diary-list"],
+            "mutableSlots": [],
+            "status": "planned",
+            "children": []
+          },
+          {
+            "nodeId": "gen-page-ai-record",
+            "kind": "page-leaf",
+            "pageIds": ["page-ai-record"],
+            "output": "pages/ai-record.html",
+            "sharedRegions": [],
+            "privateRegions": ["camera-preview", "ai-result-panel", "rating-tags", "save-actions"],
+            "mutableSlots": [],
+            "status": "planned",
+            "children": []
+          },
+          {
+            "nodeId": "gen-page-family-recipes",
+            "kind": "page-leaf",
+            "pageIds": ["page-family-recipes"],
+            "output": "pages/family-recipes.html",
+            "sharedRegions": [],
+            "privateRegions": ["family-members", "recipe-grid", "tab-bar"],
+            "mutableSlots": [],
+            "status": "planned",
+            "children": []
+          },
+          {
+            "nodeId": "gen-page-achievements",
+            "kind": "page-leaf",
+            "pageIds": ["page-achievements"],
+            "output": "pages/achievements.html",
+            "sharedRegions": [],
+            "privateRegions": ["level-progress", "badge-grid", "streak-tracker", "challenge-list"],
+            "mutableSlots": [],
+            "status": "planned",
+            "children": []
+          },
+          {
+            "nodeId": "gen-page-profile",
+            "kind": "page-leaf",
+            "pageIds": ["page-profile"],
+            "output": "pages/profile.html",
+            "sharedRegions": [],
+            "privateRegions": ["profile-header", "stats-row", "action-buttons", "menu-list"],
+            "mutableSlots": [],
+            "status": "planned",
+            "children": []
+          }
+        ]
+      }
+    }
+  },
+  "designSource": {
+    "operatingMode": "library-bound",
+    "libraryIdentity": {
+      "name": "weiji",
+      "id": "RKMY4FLJYW--LA",
+      "version": 2,
+      "scope": null,
+      "path": "/data/user/design_libraries/weiji",
+      "versionSource": "metadata.json"
+    },
+    "brandPrefix": "",
+    "cssPath": "/data/user/design_libraries/weiji/colors_and_type.css",
+    "componentsCssPath": "/data/user/design_libraries/weiji/components.css",
+    "uiKitPath": "/data/user/design_libraries/weiji/ui_kits/app/index.html",
+    "forbiddenInventedComponents": [],
+    "allowedComponents": ["button", "card", "bottom-nav", "input", "avatar", "chip"]
+  },
+  "pages": [
+    {
+      "nodeId": "page-home",
+      "title": "首页",
+      "htmlSrc": "pages/home.html",
+      "pageIndex": 1,
+      "pageType": "showcase",
+      "visualNorthStar": "温暖家庭感的美食日记首页，以打卡卡片和美食日记卡片为核心内容，底部导航中央突出拍照按钮",
+      "compositionPattern": "vertical-scroll-feed",
+      "continuityAnchors": ["bottom-nav-with-center-fab", "warm-card-radius-xl", "brand-orange-primary-cta"],
+      "componentPlan": [
+        { "slug": "input", "why": "搜索框用于搜索菜谱或食材" },
+        { "slug": "chip", "why": "分类标签筛选" },
+        { "slug": "card", "why": "美食日记卡片展示" },
+        { "slug": "button", "why": "打卡按钮" },
+        { "slug": "bottom-nav", "why": "底部导航" }
+      ],
+      "imagePlan": [
+        { "role": "supporting-content", "section": "food-diary", "filename": "food-hongshaorou.jpg", "status": "planned" },
+        { "role": "supporting-content", "section": "food-diary", "filename": "food-tomato-noodle.jpg", "status": "planned" },
+        { "role": "supporting-content", "section": "food-diary", "filename": "food-sweet-ribs.jpg", "status": "planned" }
+      ],
+      "chartsRequired": false
+    },
+    {
+      "nodeId": "page-ai-record",
+      "title": "AI识别记录",
+      "htmlSrc": "pages/ai-record.html",
+      "pageIndex": 2,
+      "pageType": "task-driven",
+      "visualNorthStar": "AI拍照识别流程页，展示相机取景→AI分析→识别结果→评分标签→保存的完整交互链路",
+      "compositionPattern": "single-flow-wizard",
+      "continuityAnchors": ["bottom-nav-with-center-fab", "warm-card-radius-xl", "brand-orange-primary-cta"],
+      "componentPlan": [
+        { "slug": "button", "why": "拍照和保存按钮" },
+        { "slug": "card", "why": "AI识别结果卡片" },
+        { "slug": "chip", "why": "评分和标签" },
+        { "slug": "input", "why": "编辑菜品名称" },
+        { "slug": "bottom-nav", "why": "底部导航" }
+      ],
+      "imagePlan": [
+        { "role": "critical-hero", "section": "camera-preview", "filename": "food-camera-preview.jpg", "status": "planned" }
+      ],
+      "chartsRequired": false
+    },
+    {
+      "nodeId": "page-family-recipes",
+      "title": "家庭菜谱",
+      "htmlSrc": "pages/family-recipes.html",
+      "pageIndex": 3,
+      "pageType": "showcase",
+      "visualNorthStar": "家庭共享菜谱空间，展示家人头像、分类标签、推荐菜谱网格，突出协作和家庭感",
+      "compositionPattern": "grid-gallery",
+      "continuityAnchors": ["bottom-nav-with-center-fab", "warm-card-radius-xl", "brand-orange-primary-cta"],
+      "componentPlan": [
+        { "slug": "avatar", "why": "家庭成员头像" },
+        { "slug": "input", "why": "搜索家庭菜谱" },
+        { "slug": "card", "why": "菜谱卡片网格" },
+        { "slug": "chip", "why": "分类标签" },
+        { "slug": "button", "why": "邀请家人按钮" },
+        { "slug": "bottom-nav", "why": "底部导航" }
+      ],
+      "imagePlan": [
+        { "role": "supporting-content", "section": "recipe-grid", "filename": "recipe-mapo-tofu.jpg", "status": "planned" },
+        { "role": "supporting-content", "section": "recipe-grid", "filename": "recipe-guihua-gao.jpg", "status": "planned" },
+        { "role": "supporting-content", "section": "recipe-grid", "filename": "recipe-broccoli.jpg", "status": "planned" },
+        { "role": "supporting-content", "section": "recipe-grid", "filename": "recipe-egg-fried-rice.jpg", "status": "planned" }
+      ],
+      "chartsRequired": false
+    },
+    {
+      "nodeId": "page-achievements",
+      "title": "成就徽章",
+      "htmlSrc": "pages/achievements.html",
+      "pageIndex": 4,
+      "pageType": "information-dense",
+      "visualNorthStar": "游戏化成就系统页面，展示等级进度、徽章墙、连续打卡日历和挑战赛列表",
+      "compositionPattern": "dashboard-cards",
+      "continuityAnchors": ["bottom-nav-with-center-fab", "warm-card-radius-xl", "brand-orange-primary-cta"],
+      "componentPlan": [
+        { "slug": "button", "why": "打卡和参与挑战按钮" },
+        { "slug": "card", "why": "成就卡片" },
+        { "slug": "chip", "why": "徽章标签" },
+        { "slug": "bottom-nav", "why": "底部导航" }
+      ],
+      "imagePlan": [],
+      "chartsRequired": false
+    },
+    {
+      "nodeId": "page-profile",
+      "title": "个人中心",
+      "htmlSrc": "pages/profile.html",
+      "pageIndex": 5,
+      "pageType": "information-dense",
+      "visualNorthStar": "个人中心页面，展示用户头像、统计数据、功能入口列表，简洁清晰的信息架构",
+      "compositionPattern": "profile-list",
+      "continuityAnchors": ["bottom-nav-with-center-fab", "warm-card-radius-xl", "brand-orange-primary-cta"],
+      "componentPlan": [
+        { "slug": "avatar", "why": "用户头像" },
+        { "slug": "button", "why": "记录美食和编辑菜谱按钮" },
+        { "slug": "bottom-nav", "why": "底部导航" }
+      ],
+      "imagePlan": [],
+      "chartsRequired": false
+    }
+  ],
+  "assets": [],
+  "wiringPlan": [
+    { "from": "page-home", "domId": "nav-records", "to": "page-ai-record", "label": "记录" },
+    { "from": "page-home", "domId": "nav-family", "to": "page-family-recipes", "label": "家庭" },
+    { "from": "page-home", "domId": "nav-profile", "to": "page-profile", "label": "我的" },
+    { "from": "page-ai-record", "domId": "nav-home", "to": "page-home", "label": "首页" },
+    { "from": "page-ai-record", "domId": "nav-family", "to": "page-family-recipes", "label": "家庭" },
+    { "from": "page-ai-record", "domId": "nav-profile", "to": "page-profile", "label": "我的" },
+    { "from": "page-family-recipes", "domId": "nav-home", "to": "page-home", "label": "首页" },
+    { "from": "page-family-recipes", "domId": "nav-records", "to": "page-ai-record", "label": "记录" },
+    { "from": "page-family-recipes", "domId": "nav-profile", "to": "page-profile", "label": "我的" },
+    { "from": "page-achievements", "domId": "nav-home", "to": "page-home", "label": "首页" },
+    { "from": "page-achievements", "domId": "nav-records", "to": "page-ai-record", "label": "记录" },
+    { "from": "page-achievements", "domId": "nav-family", "to": "page-family-recipes", "label": "家庭" },
+    { "from": "page-achievements", "domId": "nav-profile", "to": "page-profile", "label": "我的" },
+    { "from": "page-profile", "domId": "nav-home", "to": "page-home", "label": "首页" },
+    { "from": "page-profile", "domId": "nav-records", "to": "page-ai-record", "label": "记录" },
+    { "from": "page-profile", "domId": "nav-family", "to": "page-family-recipes", "label": "家庭" },
+    { "from": "page-profile", "domId": "menu-achievements", "to": "page-achievements", "label": "成就徽章", "hideEdge": true }
+  ],
+  "hiddenInteractionPlan": [
+    { "from": "page-home", "domId": "fab-camera", "to": "page-ai-record", "label": "拍照记录", "hideEdge": true },
+    { "from": "page-ai-record", "domId": "fab-camera", "to": "page-ai-record", "label": "拍照记录", "hideEdge": true },
+    { "from": "page-family-recipes", "domId": "fab-camera", "to": "page-ai-record", "label": "拍照记录", "hideEdge": true },
+    { "from": "page-achievements", "domId": "fab-camera", "to": "page-ai-record", "label": "拍照记录", "hideEdge": true },
+    { "from": "page-profile", "domId": "fab-camera", "to": "page-ai-record", "label": "拍照记录", "hideEdge": true },
+    { "from": "page-ai-record", "domId": "save-back-home", "to": "page-home", "label": "保存返回首页", "hideEdge": true },
+    { "from": "page-profile", "domId": "menu-diary", "to": "page-home", "label": "我的日记", "hideEdge": true },
+    { "from": "page-profile", "domId": "menu-family-recipes", "to": "page-family-recipes", "label": "家庭菜谱", "hideEdge": true }
+  ]
+}

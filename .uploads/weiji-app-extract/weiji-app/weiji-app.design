@@ -1,0 +1,353 @@
+{
+  "data": [
+    {
+      "id": "page-home",
+      "title": "首页",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1750819200000,
+      "canvasData": {
+        "x": 420,
+        "y": 0,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/home.html",
+        "interactions": [
+          {
+            "domId": "nav-records",
+            "targetPageId": "page-ai-record",
+            "transitionLabel": "记录"
+          },
+          {
+            "domId": "nav-family",
+            "targetPageId": "page-family-recipes",
+            "transitionLabel": "家庭"
+          },
+          {
+            "domId": "nav-profile",
+            "targetPageId": "page-profile",
+            "transitionLabel": "我的"
+          },
+          {
+            "domId": "fab-camera",
+            "targetPageId": "page-ai-record",
+            "hideEdge": true,
+            "transitionLabel": "拍照记录"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-ai-record",
+      "title": "AI识别记录",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1750819200000,
+      "canvasData": {
+        "x": 420,
+        "y": 652,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/ai-record.html",
+        "interactions": [
+          {
+            "domId": "nav-home",
+            "targetPageId": "page-home",
+            "transitionLabel": "首页"
+          },
+          {
+            "domId": "nav-family",
+            "targetPageId": "page-family-recipes",
+            "transitionLabel": "家庭"
+          },
+          {
+            "domId": "nav-profile",
+            "targetPageId": "page-profile",
+            "transitionLabel": "我的"
+          },
+          {
+            "domId": "fab-camera",
+            "targetPageId": "page-ai-record",
+            "hideEdge": true,
+            "transitionLabel": "拍照记录"
+          },
+          {
+            "domId": "save-back-home",
+            "targetPageId": "page-home",
+            "hideEdge": true,
+            "transitionLabel": "保存返回首页"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-family-recipes",
+      "title": "家庭菜谱",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1750819200000,
+      "canvasData": {
+        "x": 420,
+        "y": 1320,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/family-recipes.html",
+        "interactions": [
+          {
+            "domId": "nav-home",
+            "targetPageId": "page-home",
+            "transitionLabel": "首页"
+          },
+          {
+            "domId": "nav-records",
+            "targetPageId": "page-ai-record",
+            "transitionLabel": "记录"
+          },
+          {
+            "domId": "nav-profile",
+            "targetPageId": "page-profile",
+            "transitionLabel": "我的"
+          },
+          {
+            "domId": "fab-camera",
+            "targetPageId": "page-ai-record",
+            "hideEdge": true,
+            "transitionLabel": "拍照记录"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-achievements",
+      "title": "成就徽章",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1750819200000,
+      "canvasData": {
+        "x": 0,
+        "y": 0,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/achievements.html",
+        "interactions": [
+          {
+            "domId": "nav-home",
+            "targetPageId": "page-home",
+            "transitionLabel": "首页"
+          },
+          {
+            "domId": "nav-records",
+            "targetPageId": "page-ai-record",
+            "transitionLabel": "记录"
+          },
+          {
+            "domId": "nav-family",
+            "targetPageId": "page-family-recipes",
+            "transitionLabel": "家庭"
+          },
+          {
+            "domId": "nav-profile",
+            "targetPageId": "page-profile",
+            "transitionLabel": "我的"
+          },
+          {
+            "domId": "fab-camera",
+            "targetPageId": "page-ai-record",
+            "hideEdge": true,
+            "transitionLabel": "拍照记录"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-profile",
+      "title": "个人中心",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1750819200000,
+      "canvasData": {
+        "x": 420,
+        "y": 2029,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/profile.html",
+        "interactions": [
+          {
+            "domId": "nav-home",
+            "targetPageId": "page-home",
+            "transitionLabel": "首页"
+          },
+          {
+            "domId": "nav-records",
+            "targetPageId": "page-ai-record",
+            "transitionLabel": "记录"
+          },
+          {
+            "domId": "nav-family",
+            "targetPageId": "page-family-recipes",
+            "transitionLabel": "家庭"
+          },
+          {
+            "domId": "fab-camera",
+            "targetPageId": "page-ai-record",
+            "hideEdge": true,
+            "transitionLabel": "拍照记录"
+          },
+          {
+            "domId": "menu-achievements",
+            "targetPageId": "page-achievements",
+            "hideEdge": true,
+            "transitionLabel": "成就徽章"
+          },
+          {
+            "domId": "menu-diary",
+            "targetPageId": "page-home",
+            "hideEdge": true,
+            "transitionLabel": "我的日记"
+          },
+          {
+            "domId": "menu-family-recipes",
+            "targetPageId": "page-family-recipes",
+            "hideEdge": true,
+            "transitionLabel": "家庭菜谱"
+          }
+        ]
+      }
+    },
+    {
+      "id": "image-001",
+      "title": "红烧肉美食照片",
+      "type": "image",
+      "version": 1,
+      "createdAt": 1750819200000,
+      "canvasData": {
+        "x": 0,
+        "y": 2619
+      },
+      "devMetadata": {
+        "imageSrc": "assets/food-hongshaorou.jpg"
+      }
+    },
+    {
+      "id": "image-002",
+      "title": "番茄鸡蛋面美食照片",
+      "type": "image",
+      "version": 1,
+      "createdAt": 1750819200000,
+      "canvasData": {
+        "x": 420,
+        "y": 2619
+      },
+      "devMetadata": {
+        "imageSrc": "assets/food-tomato-noodle.jpg"
+      }
+    },
+    {
+      "id": "image-003",
+      "title": "糖醋排骨美食照片",
+      "type": "image",
+      "version": 1,
+      "createdAt": 1750819200000,
+      "canvasData": {
+        "x": 840,
+        "y": 2619
+      },
+      "devMetadata": {
+        "imageSrc": "assets/food-sweet-ribs.jpg"
+      }
+    },
+    {
+      "id": "image-004",
+      "title": "相机取景美食预览",
+      "type": "image",
+      "version": 1,
+      "createdAt": 1750819200000,
+      "canvasData": {
+        "x": 1260,
+        "y": 2619
+      },
+      "devMetadata": {
+        "imageSrc": "assets/food-camera-preview.jpg"
+      }
+    },
+    {
+      "id": "image-005",
+      "title": "麻婆豆腐菜谱照片",
+      "type": "image",
+      "version": 1,
+      "createdAt": 1750819200000,
+      "canvasData": {
+        "x": 1680,
+        "y": 2619
+      },
+      "devMetadata": {
+        "imageSrc": "assets/recipe-mapo-tofu.jpg"
+      }
+    },
+    {
+      "id": "image-006",
+      "title": "桂花糕菜谱照片",
+      "type": "image",
+      "version": 1,
+      "createdAt": 1750819200000,
+      "canvasData": {
+        "x": 2100,
+        "y": 2619
+      },
+      "devMetadata": {
+        "imageSrc": "assets/recipe-guihua-gao.jpg"
+      }
+    },
+    {
+      "id": "image-007",
+      "title": "蒜蓉西兰花菜谱照片",
+      "type": "image",
+      "version": 1,
+      "createdAt": 1750819200000,
+      "canvasData": {
+        "x": 2520,
+        "y": 2619
+      },
+      "devMetadata": {
+        "imageSrc": "assets/recipe-broccoli.jpg"
+      }
+    },
+    {
+      "id": "image-008",
+      "title": "蛋炒饭菜谱照片",
+      "type": "image",
+      "version": 1,
+      "createdAt": 1750819200000,
+      "canvasData": {
+        "x": 2940,
+        "y": 2619
+      },
+      "devMetadata": {
+        "imageSrc": "assets/recipe-egg-fried-rice.jpg"
+      }
+    }
+  ],
+  "config": {
+    "autoLayout": true,
+    "deviceType": "mobile",
+    "projectName": "味记App",
+    "designLibrary": {
+      "name": "weiji",
+      "id": "RKMY4FLJYW--LA",
+      "version": 2,
+      "scope": null,
+      "path": "/data/user/design_libraries/weiji",
+      "versionSource": "metadata.json"
+    },
+    "showEdge": false,
+    "windowSize": {
+      "width": 800,
+      "height": 600
+    }
+  }
+}

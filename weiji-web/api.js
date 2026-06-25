@@ -172,4 +172,36 @@ const api = {
   deleteShoppingItem(itemId) {
     return request('DELETE', '/api/family/shopping/' + itemId);
   },
+  getFamilyInfo() {
+    return request('GET', '/api/family');
+  },
+  createFamily(name) {
+    return request('POST', '/api/family', { name });
+  },
+  updateMemberRole(memberId, role) {
+    return request('PATCH', '/api/family/members/' + memberId, { role });
+  },
+  removeMember(memberId) {
+    return request('DELETE', '/api/family/members/' + memberId);
+  },
+  createInvitation() {
+    return request('POST', '/api/family/invitations');
+  },
+  getInvitations() {
+    return request('GET', '/api/family/invitations');
+  },
+  joinFamily(code) {
+    return request('POST', '/api/family/join', { code });
+  },
+  getRecipesFiltered(params) {
+    const query = new URLSearchParams();
+    if (params.visibility) query.set('visibility', params.visibility);
+    if (params.authorId) query.set('authorId', params.authorId);
+    if (params.category) query.set('category', params.category);
+    const qs = query.toString();
+    return request('GET', '/api/family/recipes' + (qs ? '?' + qs : ''));
+  },
+  updateRecipeVisibility(recipeId, visibility) {
+    return request('PATCH', '/api/family/recipes/' + recipeId + '/visibility', { visibility });
+  },
 };

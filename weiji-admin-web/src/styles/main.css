@@ -1,0 +1,264 @@
+/* ===== 全局 CSS 变量（暖色调，参考 weiji-web 设计） ===== */
+:root {
+  /* 主色 - 暖橙 */
+  --primary-50: #fff5f0;
+  --primary-100: #ffe6d9;
+  --primary-200: #ffc9a8;
+  --primary-300: #ffa06e;
+  --primary-400: #ff7a3d;
+  --primary-500: #ff5e1a;
+  --primary-600: #e64a10;
+  --primary-700: #b83a0e;
+  --primary-800: #8f2d0e;
+  --primary-900: #6e230f;
+
+  /* 强调色 - 琥珀 */
+  --accent-50: #fffbeb;
+  --accent-100: #fff3c4;
+  --accent-300: #ffd24a;
+  --accent-500: #f5a623;
+  --accent-700: #a86b0d;
+
+  /* 中性色 */
+  --neutral-50: #faf8f5;
+  --neutral-100: #f5f0e8;
+  --neutral-200: #e8dfd2;
+  --neutral-300: #d4c7b5;
+  --neutral-400: #b8a694;
+  --neutral-500: #9a8b7a;
+  --neutral-600: #7d7064;
+  --neutral-700: #635a50;
+  --neutral-800: #4a443d;
+  --neutral-900: #332f2a;
+
+  /* 语义色 */
+  --success-500: #22c55e;
+  --warning-500: #f59e0b;
+  --error-500: #ef4444;
+
+  /* 表面 */
+  --background: #fffaf5;
+  --surface: #ffffff;
+  --surface-dim: #f5f0e8;
+  --surface-container-low: #faf7f2;
+  --surface-container: #f5f0e8;
+  --surface-container-high: #ebe4da;
+  --card: #ffffff;
+
+  --foreground: #332f2a;
+  --muted-foreground: #7d7064;
+  --border: #e8dfd2;
+
+  /* 字体 */
+  --font-display: 'Noto Serif SC', serif;
+  --font-heading: 'Noto Serif SC', serif;
+  --font-body: 'Noto Sans SC', sans-serif;
+
+  /* 圆角 */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* 阴影 */
+  --shadow-1: 0 1px 3px rgba(51, 47, 42, 0.08), 0 1px 2px rgba(51, 47, 42, 0.04);
+  --shadow-2: 0 4px 8px -2px rgba(51, 47, 42, 0.1);
+  --shadow-3: 0 8px 24px -6px rgba(51, 47, 42, 0.14);
+  --shadow-4: 0 16px 40px -10px rgba(51, 47, 42, 0.2);
+
+  /* 覆盖 Element Plus 主色为暖橙 */
+  --el-color-primary: #ff5e1a;
+  --el-color-primary-light-3: #ff7a3d;
+  --el-color-primary-light-5: #ff9a66;
+  --el-color-primary-light-7: #ffbb99;
+  --el-color-primary-light-8: #ffccb3;
+  --el-color-primary-light-9: #ffe6d9;
+  --el-color-primary-dark-2: #e64a10;
+}
+
+/* ===== 基础重置 ===== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--background);
+  color: var(--foreground);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+/* ===== 移动端优先容器（max-width: 480px 居中） ===== */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  max-width: 480px;
+  margin: 0 auto;
+  background: var(--background);
+  position: relative;
+  box-shadow: var(--shadow-2);
+}
+
+.page-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 80px;
+}
+
+/* ===== 顶部标题栏 ===== */
+.app-header {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  background: var(--background);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.app-header-title {
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+/* ===== 底部导航栏 ===== */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-around;
+  height: 60px;
+  background: var(--card);
+  border-top: 1px solid var(--border);
+  z-index: 100;
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex: 1;
+  cursor: pointer;
+  color: var(--muted-foreground);
+  transition: color 0.15s;
+  background: none;
+  border: none;
+  font-family: var(--font-body);
+  padding: 6px 0;
+}
+
+.nav-item .el-icon {
+  font-size: 22px;
+}
+
+.nav-item .nav-label {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.nav-item.active {
+  color: var(--primary-500);
+}
+
+.nav-item.active .nav-label {
+  font-weight: 600;
+}
+
+/* ===== 通用页面内边距 ===== */
+.page-content {
+  padding: 16px;
+}
+
+.section-title {
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--foreground);
+  padding: 16px 0 12px;
+}
+
+/* ===== 卡片 ===== */
+.wj-card {
+  background: var(--card);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-1);
+  padding: 16px;
+}
+
+/* ===== 空状态 ===== */
+.empty-tip {
+  text-align: center;
+  color: var(--muted-foreground);
+  padding: 40px 16px;
+  font-size: 14px;
+}
+
+/* ===== Element Plus 组件微调 ===== */
+.el-button--primary {
+  --el-button-bg-color: var(--primary-500);
+  --el-button-border-color: var(--primary-500);
+  --el-button-hover-bg-color: var(--primary-600);
+  --el-button-hover-border-color: var(--primary-600);
+  --el-button-active-bg-color: var(--primary-700);
+  --el-button-active-border-color: var(--primary-700);
+}
+
+.el-card {
+  border-radius: var(--radius-lg);
+  border: none;
+  box-shadow: var(--shadow-1);
+}
+
+/* 滚动条隐藏 */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

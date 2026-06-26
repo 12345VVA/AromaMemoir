@@ -50,10 +50,10 @@
   - [x] SubTask 9.2: `weiji-admin-web` 运行 `npm run test` 验证 Vue 组件测试通过（4 文件 / 25 测试全过）
   - [x] SubTask 9.3: 手动验证 `weiji-web`（vanilla JS）在浏览器中无报错（启动静态服务，curl 验证 index.html/api.js/app.js 均含新功能）
 
-- [ ] Task 10: 合并到 main 并推送到 git 服务器
-  - [ ] SubTask 10.1: 在功能分支上提交所有实现代码（commit: "feat: 新增娱乐化玩法 F27-F30 实现"）
-  - [ ] SubTask 10.2: 切回 main 分支，执行 `git merge feature/extend-gamification`（no-ff）
-  - [ ] SubTask 10.3: 执行 `git push origin main` 推送到 GitHub
+- [x] Task 10: 合并到 main 并推送到 git 服务器
+  - [x] SubTask 10.1: 在功能分支上提交所有实现代码（commit: "feat: 新增娱乐化玩法 F27-F30 实现"，4d52c00，36 文件 +3238/-12）
+  - [x] SubTask 10.2: 切回 main 分支，执行 `git merge --no-ff feature/extend-gamification`（merge commit 3b8ac8b，37 文件 +3248/-15，无冲突）
+  - [x] SubTask 10.3: 执行 `git push origin main` 推送到 GitHub（21686bc..3b8ac8b，本地与远程 origin/main 已同步）
 
 # Task Dependencies
 - Task 2 依赖 Task 1（PRD 先定义，再实现）

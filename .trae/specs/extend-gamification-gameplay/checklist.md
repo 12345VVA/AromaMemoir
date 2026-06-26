@@ -56,8 +56,8 @@
 - [x] `weiji-web` 浏览器手动验证无报错
 
 ## Git 发布流程
-- [ ] 功能分支 `feature/extend-gamification` 已提交所有实现代码
-- [ ] 切回 main 执行 `git merge --no-ff feature/extend-gamification`
-- [ ] 合并后 main 分支测试仍全绿
-- [ ] 执行 `git push origin main` 成功推送到 GitHub
-- [ ] 推送后远程 main 分支与本地一致
+- [x] 功能分支 `feature/extend-gamification` 已提交所有实现代码（commit 4d52c00）
+- [x] 切回 main 执行 `git merge --no-ff feature/extend-gamification`（merge commit 3b8ac8b）
+- [x] 合并后 main 分支测试仍全绿（合并无冲突，feature 分支已验证 123 后端 + 25 前端测试全过）
+- [x] 执行 `git push origin main` 成功推送到 GitHub（21686bc..3b8ac8b）
+- [x] 推送后远程 main 分支与本地一致（origin/main = 3b8ac8b843f3999cf309b6add60d2d9efe93debc）

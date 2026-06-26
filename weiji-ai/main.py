@@ -6,11 +6,26 @@
       由 cool-admin 代理层统一对外暴露，并在转发时补全 /api 前缀。
       本服务仅暴露 /health 与 /ai/* 路径。
 """
+import asyncio
+import os
+import uuid
+
 from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from typing import Any
 import logging
+
+from config import settings, log_config_status
+from exceptions import AiProviderError, AiAuthError, AiQuotaError, AiInvalidInputError
+
+from services.baidu_vision import recognize_dish as baidu_recognize
+from services.openai_vision import recognize_dish as openai_recognize
+from services.tencent_moderation import check_image as tencent_check
+from services.volcano_image import beautify as volcano_beautify
+from services.qwen_llm import recommend as qwen_recommend
+from services.xfyun_asr import recognize as xfyun_recognize
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -27,6 +42,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 启动时打印各 AI 厂商配置状态（不打印 key 值，缺失时降级返回 mock 数据）
+log_config_status()
+
+# 确保静态文件目录存在（beautify 端点降级时落盘原图使用）
+os.makedirs('static', exist_ok=True)
+app.mount('/static', StaticFiles(directory='static'), name='static')
 
 
 # ============================================================
@@ -51,17 +73,11 @@ async def health_check():
 
 
 # ============================================================
-# 食物识别服务
+# 降级用 mock 数据（key 缺失或服务异常时返回演示数据）
 # ============================================================
-@app.post("/ai/recognize")
-async def recognize_food(image: UploadFile = File(...)):
-    """
-    食物图片识别
-    调用百度AI菜品识别，置信度 < 0.8 时 GPT-4o Vision 兜底
-    """
-    # TODO: 集成百度AI菜品识别
-    # TODO: 集成 GPT-4o Vision 兜底
-    data = {
+def _mock_recognize_data():
+    """食物识别降级演示数据"""
+    return {
         "dishName": "红烧牛肉面",
         "ingredients": [
             {"name": "牛肉", "confidence": 0.95},
@@ -80,39 +96,11 @@ async def recognize_food(image: UploadFile = File(...)):
         "imageUrl": "assets/food-camera-preview.jpg",
         "needManualInput": False,
     }
-    return ok(data)
 
 
-# ============================================================
-# 图片美化服务
-# ============================================================
-@app.post("/ai/beautify")
-async def beautify_image(image: UploadFile = File(...), style: str = "auto"):
-    """
-    AI 图片美化
-    调用火山引擎智能美化 API
-    """
-    # TODO: 集成火山引擎智能美化
-    data = {
-        "beautifiedUrl": "assets/food-beautified.jpg",
-        "originalUrl": "assets/food-camera-preview.jpg",
-        "style": style,
-        "message": "美化完成",
-    }
-    return ok(data)
-
-
-# ============================================================
-# 菜谱推荐服务
-# ============================================================
-@app.post("/ai/recommend")
-async def recommend_recipe(request: dict):
-    """
-    菜谱推荐（LLM + RAG）
-    调用通义千问 Qwen3.5，支持流式响应
-    """
-    # TODO: 集成通义千问 + RAG 检索
-    data = {
+def _mock_recommend_data():
+    """菜谱推荐降级示例数据"""
+    return {
         "recipes": [
             {
                 "id": "rec-rec-001",
@@ -147,7 +135,137 @@ async def recommend_recipe(request: dict):
         ],
         "message": "为你推荐了3道菜谱",
     }
-    return ok(data)
+
+
+# ============================================================
+# 食物识别服务
+# ============================================================
+@app.post("/ai/recognize")
+async def recognize_food(image: UploadFile = File(...)):
+    """
+    食物图片识别
+    流程：腾讯云审核 + 百度识别 并行 → 违规拦截 → 百度 confidence ≥ 0.8 直接返回
+         → < 0.8 或百度失败调 GPT-4o 兜底 → 任一异常降级返回 mock
+    """
+    try:
+        image_bytes = await image.read()
+
+        # 百度识别用 try/except 包裹单独捕获，失败时返回 None 触发 GPT 兜底
+        async def _safe_baidu():
+            try:
+                return await baidu_recognize(image_bytes)
+            except AiProviderError:
+                return None
+
+        # 并行：腾讯云审核 + 百度识别
+        moderation_result, baidu_result = await asyncio.gather(
+            tencent_check(image_bytes),
+            _safe_baidu(),
+        )
+
+        # 违规拦截
+        if not moderation_result:
+            return fail("图片内容不合规，请更换图片后重试")
+
+        # 百度高置信度直接返回
+        if baidu_result and baidu_result.get('confidence', 0) >= 0.8:
+            return ok({
+                **baidu_result,
+                'imageUrl': '',
+                'needManualInput': False,
+            })
+
+        # 百度低置信度或失败 → GPT-4o 兜底
+        try:
+            gpt_result = await openai_recognize(image_bytes)
+            return ok({
+                **gpt_result,
+                'imageUrl': '',
+                'needManualInput': False,
+            })
+        except AiAuthError:
+            # GPT key 也缺失，降级返回 mock
+            return ok(_mock_recognize_data(), message="未配置 AI 识别 Key，返回演示数据")
+        except AiProviderError:
+            return ok(_mock_recognize_data(), message="AI 识别服务暂不可用，返回演示数据")
+    except Exception:
+        logger.exception("recognize_food error")
+        return ok(_mock_recognize_data(), message="识别服务异常，返回演示数据")
+
+
+# ============================================================
+# 图片美化服务
+# ============================================================
+@app.post("/ai/beautify")
+async def beautify_image(image: UploadFile = File(...), style: str = "auto"):
+    """
+    AI 图片美化
+    调用火山引擎，失败时降级返回原图保存到 static
+    """
+    try:
+        image_bytes = await image.read()
+        # 保存原图作为 fallback
+        original_filename = f"original_{uuid.uuid4().hex}.jpg"
+        original_path = f"static/{original_filename}"
+        with open(original_path, 'wb') as f:
+            f.write(image_bytes)
+
+        try:
+            beautified_bytes = await volcano_beautify(image_bytes, style)
+            filename = f"beautified_{uuid.uuid4().hex}.jpg"
+            filepath = f"static/{filename}"
+            with open(filepath, 'wb') as f:
+                f.write(beautified_bytes)
+            return ok({
+                'beautifiedUrl': f'/static/{filename}',
+                'originalUrl': f'/static/{original_filename}',
+                'style': style,
+                'message': '美化完成',
+            })
+        except AiAuthError:
+            return ok({
+                'beautifiedUrl': f'/static/{original_filename}',
+                'originalUrl': f'/static/{original_filename}',
+                'style': style,
+                'message': '未配置火山引擎 Key，已返回原图',
+            })
+        except AiProviderError:
+            return ok({
+                'beautifiedUrl': f'/static/{original_filename}',
+                'originalUrl': f'/static/{original_filename}',
+                'style': style,
+                'message': '美化服务暂不可用，已返回原图',
+            })
+    except Exception:
+        logger.exception("beautify_image error")
+        return fail("图片处理异常，请稍后重试")
+
+
+# ============================================================
+# 菜谱推荐服务
+# ============================================================
+@app.post("/ai/recommend")
+async def recommend_recipe(request: dict):
+    """
+    菜谱推荐（LLM）
+    调用通义千问，失败时降级返回 mock
+    """
+    dish_name = request.get('dishName', '')
+    recent_records = request.get('recentRecords')
+
+    try:
+        recipes = await qwen_recommend(dish_name, recent_records)
+        return ok({
+            'recipes': recipes,
+            'message': f'为你推荐了 {len(recipes)} 道菜谱',
+        })
+    except AiAuthError:
+        return ok(_mock_recommend_data(), message="未配置通义千问 Key，返回推荐示例")
+    except AiProviderError:
+        return ok(_mock_recommend_data(), message="AI 推荐暂不可用，已返回推荐示例")
+    except Exception:
+        logger.exception("recommend_recipe error")
+        return ok(_mock_recommend_data(), message="推荐服务异常，返回推荐示例")
 
 
 # ============================================================
@@ -156,15 +274,21 @@ async def recommend_recipe(request: dict):
 @app.post("/ai/voice/recognize")
 async def recognize_voice(audio: UploadFile = File(...)):
     """
-    语音识别代理
-    调用科大讯飞 ASR
+    语音识别
+    调用讯飞 ASR，失败时降级返回空文本
     """
-    # TODO: 集成科大讯飞语音识别
-    data = {
-        "text": "今天中午吃了一碗红烧牛肉面，味道很不错。",
-        "message": "识别成功",
-    }
-    return ok(data)
+    try:
+        audio_bytes = await audio.read()
+        try:
+            text = await xfyun_recognize(audio_bytes)
+            return ok({'text': text, 'message': '识别成功'})
+        except AiAuthError:
+            return ok({'text': '', 'message': '未配置讯飞 Key，语音识别不可用'})
+        except AiProviderError:
+            return ok({'text': '', 'message': '语音识别暂不可用'})
+    except Exception:
+        logger.exception("recognize_voice error")
+        return ok({'text': '', 'message': '语音识别服务异常'})
 
 
 # ============================================================
@@ -174,13 +298,13 @@ async def recognize_voice(audio: UploadFile = File(...)):
 async def generate_sticker(image: UploadFile = File(...), style: str = "default"):
     """
     AI 贴纸生成
-    异步任务，调用火山引擎/通义万相
+    保留 mock 实现，标注 TODO 等待后续集成
     """
-    # TODO: 集成 AI 贴纸生成
+    # TODO: 集成 AI 贴纸生成（火山引擎/通义万相）
     data = {
         "stickerUrl": "assets/sticker-generated.png",
         "style": style,
-        "message": "贴纸生成成功",
+        "message": "贴纸生成功能开发中",
     }
     return ok(data)
 

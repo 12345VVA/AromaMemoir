@@ -18,6 +18,9 @@ import type {
   Challenge,
   MealType,
   ShoppingCategory,
+  PokedexCatalogEntry,
+  PersonalityTypeDef,
+  BlindGuessRound,
 } from './types';
 
 // ============================================================
@@ -624,6 +627,128 @@ export const challenges: Challenge[] = [
 ];
 
 // ============================================================
+// 种子数据：pokedexCatalog（美食图鉴全量目录）
+// 覆盖 6 个菜系分类，每个分类 5-7 道菜，含稀有度等级
+// 这些是"图鉴全部格子"，与用户是否记录过无关；运行时由 aggregatePokedex 与用户记录交叉对比
+// 稀有度分布约 60% common / 25% rare / 10% epic / 5% legendary
+// ============================================================
+export const pokedexCatalog: PokedexCatalogEntry[] = [
+  // 家常菜（6 道）
+  { dishName: '番茄炒蛋', category: '家常菜', rarity: 'common' },
+  { dishName: '红烧肉', category: '家常菜', rarity: 'common' },
+  { dishName: '清炒西兰花', category: '家常菜', rarity: 'common' },
+  { dishName: '蒸蛋羹', category: '家常菜', rarity: 'common' },
+  { dishName: '糖醋里脊', category: '家常菜', rarity: 'rare' },
+  { dishName: '板栗烧鸡', category: '家常菜', rarity: 'rare' },
+  { dishName: '八宝鸭', category: '家常菜', rarity: 'epic' },
+  // 川菜（6 道）
+  { dishName: '麻婆豆腐', category: '川菜', rarity: 'common' },
+  { dishName: '宫保鸡丁', category: '川菜', rarity: 'common' },
+  { dishName: '回锅肉', category: '川菜', rarity: 'common' },
+  { dishName: '辣子鸡', category: '川菜', rarity: 'common' },
+  { dishName: '水煮鱼', category: '川菜', rarity: 'rare' },
+  { dishName: '夫妻肺片', category: '川菜', rarity: 'rare' },
+  // 粤菜（6 道）
+  { dishName: '白切鸡', category: '粤菜', rarity: 'common' },
+  { dishName: '蒸排骨', category: '粤菜', rarity: 'common' },
+  { dishName: '叉烧', category: '粤菜', rarity: 'common' },
+  { dishName: '虾饺', category: '粤菜', rarity: 'rare' },
+  { dishName: '烧鹅', category: '粤菜', rarity: 'rare' },
+  { dishName: '老火靓汤', category: '粤菜', rarity: 'epic' },
+  // 面食（6 道）
+  { dishName: '红烧牛肉面', category: '面食', rarity: 'common' },
+  { dishName: '阳春面', category: '面食', rarity: 'common' },
+  { dishName: '担担面', category: '面食', rarity: 'common' },
+  { dishName: '兰州拉面', category: '面食', rarity: 'rare' },
+  { dishName: '重庆小面', category: '面食', rarity: 'rare' },
+  { dishName: '意大利面', category: '面食', rarity: 'epic' },
+  // 烘焙（6 道）
+  { dishName: '桂花糕', category: '烘焙', rarity: 'common' },
+  { dishName: '戚风蛋糕', category: '烘焙', rarity: 'common' },
+  { dishName: '曲奇饼干', category: '烘焙', rarity: 'common' },
+  { dishName: '蛋挞', category: '烘焙', rarity: 'rare' },
+  { dishName: '法棍面包', category: '烘焙', rarity: 'rare' },
+  { dishName: '马卡龙', category: '烘焙', rarity: 'legendary' },
+  // 日料（6 道）
+  { dishName: '寿司', category: '日料', rarity: 'common' },
+  { dishName: '刺身', category: '日料', rarity: 'common' },
+  { dishName: '天妇罗', category: '日料', rarity: 'common' },
+  { dishName: '日式拉面', category: '日料', rarity: 'common' },
+  { dishName: '寿喜烧', category: '日料', rarity: 'rare' },
+  { dishName: '怀石料理', category: '日料', rarity: 'legendary' },
+];
+
+// ============================================================
+// 种子数据：personalityTypes（人格类型映射表）
+// 8 种美食人格，含 code/name/description/traits[]/shareText
+// shareText 为预格式化的社交分享文案；buildPersonalityReport 也可使用模板动态生成
+// ============================================================
+export const personalityTypes: PersonalityTypeDef[] = [
+  {
+    code: 'carb_lover',
+    name: '碳水爱好者',
+    description: '你是碳水的忠实粉丝，每一口米饭与面条都是幸福的味道',
+    traits: ['米饭党', '面条控', '能量满载'],
+    shareText: '我是「碳水爱好者」——你是碳水的忠实粉丝，每一口米饭与面条都是幸福的味道。来味记测测你的美食人格！',
+  },
+  {
+    code: 'spice_explorer',
+    name: '辣味探险家',
+    description: '无辣不欢的你，用每一次舌尖的刺激探索美食的边界',
+    traits: ['无辣不欢', '重口偏好', '味蕾冒险'],
+    shareText: '我是「辣味探险家」——无辣不欢的你，用每一次舌尖的刺激探索美食的边界。来味记测测你的美食人格！',
+  },
+  {
+    code: 'health_guru',
+    name: '健康达人',
+    description: '你追求轻盈与营养的平衡，每一餐都是对身体最好的告白',
+    traits: ['轻食主义', '营养均衡', '自律人生'],
+    shareText: '我是「健康达人」——你追求轻盈与营养的平衡，每一餐都是对身体最好的告白。来味记测测你的美食人格！',
+  },
+  {
+    code: 'meat_enthusiast',
+    name: '肉食主义者',
+    description: '肉食是你的信仰，每一块鲜嫩的肉类都是无法抗拒的诱惑',
+    traits: ['无肉不欢', '高蛋白', '能量爆炸'],
+    shareText: '我是「肉食主义者」——肉食是你的信仰，每一块鲜嫩的肉类都是无法抗拒的诱惑。来味记测测你的美食人格！',
+  },
+  {
+    code: 'sweet_tooth',
+    name: '甜品控',
+    description: '甜食是你的快乐源泉，每一口甜品都是治愈心灵的良药',
+    traits: ['甜品爱好', '甜味至上', '快乐源泉'],
+    shareText: '我是「甜品控」——甜食是你的快乐源泉，每一口甜品都是治愈心灵的良药。来味记测测你的美食人格！',
+  },
+  {
+    code: 'light_eater',
+    name: '清淡派',
+    description: '你崇尚清淡饮食，用最简单的烹饪还原食材本真的味道',
+    traits: ['清淡饮食', '少油少盐', '本味追求'],
+    shareText: '我是「清淡派」——你崇尚清淡饮食，用最简单的烹饪还原食材本真的味道。来味记测测你的美食人格！',
+  },
+  {
+    code: 'family_chef',
+    name: '家庭厨神',
+    description: '你是家里的掌勺大厨，用一道道家常菜温暖整个家庭的胃',
+    traits: ['家常菜大师', '温暖厨艺', '家的味道'],
+    shareText: '我是「家庭厨神」——你是家里的掌勺大厨，用一道道家常菜温暖整个家庭的胃。来味记测测你的美食人格！',
+  },
+  {
+    code: 'adventurer',
+    name: '美食冒险家',
+    description: '你的味蕾永远在路上，乐于尝试各种风格与新颖的菜品',
+    traits: ['多元尝试', '美食探险', '不设边界'],
+    shareText: '我是「美食冒险家」——你的味蕾永远在路上，乐于尝试各种风格与新颖的菜品。来味记测测你的美食人格！',
+  },
+];
+
+// ============================================================
+// 种子数据：blindGuessRounds（盲猜轮次内存表）
+// 初始为空数组，运行时由控制器动态创建
+// ============================================================
+export const blindGuessRounds: BlindGuessRound[] = [];
+
+// ============================================================
 // 启动时打印种子数据统计（验证可见）
 // ============================================================
 console.log('[store] 种子数据加载完成:');
@@ -639,4 +764,7 @@ console.log(`  - achievements count: ${achievements.length}`);
 console.log(`  - user_achievements count: ${user_achievements.length}`);
 console.log(`  - check_ins count: ${check_ins.length}`);
 console.log(`  - challenges count: ${challenges.length}`);
+console.log(`  - pokedexCatalog count: ${pokedexCatalog.length}`);
+console.log(`  - personalityTypes count: ${personalityTypes.length}`);
+console.log(`  - blindGuessRounds count: ${blindGuessRounds.length}`);
 console.log(`[store] 演示账号：demo / 123456`);

@@ -29,7 +29,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { HomeFilled, Camera, User, Trophy, UserFilled } from '@element-plus/icons-vue';
+import { HomeFilled, Camera, User, Trophy, UserFilled, MagicStick } from '@element-plus/icons-vue';
 
 // 底部导航 Tab 配置
 const tabs = [
@@ -37,6 +37,7 @@ const tabs = [
   { path: '/ai-record', label: 'AI记录', icon: Camera },
   { path: '/family', label: '家庭', icon: User },
   { path: '/achievements', label: '成就', icon: Trophy },
+  { path: '/gameplay', label: '玩法', icon: MagicStick },
   { path: '/profile', label: '我的', icon: UserFilled },
 ];
 
@@ -49,6 +50,7 @@ const titleMap: Record<string, string> = {
   AiRecord: 'AI 记录',
   FamilyRecipes: '家庭菜谱',
   Achievements: '成就徽章',
+  Gameplay: '趣味玩法',
   Profile: '我的',
 };
 const currentTitle = computed(() => titleMap[route.name as string] || '味记');

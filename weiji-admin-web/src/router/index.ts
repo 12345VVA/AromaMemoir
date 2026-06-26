@@ -7,6 +7,7 @@ const routes = [
   { path: '/ai-record', name: 'AiRecord', component: () => import('../views/AiRecord.vue'), meta: { requiresAuth: true } },
   { path: '/family', name: 'FamilyRecipes', component: () => import('../views/FamilyRecipes.vue'), meta: { requiresAuth: true } },
   { path: '/achievements', name: 'Achievements', component: () => import('../views/Achievements.vue'), meta: { requiresAuth: true } },
+  { path: '/gameplay', name: 'Gameplay', component: () => import('../views/Gameplay.vue'), meta: { requiresAuth: true } },
   { path: '/profile', name: 'Profile', component: () => import('../views/Profile.vue'), meta: { requiresAuth: true } },
 ];
 

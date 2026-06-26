@@ -204,4 +204,27 @@ const api = {
   updateRecipeVisibility(recipeId, visibility) {
     return request('PATCH', '/api/family/recipes/' + recipeId + '/visibility', { visibility });
   },
+
+  /* ===== 趣味玩法（F27-F30） ===== */
+  getPokedex() {
+    return request('GET', '/api/gamification/pokedex');
+  },
+  getPersonality() {
+    return request('GET', '/api/gamification/personality');
+  },
+  getTimemachine() {
+    return request('GET', '/api/gamification/timemachine');
+  },
+  createBlindGuessRound(data) {
+    return request('POST', '/api/gamification/blindguess/round', data);
+  },
+  getBlindGuessRound(roundId) {
+    return request('GET', '/api/gamification/blindguess/round/' + encodeURIComponent(roundId));
+  },
+  submitBlindGuess(roundId, data) {
+    return request('POST', '/api/gamification/blindguess/round/' + encodeURIComponent(roundId) + '/guess', data);
+  },
+  revealBlindGuessRound(roundId) {
+    return request('POST', '/api/gamification/blindguess/round/' + encodeURIComponent(roundId) + '/reveal');
+  },
 };

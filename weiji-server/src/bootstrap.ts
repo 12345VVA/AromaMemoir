@@ -66,7 +66,10 @@ function registerController(router: Router, ControllerClass: { new (...args: unk
   }
 }
 
-async function bootstrap(): Promise<void> {
+// 构建并返回 Koa 应用实例（装配中间件 + 注册控制器 + onReady 钩子）
+// 不启动 HTTP 服务、不启动 AI 健康检查定时任务，供 bootstrap 启动与测试复用：
+// supertest 通过 app.callback() 直接调用 Node http handler，无需占用真实端口。
+export async function createApp(): Promise<Koa> {
   const app = new Koa();
   const router = new Router();
 
@@ -115,7 +118,14 @@ async function bootstrap(): Promise<void> {
   const configuration = new Configuration();
   await configuration.onReady();
 
-  // 7.5 AI 服务健康检查：启动时立即检查一次，之后每 60 秒定时检查
+  return app;
+}
+
+// 启动 HTTP 服务（含 AI 健康检查定时任务）
+async function bootstrap(): Promise<void> {
+  const app = await createApp();
+
+  // AI 服务健康检查：启动时立即检查一次，之后每 60 秒定时检查
   // 维护 AiProxyService.aiStatus 供 /health 端点动态暴露
   AiProxyService.checkHealth().catch(() => {
     // 忽略：checkHealth 内部已记录日志并更新状态
@@ -126,14 +136,18 @@ async function bootstrap(): Promise<void> {
     });
   }, 60_000);
 
-  // 8. 启动 HTTP 服务
+  // 启动 HTTP 服务
   app.listen(appConfig.port, () => {
     console.log(`[weiji-server] 业务后端已启动：http://localhost:${appConfig.port}`);
     console.log(`[weiji-server] 健康检查：curl http://localhost:${appConfig.port}/health`);
   });
 }
 
-bootstrap().catch((err) => {
-  console.error('[weiji-server] 启动失败：', err);
-  process.exit(1);
-});
+// 仅在直接执行本文件时启动（ts-node src/bootstrap.ts 或 node dist/bootstrap.js）。
+// 被 require/import 时（如单元/集成测试）只暴露 createApp，不启动服务、不占端口、不挂定时任务。
+if (require.main === module) {
+  bootstrap().catch((err) => {
+    console.error('[weiji-server] 启动失败：', err);
+    process.exit(1);
+  });
+}

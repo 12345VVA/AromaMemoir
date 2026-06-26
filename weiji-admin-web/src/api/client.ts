@@ -24,6 +24,14 @@ instance.interceptors.response.use(
     return res.data !== undefined ? res.data : res;
   },
   (error) => {
+    // 401 未认证：清除 token 并重定向到登录页
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      // 避免 SSR 环境无 window，加 typeof 判断
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+    }
     return Promise.reject(error);
   }
 );

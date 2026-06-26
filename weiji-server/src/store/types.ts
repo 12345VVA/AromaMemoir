@@ -243,3 +243,139 @@ export interface Challenge {
   isActive: boolean;
   createdAt: string;
 }
+
+// ============================================================
+// 娱乐化玩法扩展（F27-F30）
+// ============================================================
+
+// 稀有度等级
+export type PokedexRarity = 'common' | 'rare' | 'epic' | 'legendary';
+
+// 美食图鉴条目
+export interface PokedexItem {
+  dishName: string;
+  category: string;          // 菜系/食材/地域分类
+  rarity: PokedexRarity;
+  unlocked: boolean;
+  firstRecordedAt: string | null;
+  recordCount: number;
+}
+
+// 美食图鉴汇总
+export interface PokedexSummary {
+  totalSlots: number;
+  unlockedSlots: number;
+  completionRate: number;   // 0-1
+  categories: Array<{
+    category: string;
+    totalSlots: number;
+    unlockedSlots: number;
+    items: PokedexItem[];
+  }>;
+}
+
+// 人格报告
+export interface PersonalityReport {
+  available: boolean;
+  personalityType: string | null;
+  description: string;
+  traits: string[];
+  shareText: string;
+  coverImage: string;
+  recordCount: number;
+}
+
+// 时光机回忆条目
+export interface TimemachineMemory {
+  year: number;
+  date: string;             // YYYY-MM-DD
+  records: Record[];        // 复用已有 Record 类型
+  coverImage: string;
+  caption: string;
+}
+
+// 时光机结果
+export interface TimemachineResult {
+  memories: TimemachineMemory[];
+  todayDate: string;
+}
+
+// 盲猜轮次状态
+export type BlindGuessRoundStatus = 'active' | 'revealed';
+
+// 盲猜轮次条目（一条家庭菜谱记录 + 真实作者信息）
+export interface BlindGuessItem {
+  recordId: string;
+  recipeId: string;
+  dishName: string;
+  coverUrl: string;
+  realAuthorId: string;
+  realAuthorName: string;
+}
+
+// 盲猜轮次
+export interface BlindGuessRound {
+  id: string;
+  familyId: string;
+  roundName: string;
+  creatorId: string;
+  items: BlindGuessItem[];
+  guesses: BlindGuessGuess[];   // 所有成员的猜测
+  status: BlindGuessRoundStatus;
+  createdAt: string;
+  revealedAt: string | null;
+}
+
+// 盲猜猜测
+export interface BlindGuessGuess {
+  userId: string;
+  userNickname: string;
+  itemId: string;               // 对应 BlindGuessItem.recordId
+  guessAuthorId: string;
+  guessAuthorName: string;
+  guessDishName: string;
+  correct: boolean;             // 揭晓后填充
+  score: number;                // 揭晓后填充
+  createdAt: string;
+}
+
+// 盲猜结果排名
+export interface BlindGuessRankEntry {
+  userId: string;
+  userNickname: string;
+  totalScore: number;
+  correctCount: number;
+  rank: number;
+  isChef: boolean;              // 是否为本周厨神
+}
+
+// 盲猜揭晓结果
+export interface BlindGuessResult {
+  roundId: string;
+  roundName: string;
+  status: BlindGuessRoundStatus;
+  items: Array<{
+    recordId: string;
+    dishName: string;
+    realAuthorName: string;
+    coverUrl: string;
+  }>;
+  ranking: BlindGuessRankEntry[];
+  chefWinner: BlindGuessRankEntry | null;
+}
+
+// 人格类型映射表条目（DB 种子数据结构）
+export interface PersonalityTypeDef {
+  code: string;
+  name: string;
+  description: string;
+  traits: string[];
+  shareText: string;
+}
+
+// 图鉴目录条目（DB 种子数据结构）
+export interface PokedexCatalogEntry {
+  dishName: string;
+  category: string;
+  rarity: PokedexRarity;
+}

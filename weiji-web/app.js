@@ -145,6 +145,7 @@ function navigateTo(page) {
   else if (page === 'family') loadFamilyData();
   else if (page === 'achievements') loadAchievementsData();
   else if (page === 'profile') loadProfileData();
+  else if (page === 'gameplay') loadGameplayEntry();
 }
 
 /* ===== 数据加载 ===== */
@@ -1457,4 +1458,364 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
 } else {
   init();
+}
+
+/* ===== 趣味玩法（F27-F30） ===== */
+function navigateToGameplay(view) {
+  ['pokedex', 'personality', 'timemachine', 'blindguess'].forEach(v => {
+    const el = document.getElementById('gameplay-view-' + v);
+    if (el) el.style.display = 'none';
+  });
+  const target = document.getElementById('gameplay-view-' + view);
+  if (target) target.style.display = 'block';
+  if (view === 'pokedex') loadPokedex();
+  else if (view === 'personality') loadPersonality();
+  else if (view === 'timemachine') loadTimemachine();
+  else if (view === 'blindguess') loadBlindguess();
+  lucide.createIcons();
+  window.scrollTo(0, 0);
+}
+
+function loadGameplayEntry() {
+  navigateToGameplay('pokedex');
+}
+
+async function loadPokedex() {
+  const summaryEl = document.getElementById('pokedex-summary');
+  const categoriesEl = document.getElementById('pokedex-categories');
+  if (summaryEl) summaryEl.innerHTML = '<div class="caption">加载中...</div>';
+  if (categoriesEl) categoriesEl.innerHTML = '';
+  try {
+    const data = await api.getPokedex();
+    renderPokedex(data);
+  } catch (err) {
+    if (summaryEl) summaryEl.innerHTML = '<div class="caption">' + escapeHTML(err.message) + '</div>';
+  }
+}
+
+function renderPokedex(data) {
+  const summaryEl = document.getElementById('pokedex-summary');
+  const categoriesEl = document.getElementById('pokedex-categories');
+  const rate = Math.round((data.completionRate || 0) * 100);
+  if (summaryEl) {
+    summaryEl.innerHTML =
+      '<div class="pokedex-progress">' +
+        '<span class="pokedex-progress-num">' + (data.unlockedSlots || 0) + '/' + (data.totalSlots || 0) + '</span>' +
+        '<span class="pokedex-progress-text">已点亮 ' + rate + '%</span>' +
+      '</div>' +
+      '<div class="pokedex-progress-bar"><div class="pokedex-progress-fill" style="width:' + rate + '%;"></div></div>';
+  }
+  if (categoriesEl) {
+    if (!data.categories || !data.categories.length) {
+      categoriesEl.innerHTML = '<div class="caption" style="padding: var(--space-4); text-align:center;">开始记录第一道菜来点亮图鉴</div>';
+      return;
+    }
+    categoriesEl.innerHTML = data.categories.map(cat => {
+      const cells = (cat.items || []).map(item => renderPokedexCell(item)).join('');
+      const catRate = cat.totalSlots ? Math.round((cat.unlockedSlots / cat.totalSlots) * 100) : 0;
+      return '<div class="pokedex-category">' +
+        '<div class="pokedex-category-title">' +
+          '<span>' + escapeHTML(cat.category) + '</span>' +
+          '<span class="caption">' + cat.unlockedSlots + '/' + cat.totalSlots + ' · ' + catRate + '%</span>' +
+        '</div>' +
+        '<div class="pokedex-grid">' + cells + '</div>' +
+      '</div>';
+    }).join('');
+  }
+  lucide.createIcons();
+}
+
+function renderPokedexCell(item) {
+  const rarityLabel = { common: '', rare: '·稀有', epic: '·史诗', legendary: '·传说' };
+  if (item.unlocked) {
+    return '<div class="pokedex-cell unlocked rarity-' + item.rarity + '">' +
+      '<div class="pokedex-cell-icon">' + rarityEmoji(item.rarity) + '</div>' +
+      '<div class="pokedex-cell-name">' + escapeHTML(item.dishName) + '</div>' +
+      '<div class="pokedex-cell-count">×' + (item.recordCount || 0) + '</div>' +
+    '</div>';
+  }
+  return '<div class="pokedex-cell locked">' +
+    '<div class="pokedex-cell-icon">🔒</div>' +
+    '<div class="pokedex-cell-name">未点亮</div>' +
+  '</div>';
+}
+
+function rarityEmoji(rarity) {
+  return { common: '🍽️', rare: '⭐', epic: '💎', legendary: '👑' }[rarity] || '🍽️';
+}
+
+async function loadPersonality() {
+  const el = document.getElementById('gameplay-view-personality');
+  if (!el) return;
+  el.innerHTML = '<div class="padding-x" style="padding-top: var(--space-4);"><div class="caption">生成中...</div></div>';
+  try {
+    const data = await api.getPersonality();
+    renderPersonality(data);
+  } catch (err) {
+    el.innerHTML = '<div class="padding-x" style="padding-top: var(--space-4);"><div class="caption">' + escapeHTML(err.message) + '</div></div>';
+  }
+}
+
+function renderPersonality(data) {
+  const el = document.getElementById('gameplay-view-personality');
+  if (!el) return;
+  if (!data.available) {
+    el.innerHTML = '<div class="padding-x" style="padding-top: var(--space-4);">' +
+      '<div class="card-white" style="text-align:center; padding: var(--space-6);">' +
+        '<div style="font-size: 36px; margin-bottom: var(--space-2);">🍽️</div>' +
+        '<div style="color: var(--color-on-surface-variant);">' + escapeHTML(data.description) + '</div>' +
+        '<div class="caption" style="margin-top: var(--space-2);">当前记录数：' + data.recordCount + ' / 3</div>' +
+      '</div>' +
+    '</div>';
+    return;
+  }
+  const traits = (data.traits || []).map(t => '<span class="personality-tag">' + escapeHTML(t) + '</span>').join('');
+  el.innerHTML = '<div class="padding-x" style="padding-top: var(--space-4);">' +
+    '<div class="card-white personality-card">' +
+      '<div style="font-size: 40px; margin-bottom: var(--space-2);">🎯</div>' +
+      '<div class="personality-type">' + escapeHTML(data.personalityType) + '</div>' +
+      '<div class="personality-desc">' + escapeHTML(data.description) + '</div>' +
+      '<div class="personality-traits">' + traits + '</div>' +
+      '<div style="background: var(--primary-50); padding: var(--space-3); border-radius: 10px; margin-bottom: var(--space-3); text-align: left;">' +
+        '<div class="caption" style="margin-bottom: 4px;">分享文案</div>' +
+        '<div style="font-size: var(--font-size-caption); color: var(--color-on-surface); line-height: 1.5;">' + escapeHTML(data.shareText) + '</div>' +
+      '</div>' +
+      '<button class="btn btn-primary" onclick="copyPersonalityShareText(' + JSON.stringify(JSON.stringify(data.shareText)) + ')">' +
+        '<i data-lucide="copy" style="width:16px;height:16px;margin-right:4px;"></i>复制分享文案' +
+      '</button>' +
+    '</div>' +
+  '</div>';
+  lucide.createIcons();
+}
+
+function copyPersonalityShareText(text) {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => showToast('已复制分享文案'));
+  } else {
+    showToast('当前浏览器不支持复制');
+  }
+}
+
+async function loadTimemachine() {
+  const el = document.getElementById('gameplay-view-timemachine');
+  if (!el) return;
+  el.innerHTML = '<div class="timemachine-empty">寻找记忆中...</div>';
+  try {
+    const data = await api.getTimemachine();
+    renderTimemachine(data);
+  } catch (err) {
+    el.innerHTML = '<div class="timemachine-empty">' + escapeHTML(err.message) + '</div>';
+  }
+}
+
+function renderTimemachine(data) {
+  const el = document.getElementById('gameplay-view-timemachine');
+  if (!el) return;
+  const memories = data.memories || [];
+  if (!memories.length) {
+    el.innerHTML = '<div class="timemachine-empty">' +
+      '<div style="font-size: 36px; margin-bottom: var(--space-2);">🕰️</div>' +
+      '暂无往年今日回忆，再记录一年就有啦' +
+    '</div>';
+    return;
+  }
+  el.innerHTML = memories.map(mem => {
+    const records = (mem.records || []).map(r =>
+      '<div class="timemachine-record">' +
+        '<img src="' + escapeAttr(r.imageUrl || r.beautifiedUrl || '') + '" alt="" onerror="this.style.visibility=\'hidden\'">' +
+        '<div class="timemachine-record-name">' + escapeHTML(r.dishName) + '</div>' +
+      '</div>'
+    ).join('');
+    return '<div class="timemachine-card">' +
+      '<div class="timemachine-year">' + mem.year + ' 年</div>' +
+      '<div class="timemachine-caption">' + escapeHTML(mem.caption) + '</div>' +
+      '<div class="timemachine-records">' + records + '</div>' +
+    '</div>';
+  }).join('');
+  lucide.createIcons();
+}
+
+let currentBlindGuessFamilyId = null;
+async function loadBlindguess() {
+  const el = document.getElementById('gameplay-view-blindguess');
+  if (!el) return;
+  el.innerHTML = '<div class="blindguess-section"><div class="caption">加载中...</div></div>';
+  try {
+    const familyInfo = await api.getFamilyInfo();
+    currentBlindGuessFamilyId = familyInfo && familyInfo.id;
+    const recipes = await api.getFamilyRecipes();
+    renderBlindguess(recipes || []);
+  } catch (err) {
+    el.innerHTML = '<div class="blindguess-section"><div class="caption">' + escapeHTML(err.message) + '</div></div>';
+  }
+}
+
+let blindGuessSelectedRecipes = new Set();
+function renderBlindguess(recipes) {
+  const el = document.getElementById('gameplay-view-blindguess');
+  if (!el) return;
+  const selectable = recipes.filter(r => !r.isDeleted);
+  blindGuessSelectedRecipes = new Set();
+  const recipeCheckboxes = selectable.map(r =>
+    '<label style="display:flex;align-items:center;gap:var(--space-2);padding:var(--space-2);background:var(--color-surface);border-radius:8px;">' +
+      '<input type="checkbox" value="' + escapeAttr(r.id) + '" onchange="toggleBlindGuessRecipe(\'' + escapeAttr(r.id) + '\', this.checked)">' +
+      '<span style="flex:1;">' + escapeHTML(r.name) + '</span>' +
+      '<span class="caption">' + escapeHTML(r.difficulty || '') + '</span>' +
+    '</label>'
+  ).join('');
+  el.innerHTML = '<div class="blindguess-section">' +
+    '<div class="section-title">发起一轮盲猜</div>' +
+    '<div class="blindguess-form">' +
+      '<input class="blindguess-input" id="blindguess-round-name" placeholder="轮次名称（如：本周家庭盲猜）">' +
+      '<div style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:var(--space-1);">' + recipeCheckboxes + '</div>' +
+      '<button class="btn btn-primary" onclick="createBlindGuessRound()">' +
+        '<i data-lucide="plus" style="width:16px;height:16px;margin-right:4px;"></i>发起盲猜（需选 3-10 道）' +
+      '</button>' +
+    '</div>' +
+    '<div id="blindguess-rounds-list"></div>' +
+  '</div>';
+  lucide.createIcons();
+  loadBlindGuessRounds();
+}
+
+function toggleBlindGuessRecipe(recipeId, checked) {
+  if (checked) blindGuessSelectedRecipes.add(recipeId);
+  else blindGuessSelectedRecipes.delete(recipeId);
+}
+
+async function createBlindGuessRound() {
+  const name = (document.getElementById('blindguess-round-name') || {}).value || '';
+  const ids = Array.from(blindGuessSelectedRecipes);
+  if (!name.trim()) { showToast('请输入轮次名称'); return; }
+  if (ids.length < 3 || ids.length > 10) { showToast('请选择 3-10 道菜谱'); return; }
+  if (!currentBlindGuessFamilyId) { showToast('未找到家庭组'); return; }
+  try {
+    await api.createBlindGuessRound({ familyId: currentBlindGuessFamilyId, roundName: name.trim(), recordIds: ids });
+    showToast('盲猜轮次已发起');
+    document.getElementById('blindguess-round-name').value = '';
+    document.querySelectorAll('#gameplay-view-blindguess input[type=checkbox]').forEach(c => c.checked = false);
+    blindGuessSelectedRecipes = new Set();
+    loadBlindGuessRounds();
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+async function loadBlindGuessRounds() {
+  const listEl = document.getElementById('blindguess-rounds-list');
+  if (!listEl) return;
+  const roundIds = JSON.parse(localStorage.getItem('blindguess_rounds') || '[]');
+  if (!roundIds.length) {
+    listEl.innerHTML = '<div class="caption" style="text-align:center;padding:var(--space-4);">还没有发起过盲猜轮次</div>';
+    return;
+  }
+  const rounds = await Promise.all(roundIds.map(id => api.getBlindGuessRound(id).catch(() => null)));
+  listEl.innerHTML = rounds.filter(Boolean).map(r => renderBlindGuessRoundCard(r)).join('');
+  lucide.createIcons();
+}
+
+function renderBlindGuessRoundCard(round) {
+  const statusTag = round.status === 'revealed'
+    ? '<span class="chip filled" style="background: var(--success-100); color: var(--success-700);">已揭晓</span>'
+    : '<span class="chip filled" style="background: var(--warning-100); color: var(--warning-700);">进行中</span>';
+  return '<div class="blindguess-round-card">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-2);">' +
+      '<span style="font-weight:600;">' + escapeHTML(round.roundName) + '</span>' +
+      statusTag +
+    '</div>' +
+    '<div class="caption" style="margin-bottom:var(--space-2);">' + (round.items || []).length + ' 道菜 · ' + (round.guesses || []).length + ' 次猜测</div>' +
+    '<button class="btn btn-outline btn-sm" onclick="showBlindGuessDetail(\'' + escapeAttr(round.id) + '\')">查看详情</button>' +
+  '</div>';
+}
+
+async function showBlindGuessDetail(roundId) {
+  const ids = JSON.parse(localStorage.getItem('blindguess_rounds') || '[]');
+  if (!ids.includes(roundId)) {
+    ids.unshift(roundId);
+    localStorage.setItem('blindguess_rounds', JSON.stringify(ids.slice(0, 20)));
+  }
+  try {
+    const round = await api.getBlindGuessRound(roundId);
+    const items = (round.items || []).map(item => {
+      return '<div class="blindguess-item-card">' +
+        '<img src="' + escapeAttr(item.coverUrl || '') + '" alt="" onerror="this.style.visibility=\'hidden\'">' +
+        '<div style="flex:1;">' +
+          '<div style="font-weight:600;">' + escapeHTML(item.dishName) + '</div>' +
+          (round.status === 'revealed' ? '<div class="caption">作者：' + escapeHTML(item.realAuthorName || '') + '</div>' : '<div class="caption">作者：???（待揭晓）</div>') +
+        '</div>' +
+      '</div>';
+    }).join('');
+    const actionBtn = round.status === 'active'
+      ? '<button class="btn btn-primary" onclick="revealBlindGuess(\'' + escapeAttr(round.id) + '\')">揭晓结果</button>'
+      : '';
+    const guessForm = round.status === 'active'
+      ? '<div style="margin-top:var(--space-3);"><div class="caption" style="margin-bottom:var(--space-1);">提交一次猜测（选一道菜）</div>' +
+        '<div class="blindguess-form">' +
+          '<input class="blindguess-input" id="blindguess-dish-input" placeholder="你猜的菜名">' +
+          '<button class="btn btn-outline btn-sm" onclick="submitBlindGuessForm(\'' + escapeAttr(round.id) + '\')">提交猜测</button>' +
+        '</div></div>'
+      : '';
+    const ranking = round.status === 'revealed' ? renderBlindGuessRanking(round) : '';
+    const html = '<div class="blindguess-section">' +
+      '<button class="btn btn-ghost btn-sm" onclick="loadBlindguess()" style="margin-bottom:var(--space-2);">← 返回</button>' +
+      '<div class="blindguess-round-card">' +
+        '<div style="font-weight:600;margin-bottom:var(--space-2);">' + escapeHTML(round.roundName) + '</div>' +
+        items +
+        guessForm +
+        ranking +
+        '<div style="margin-top:var(--space-3);">' + actionBtn + '</div>' +
+      '</div>' +
+    '</div>';
+    document.getElementById('gameplay-view-blindguess').innerHTML = html;
+    lucide.createIcons();
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+function renderBlindGuessRanking(round) {
+  const cached = sessionStorage.getItem('blindguess_result_' + round.id);
+  if (!cached) return '<div class="caption" style="margin-top:var(--space-2);">已揭晓</div>';
+  try {
+    const result = JSON.parse(cached);
+    const ranking = (result.ranking || []).map(r =>
+      '<div style="display:flex;justify-content:space-between;padding:var(--space-2);border-bottom:1px solid var(--color-outline, #eee);">' +
+        '<span>' + (r.isChef ? '👑 ' : '') + escapeHTML(r.userNickname) + '</span>' +
+        '<span class="caption">得分 ' + r.totalScore + ' · 命中 ' + r.correctCount + '</span>' +
+      '</div>'
+    ).join('');
+    return '<div style="margin-top:var(--space-3);"><div class="section-title">排名</div>' + ranking + '</div>';
+  } catch {
+    return '';
+  }
+}
+
+async function submitBlindGuessForm(roundId) {
+  const dishInput = document.getElementById('blindguess-dish-input');
+  if (!dishInput || !dishInput.value.trim()) { showToast('请输入菜名'); return; }
+  try {
+    const round = await api.getBlindGuessRound(roundId);
+    const firstItem = (round.items || [])[0];
+    if (!firstItem) { showToast('轮次无菜品'); return; }
+    await api.submitBlindGuess(roundId, {
+      itemId: firstItem.recordId,
+      guessAuthorId: '',
+      guessDishName: dishInput.value.trim()
+    });
+    showToast('猜测已提交');
+    showBlindGuessDetail(roundId);
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+async function revealBlindGuess(roundId) {
+  try {
+    const result = await api.revealBlindGuessRound(roundId);
+    sessionStorage.setItem('blindguess_result_' + roundId, JSON.stringify(result));
+    showToast('已揭晓，' + (result.chefWinner ? result.chefWinner.userNickname + ' 获得本周厨神！' : '无人得分'));
+    showBlindGuessDetail(roundId);
+  } catch (err) {
+    showToast(err.message);
+  }
 }

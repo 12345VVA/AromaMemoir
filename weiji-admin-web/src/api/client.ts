@@ -122,4 +122,26 @@ export const api = {
   getRecommendations(dishName: string) {
     return instance.post('/ai/recommend', { dishName });
   },
+  // 娱乐化玩法（F27-F30）
+  getPokedex() {
+    return instance.get('/gamification/pokedex');
+  },
+  getPersonality() {
+    return instance.get('/gamification/personality');
+  },
+  getTimemachine() {
+    return instance.get('/gamification/timemachine');
+  },
+  createBlindGuessRound(data: { familyId: string; roundName: string; recordIds: string[] }) {
+    return instance.post('/gamification/blindguess/round', data);
+  },
+  getBlindGuessRound(roundId: string) {
+    return instance.get(`/gamification/blindguess/round/${roundId}`);
+  },
+  submitBlindGuess(roundId: string, data: { itemId: string; guessAuthorId: string; guessDishName: string }) {
+    return instance.post(`/gamification/blindguess/round/${roundId}/guess`, data);
+  },
+  revealBlindGuessRound(roundId: string) {
+    return instance.post(`/gamification/blindguess/round/${roundId}/reveal`);
+  },
 };

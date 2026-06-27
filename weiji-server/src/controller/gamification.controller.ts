@@ -19,6 +19,7 @@ import {
   blindGuessRounds,
 } from '../store/db';
 import { findByField, uuid } from '../store/helpers';
+import { trackEvent } from '../store/analytics';
 import {
   aggregatePokedex,
   buildPersonalityReport,
@@ -86,6 +87,7 @@ export class GamificationController {
   @Get('/pokedex')
   async pokedex(ctx: Context): Promise<ApiResponse<PokedexSummary>> {
     const { userId } = ctx.state.user as AuthUser;
+    trackEvent('pokedex_view', userId);
     return ok(aggregatePokedex(userId));
   }
 
@@ -102,6 +104,7 @@ export class GamificationController {
   @Get('/timemachine')
   async timemachine(ctx: Context): Promise<ApiResponse<TimemachineResult>> {
     const { userId } = ctx.state.user as AuthUser;
+    trackEvent('timemachine_view', userId);
     return ok(queryTimemachine(userId));
   }
 

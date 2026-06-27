@@ -64,6 +64,8 @@ import {
   pokedexCatalog,
   personalityTypes,
   blindGuessRounds,
+  user_achievements,
+  user_personalities,
 } from './db';
 import type {
   PokedexSummary,
@@ -73,6 +75,8 @@ import type {
   TimemachineMemory,
   BlindGuessResult,
   BlindGuessRankEntry,
+  UserAchievement,
+  UserPersonality,
   Record,
 } from './types';
 
@@ -82,6 +86,36 @@ const MEAT_KEYWORDS = [
   '鱼肉', '鱼', '虾', '蟹', '贝', '排骨', '五花肉',
   '牛腩', '里脊', '培根', '香肠', '火腿', '鸡腿', '鸡胸',
 ];
+
+// 人格类型 code → 视觉符号 emoji 映射（用于分享卡片 SVG）
+// 注意：用索引签名而非 Record<K,V>，避免被本文件导入的 Record 实体接口遮蔽内置工具类型
+const PERSONALITY_EMOJI: { [code: string]: string } = {
+  carb_lover: '🍚',
+  spice_explorer: '🌶️',
+  health_guru: '🥗',
+  meat_enthusiast: '🥩',
+  sweet_tooth: '🍰',
+  light_eater: '🍵',
+  family_chef: '👨‍🍳',
+  adventurer: '🍜',
+};
+
+// 生成人格分享卡片 SVG data URL（300x400，渐变背景，居中显示 emoji + 人格名）
+// 注意：# 等 URL 保留字符通过 encodeURIComponent 编码，避免 data URL 解析异常
+function buildPersonalityCoverImage(code: string, name: string): string {
+  const emoji = PERSONALITY_EMOJI[code] || '🍴';
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400">` +
+    `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">` +
+    `<stop offset="0" stop-color="#FFB199"/>` +
+    `<stop offset="1" stop-color="#FF6B6B"/>` +
+    `</linearGradient></defs>` +
+    `<rect width="300" height="400" fill="url(#g)"/>` +
+    `<text x="150" y="190" font-size="80" text-anchor="middle">${emoji}</text>` +
+    `<text x="150" y="270" font-size="28" text-anchor="middle" fill="#ffffff" font-weight="bold">${name}</text>` +
+    `</svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
 
 // 聚合用户图鉴：将 pokedexCatalog 与用户实际记录交叉对比
 // - 取 records 中 userId 匹配且 isDeleted=false 的所有记录
@@ -264,6 +298,7 @@ export function buildPersonalityReport(userId: string): PersonalityReport {
   }
 
   const shareText = `我是「${typeDef.name}」——${typeDef.description}。来味记测测你的美食人格！`;
+  const coverImage = buildPersonalityCoverImage(typeDef.code, typeDef.name);
 
   return {
     available: true,
@@ -271,17 +306,36 @@ export function buildPersonalityReport(userId: string): PersonalityReport {
     description: typeDef.description,
     traits: typeDef.traits,
     shareText,
-    coverImage: '',
+    coverImage,
     recordCount,
   };
+}
+
+// 持久化人格报告到 user_personalities（F28 分享卡片：available 时写入，不阻塞返回）
+// 通过人格名反查 code 作为 personalityType，personalityName 存人格名（展示用）
+export function persistPersonality(userId: string, report: PersonalityReport): UserPersonality | null {
+  if (!report.available || !report.personalityType) return null;
+  const typeDef = personalityTypes.find((p) => p.name === report.personalityType);
+  const personalityType = typeDef?.code ?? report.personalityType;
+  const entry: UserPersonality = {
+    id: uuid(),
+    userId,
+    personalityType,
+    personalityName: report.personalityType,
+    description: report.description,
+    createdAt: new Date().toISOString(),
+  };
+  user_personalities.push(entry);
+  return entry;
 }
 
 // 查询往年今日记录
 // - 取今天的月-日（如 06-26）
 // - 在 records 中找 userId 匹配且 isDeleted=false 且 recordDate 月-日相同、年份小于今年的记录
 // - 按年份分组，每年组装成 TimemachineMemory
-export function queryTimemachine(userId: string): TimemachineResult {
-  const now = new Date();
+// - 节日判定：命中春节/中秋/冬至等时额外返回 festival 字段（公历近似，非精确农历）
+// now 参数供单元测试注入特定日期，默认取当前时间
+export function queryTimemachine(userId: string, now: Date = new Date()): TimemachineResult {
   const currentYear = now.getFullYear();
   const todayDate = now.toISOString().split('T')[0]; // YYYY-MM-DD
   const todayMonthDay = todayDate.slice(5); // MM-DD
@@ -327,9 +381,23 @@ export function queryTimemachine(userId: string): TimemachineResult {
       };
     });
 
+  // 节日家宴判定（公历近似，非精确农历，用于 F29 节日家宴特别卡）
+  // todayMonthDay 格式为 MM-DD（带横杠），节日范围保持同格式比较
+  // 春节 ~02-01 至 02-15、中秋 ~09-15、冬至 12-22 至 12-23
+  let festival: { name: string; isFamilyFeast: boolean } | undefined;
+  if (todayMonthDay >= '02-01' && todayMonthDay <= '02-15') {
+    festival = { name: '春节', isFamilyFeast: true };
+  } else if (todayMonthDay === '09-15') {
+    // 公历近似中秋（实际农历八月十五，此处用固定近似日）
+    festival = { name: '中秋', isFamilyFeast: true };
+  } else if (todayMonthDay === '12-22' || todayMonthDay === '12-23') {
+    festival = { name: '冬至', isFamilyFeast: true };
+  }
+
   return {
     memories,
     todayDate,
+    festival,
   };
 }
 
@@ -419,6 +487,23 @@ export function scoreBlindGuess(roundId: string): BlindGuessResult | null {
   }
 
   const chefWinner = ranking.find((r) => r.isChef) || null;
+
+  // F30 厨神徽章：揭晓时对 isChef 用户写入 user_achievements（同一用户同一徽章去重）
+  // 沿用现有 UserAchievement 结构（earnedAt 字段，非 unlockedAt）
+  for (const entry of ranking) {
+    if (!entry.isChef) continue;
+    const already = user_achievements.find(
+      (ua) => ua.userId === entry.userId && ua.achievementId === 'ach-blindguess-chef',
+    );
+    if (already) continue;
+    const ua: UserAchievement = {
+      id: uuid(),
+      userId: entry.userId,
+      achievementId: 'ach-blindguess-chef',
+      earnedAt: new Date().toISOString(),
+    };
+    user_achievements.push(ua);
+  }
 
   const items = round.items.map((it) => ({
     recordId: it.recordId,

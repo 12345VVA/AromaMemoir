@@ -11,6 +11,8 @@ import { describe, it, before } from 'node:test';
 import assert from 'node:assert';
 import { createTestApp } from '../helpers/app';
 import { loginAsDemo } from '../helpers/auth';
+import { blindGuessRounds, family_members } from '../../src/store/db';
+import type { BlindGuessRound, FamilyMember } from '../../src/store/types';
 
 describe('Gamification 控制器', () => {
   let token: string;
@@ -260,5 +262,190 @@ describe('Gamification 控制器', () => {
       .post(`/api/gamification/blindguess/round/${createdRoundId}/reveal`)
       .set('Authorization', `Bearer ${token}`);
     assert.notStrictEqual(res.body.code, 0, '再次揭晓应失败');
+  });
+
+  // 9. 揭晓后再猜测应返回业务错误（code != 0）
+  it('POST /api/gamification/blindguess/round/:id/guess 揭晓后再猜测应返回业务错误', async () => {
+    const res = await request
+      .post(`/api/gamification/blindguess/round/${createdRoundId}/guess`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        itemId: createdItemId,
+        guessAuthorId: 'user-mom-0002',
+        guessDishName: '红烧牛肉面',
+      });
+    assert.notStrictEqual(res.body.code, 0, '已揭晓轮次不应再接受猜测');
+    assert.strictEqual(res.body.code, 400);
+  });
+
+  // 10. POST /api/gamification/blindguess/round 家庭组不存在返回 403
+  it('POST /api/gamification/blindguess/round 家庭组不存在返回 403', async () => {
+    const res = await request
+      .post('/api/gamification/blindguess/round')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        familyId: 'family-not-exist-9999',
+        roundName: '不存在的家庭',
+        recordIds: ['recipe-0001', 'recipe-0002', 'recipe-0003'],
+      });
+    assert.strictEqual(res.body.code, 403, '家庭组不存在应返回 403');
+  });
+
+  // 11. POST /api/gamification/blindguess/round/:id/reveal 非 creator 返回 403
+  it('POST /api/gamification/blindguess/round/:id/reveal 非 creator 用户揭晓返回 403', async () => {
+    // 直接构造一个 creatorId 为 mom 的 active 轮次，demo 尝试揭晓应 403
+    const otherRound: BlindGuessRound = {
+      id: 'integ-round-mom-creator-001',
+      familyId: 'family-0001',
+      roundName: '妈妈发起的轮次',
+      creatorId: 'user-mom-0002',
+      items: [
+        {
+          recordId: 'recipe-0001',
+          recipeId: 'recipe-0001',
+          dishName: '红烧牛肉面',
+          coverUrl: 'assets/food-hongshaorou.jpg',
+          realAuthorId: 'user-demo-0001',
+          realAuthorName: '小明',
+        },
+      ],
+      guesses: [],
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      revealedAt: null,
+    };
+    blindGuessRounds.push(otherRound);
+    try {
+      const res = await request
+        .post(`/api/gamification/blindguess/round/${otherRound.id}/reveal`)
+        .set('Authorization', `Bearer ${token}`);
+      assert.strictEqual(res.body.code, 403, '非 creator 揭晓应返回 403');
+    } finally {
+      const idx = blindGuessRounds.findIndex((r) => r.id === otherRound.id);
+      if (idx >= 0) blindGuessRounds.splice(idx, 1);
+    }
+  });
+
+  // 12. GET /api/gamification/blindguess/rounds 缺少 familyId 返回 400
+  it('GET /api/gamification/blindguess/rounds 缺少 familyId 返回 400', async () => {
+    const res = await request
+      .get('/api/gamification/blindguess/rounds')
+      .set('Authorization', `Bearer ${token}`);
+    assert.strictEqual(res.body.code, 400, '缺少 familyId 应返回 400');
+  });
+
+  // 13. GET /api/gamification/blindguess/rounds 非家庭成员返回 403
+  it('GET /api/gamification/blindguess/rounds 非家庭成员返回 403', async () => {
+    const res = await request
+      .get('/api/gamification/blindguess/rounds?familyId=family-not-exist-9999')
+      .set('Authorization', `Bearer ${token}`);
+    assert.strictEqual(res.body.code, 403, '非家庭成员应返回 403');
+  });
+
+  // 14. GET /api/gamification/blindguess/rounds 返回当前家庭轮次：active 脱敏、revealed 原样
+  it('GET /api/gamification/blindguess/rounds 返回当前家庭轮次（active 脱敏、revealed 原样）', async () => {
+    // 新建一个 active 轮次用于校验脱敏
+    const createRes = await request
+      .post('/api/gamification/blindguess/round')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        familyId: 'family-0001',
+        roundName: '列表脱敏测试轮次',
+        recordIds: ['recipe-0001', 'recipe-0002', 'recipe-0003'],
+      });
+    assert.strictEqual(createRes.body.code, 0);
+    const activeRoundId = createRes.body.data.id;
+
+    const res = await request
+      .get('/api/gamification/blindguess/rounds?familyId=family-0001')
+      .set('Authorization', `Bearer ${token}`);
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.code, 0);
+    assert.ok(Array.isArray(res.body.data), '返回应为数组');
+    assert.ok(res.body.data.length >= 1, '至少包含已创建的轮次');
+
+    // active 轮次应已脱敏（items 不含 realAuthorId / realAuthorName）
+    const active = res.body.data.find((r: any) => r.id === activeRoundId);
+    assert.ok(active, '应包含刚创建的 active 轮次');
+    assert.strictEqual(active.status, 'active');
+    for (const item of active.items) {
+      assert.strictEqual(item.realAuthorId, undefined, 'active items 不应含 realAuthorId');
+      assert.strictEqual(item.realAuthorName, undefined, 'active items 不应含 realAuthorName');
+    }
+
+    // revealed 轮次应原样返回（items 含 realAuthorId / realAuthorName）
+    const revealed = res.body.data.find((r: any) => r.id === createdRoundId);
+    assert.ok(revealed, '应包含已揭晓的 revealed 轮次');
+    assert.strictEqual(revealed.status, 'revealed');
+    assert.ok(
+      revealed.items[0].realAuthorId !== undefined,
+      'revealed items 应保留 realAuthorId',
+    );
+    assert.ok(
+      revealed.items[0].realAuthorName !== undefined,
+      'revealed items 应保留 realAuthorName',
+    );
+
+    // 列表应按 createdAt 降序
+    for (let i = 1; i < res.body.data.length; i++) {
+      assert.ok(
+        res.body.data[i - 1].createdAt >= res.body.data[i].createdAt,
+        '列表应按 createdAt 降序',
+      );
+    }
+  });
+
+  // 15. GET /api/gamification/blindguess/rounds 跨家庭隔离：不返回其他家庭轮次
+  it('GET /api/gamification/blindguess/rounds 跨家庭隔离：不返回其他家庭轮次', async () => {
+    // 直接塞入一个其他家庭的轮次，列表查询 family-0001 时不应包含它
+    const otherRound: BlindGuessRound = {
+      id: 'integ-round-other-family-002',
+      familyId: 'family-other-9999',
+      roundName: '其他家庭的轮次',
+      creatorId: 'user-demo-0001',
+      items: [],
+      guesses: [],
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      revealedAt: null,
+    };
+    blindGuessRounds.push(otherRound);
+    try {
+      const res = await request
+        .get('/api/gamification/blindguess/rounds?familyId=family-0001')
+        .set('Authorization', `Bearer ${token}`);
+      assert.strictEqual(res.body.code, 0);
+      const ids = res.body.data.map((r: any) => r.id);
+      assert.ok(!ids.includes(otherRound.id), '不应包含其他家庭的轮次');
+    } finally {
+      const idx = blindGuessRounds.findIndex((r) => r.id === otherRound.id);
+      if (idx >= 0) blindGuessRounds.splice(idx, 1);
+    }
+  });
+
+  // 16. GET /api/gamification/blindguess/rounds 空列表：无轮次的家庭返回空数组
+  it('GET /api/gamification/blindguess/rounds 空列表：无轮次的家庭返回空数组', async () => {
+    // 临时给 demo 加一个空家庭的成员关系
+    const membership: FamilyMember = {
+      id: 'fm-integ-empty-0002',
+      familyId: 'family-empty-0002',
+      userId: 'user-demo-0001',
+      role: 'member',
+      joinedAt: new Date().toISOString(),
+    };
+    family_members.push(membership);
+    try {
+      const res = await request
+        .get('/api/gamification/blindguess/rounds?familyId=family-empty-0002')
+        .set('Authorization', `Bearer ${token}`);
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.code, 0);
+      assert.ok(Array.isArray(res.body.data));
+      assert.strictEqual(res.body.data.length, 0, '无轮次家庭应返回空数组');
+    } finally {
+      const idx = family_members.findIndex((m) => m.id === membership.id);
+      if (idx >= 0) family_members.splice(idx, 1);
+    }
   });
 });

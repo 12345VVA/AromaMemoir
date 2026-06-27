@@ -113,6 +113,12 @@ const api = {
   saveRecord(data) {
     return request('POST', '/api/record', data);
   },
+  updateRecord(id, data) {
+    return request('PATCH', '/api/record/' + encodeURIComponent(id), data);
+  },
+  deleteRecord(id) {
+    return request('DELETE', '/api/record/' + encodeURIComponent(id));
+  },
   recognizeFood(file) {
     const fd = new FormData();
     fd.append('image', file);
@@ -226,16 +232,5 @@ const api = {
   },
   revealBlindGuessRound(roundId) {
     return request('POST', '/api/gamification/blindguess/round/' + encodeURIComponent(roundId) + '/reveal');
-  },
-  getBlindGuessRounds(familyId) {
-    const query = familyId ? '?familyId=' + encodeURIComponent(familyId) : '';
-    return request('GET', '/api/gamification/blindguess/rounds' + query);
-  },
-
-  /* ===== 埋点上报（F-analytics） ===== */
-  trackEvent(type, payload) {
-    const body = { type };
-    if (payload !== undefined && payload !== null) body.payload = payload;
-    return request('POST', '/api/analytics/track', body);
   },
 };

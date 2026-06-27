@@ -15,7 +15,7 @@ export type RecipeVisibility = 'family' | 'private';
 export type ShoppingCategory = '蔬菜' | '肉类' | '水产' | '调料' | '乳制品' | '干货' | '其他';
 
 // 成就类型
-export type AchievementType = 'record' | 'streak' | 'variety' | 'family';
+export type AchievementType = 'record' | 'streak' | 'variety' | 'family' | 'gameplay';
 
 // 餐次类型
 export type MealType = 'breakfast' | 'lunch' | 'dinner';
@@ -213,16 +213,6 @@ export interface UserAchievement {
   earnedAt: string;
 }
 
-// 用户人格报告持久化记录（F28 分享卡片：人格测试结果落库）
-export interface UserPersonality {
-  id: string;
-  userId: string;
-  personalityType: string;   // 人格类型 code
-  personalityName: string;   // 人格名（展示用）
-  description: string;
-  createdAt: string;
-}
-
 // 打卡记录
 export interface CheckIn {
   id: string;
@@ -308,8 +298,6 @@ export interface TimemachineMemory {
 export interface TimemachineResult {
   memories: TimemachineMemory[];
   todayDate: string;
-  // 节日家宴标识：当前日期命中节日（春节/中秋/冬至等）时填充
-  festival?: { name: string; isFamilyFeast: boolean };
 }
 
 // 盲猜轮次状态
@@ -333,27 +321,6 @@ export interface BlindGuessRound {
   creatorId: string;
   items: BlindGuessItem[];
   guesses: BlindGuessGuess[];   // 所有成员的猜测
-  status: BlindGuessRoundStatus;
-  createdAt: string;
-  revealedAt: string | null;
-}
-
-// 盲猜轮次列表项（与 BlindGuessRound 结构一致，用于列表端点返回）
-// active 状态下 items 已脱敏，realAuthorId / realAuthorName 可选
-export interface BlindGuessListItem {
-  id: string;
-  familyId: string;
-  roundName: string;
-  creatorId: string;
-  items: Array<{
-    recordId: string;
-    recipeId: string;
-    dishName: string;
-    coverUrl: string;
-    realAuthorId?: string;
-    realAuthorName?: string;
-  }>;
-  guesses: BlindGuessGuess[];
   status: BlindGuessRoundStatus;
   createdAt: string;
   revealedAt: string | null;

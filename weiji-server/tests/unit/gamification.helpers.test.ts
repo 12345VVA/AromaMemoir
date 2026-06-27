@@ -10,22 +10,14 @@ import assert from 'node:assert';
 import {
   aggregatePokedex,
   buildPersonalityReport,
-  persistPersonality,
   queryTimemachine,
   scoreBlindGuess,
 } from '../../src/store/helpers';
-import {
-  blindGuessRounds,
-  pokedexCatalog,
-  user_personalities,
-  user_achievements,
-} from '../../src/store/db';
+import { blindGuessRounds, pokedexCatalog } from '../../src/store/db';
 import type { BlindGuessRound } from '../../src/store/types';
 
 const DEMO_USER_ID = 'user-demo-0001';
 const NON_EXIST_USER_ID = 'user-not-exist-9999';
-// F30 厨神徽章 achievementId（与 db.ts 种子一致）
-const CHEF_BADGE_ID = 'ach-blindguess-chef';
 
 // 测试期间临时插入到 blindGuessRounds 的 mock 轮次 id，afterEach 统一清理，避免状态污染
 const mockRoundIds: string[] = [];
@@ -38,18 +30,8 @@ function cleanupMockRounds(): void {
   mockRoundIds.length = 0;
 }
 
-// 清理测试期间 scoreBlindGuess 写入的厨神徽章（种子数据无此徽章，全量移除即恢复初态）
-function cleanupChefBadges(): void {
-  for (let i = user_achievements.length - 1; i >= 0; i--) {
-    if (user_achievements[i].achievementId === CHEF_BADGE_ID) {
-      user_achievements.splice(i, 1);
-    }
-  }
-}
-
 afterEach(() => {
   cleanupMockRounds();
-  cleanupChefBadges();
 });
 
 describe('aggregatePokedex', () => {
@@ -120,16 +102,6 @@ describe('buildPersonalityReport', () => {
     );
   });
 
-  it('available=true 时 coverImage 非空且以 data:image/svg 开头（F28 分享卡片）', () => {
-    const report = buildPersonalityReport(DEMO_USER_ID);
-    assert.strictEqual(report.available, true, '前置：demo 应 available=true');
-    assert.ok(report.coverImage, 'coverImage 应非空');
-    assert.ok(
-      report.coverImage.startsWith('data:image/svg'),
-      'coverImage 应以 data:image/svg 开头',
-    );
-  });
-
   it('不存在的用户 available=false、recordCount=0、description 含"记录不足"', () => {
     const report = buildPersonalityReport(NON_EXIST_USER_ID);
     assert.strictEqual(report.available, false);
@@ -138,36 +110,6 @@ describe('buildPersonalityReport', () => {
       report.description.includes('记录不足'),
       'description 应含"记录不足"',
     );
-  });
-});
-
-describe('persistPersonality', () => {
-  it('available=true 时写入 user_personalities，长度 +1 且字段完整', () => {
-    const report = buildPersonalityReport(DEMO_USER_ID);
-    assert.strictEqual(report.available, true, '前置：demo 应 available=true');
-
-    const before = user_personalities.length;
-    const entry = persistPersonality(DEMO_USER_ID, report);
-    assert.ok(entry, '应返回写入的记录');
-    assert.strictEqual(user_personalities.length, before + 1, '长度应 +1');
-    assert.strictEqual(entry!.userId, DEMO_USER_ID);
-    assert.ok(entry!.personalityType, 'personalityType 应非空');
-    assert.ok(entry!.personalityName, 'personalityName 应非空');
-    assert.ok(entry!.description, 'description 应非空');
-    // personalityName 应等于报告中的 personalityType（人格名）
-    assert.strictEqual(entry!.personalityName, report.personalityType);
-    // 恢复初态，避免污染其他用例
-    user_personalities.pop();
-    assert.strictEqual(user_personalities.length, before, '清理后长度应恢复');
-  });
-
-  it('available=false 时不写入（返回 null，长度不变）', () => {
-    const report = buildPersonalityReport(NON_EXIST_USER_ID);
-    assert.strictEqual(report.available, false);
-    const before = user_personalities.length;
-    const entry = persistPersonality(NON_EXIST_USER_ID, report);
-    assert.strictEqual(entry, null);
-    assert.strictEqual(user_personalities.length, before, 'available=false 不应写入');
   });
 });
 
@@ -187,18 +129,6 @@ describe('queryTimemachine', () => {
     assert.ok(Array.isArray(result.memories));
     assert.strictEqual(result.memories.length, 0);
     assert.ok(typeof result.todayDate === 'string');
-  });
-
-  it('命中春节（02-10）时 festival 非空且 isFamilyFeast=true（F29 节日家宴）', () => {
-    const result = queryTimemachine(DEMO_USER_ID, new Date('2026-02-10'));
-    assert.ok(result.festival, '春节命中时 festival 应非空');
-    assert.strictEqual(result.festival!.name, '春节');
-    assert.strictEqual(result.festival!.isFamilyFeast, true);
-  });
-
-  it('非节日（06-27）时 festival 为 undefined', () => {
-    const result = queryTimemachine(DEMO_USER_ID, new Date('2026-06-27'));
-    assert.strictEqual(result.festival, undefined, '非节日 festival 应为 undefined');
   });
 });
 
@@ -299,84 +229,5 @@ describe('scoreBlindGuess', () => {
     // chefWinner 应指向最高分者
     assert.ok(result!.chefWinner, 'chefWinner 应非空');
     assert.strictEqual(result!.chefWinner!.userId, top.userId);
-  });
-
-  it('揭晓后厨神用户在 user_achievements 写入对应徽章且去重（F30 厨神徽章）', () => {
-    // 构造 mock 轮次：mom 全对（2 分，rank 1，isChef），demo 全错（0 分）
-    const mockRound: BlindGuessRound = {
-      id: 'test-round-chef-002',
-      familyId: 'family-0001',
-      roundName: '厨神徽章测试轮次',
-      creatorId: DEMO_USER_ID,
-      items: [
-        {
-          recordId: 'chef-item-a',
-          recipeId: 'chef-item-a',
-          dishName: '番茄炒蛋',
-          coverUrl: '',
-          realAuthorId: 'user-mom-0002',
-          realAuthorName: '妈妈',
-        },
-      ],
-      guesses: [
-        // mom 猜 chef-item-a：作者命中 + 菜名命中 → 2 分
-        {
-          userId: 'user-mom-0002',
-          userNickname: '妈妈',
-          itemId: 'chef-item-a',
-          guessAuthorId: 'user-mom-0002',
-          guessAuthorName: '妈妈',
-          guessDishName: '番茄炒蛋',
-          correct: false,
-          score: 0,
-          createdAt: '',
-        },
-        // demo 猜 chef-item-a：全错 → 0 分
-        {
-          userId: DEMO_USER_ID,
-          userNickname: '小明',
-          itemId: 'chef-item-a',
-          guessAuthorId: DEMO_USER_ID,
-          guessAuthorName: '小明',
-          guessDishName: '完全不对的菜名',
-          correct: false,
-          score: 0,
-          createdAt: '',
-        },
-      ],
-      status: 'revealed',
-      createdAt: '',
-      revealedAt: null,
-    };
-    blindGuessRounds.push(mockRound);
-    mockRoundIds.push(mockRound.id);
-
-    const beforeCount = user_achievements.filter(
-      (ua) => ua.achievementId === CHEF_BADGE_ID,
-    ).length;
-
-    const result = scoreBlindGuess(mockRound.id);
-    assert.ok(result, '应返回非 null 结果');
-    const chefEntry = result!.ranking.find((r) => r.isChef);
-    assert.ok(chefEntry, '应存在厨神');
-    assert.strictEqual(chefEntry!.userId, 'user-mom-0002', 'mom 应为厨神');
-
-    // mom 应被写入厨神徽章
-    const afterCount = user_achievements.filter(
-      (ua) => ua.achievementId === CHEF_BADGE_ID,
-    ).length;
-    assert.strictEqual(afterCount, beforeCount + 1, '厨神徽章数量应 +1');
-    const momBadge = user_achievements.find(
-      (ua) => ua.userId === 'user-mom-0002' && ua.achievementId === CHEF_BADGE_ID,
-    );
-    assert.ok(momBadge, 'mom 应有厨神徽章记录');
-    assert.ok(momBadge!.earnedAt, 'earnedAt 应非空');
-
-    // 再次调用应去重，不重复解锁
-    scoreBlindGuess(mockRound.id);
-    const dedupCount = user_achievements.filter(
-      (ua) => ua.achievementId === CHEF_BADGE_ID,
-    ).length;
-    assert.strictEqual(dedupCount, afterCount, '同一用户同一徽章不应重复解锁');
   });
 });

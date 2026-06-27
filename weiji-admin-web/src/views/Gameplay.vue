@@ -17,23 +17,6 @@
               <el-progress :percentage="completionPercent" :stroke-width="8" />
             </div>
 
-            <!-- 空状态引导：未点亮任何格子 -->
-            <div
-              v-if="!pokedexLoading && (pokedex.unlockedSlots || 0) === 0"
-              class="wj-card pokedex-empty-guide"
-            >
-              <div class="empty-emoji">📖</div>
-              <p class="empty-desc">你的图鉴还是空的，去记录第一道美食点亮它吧</p>
-              <el-button
-                type="primary"
-                size="small"
-                @click="goToRecord"
-              >
-                <el-icon><Camera /></el-icon>
-                去记录解锁更多
-              </el-button>
-            </div>
-
             <!-- 分类分组 -->
             <div
               v-for="cat in pokedexCategories"
@@ -49,10 +32,7 @@
                   v-for="item in cat.items"
                   :key="item.dishName"
                   class="pokedex-cell"
-                  :class="[
-                    rarityClass(item.rarity),
-                    { locked: !item.unlocked, 'just-unlocked': item.unlocked && justUnlockedNames.has(item.dishName) }
-                  ]"
+                  :class="[rarityClass(item.rarity), { locked: !item.unlocked }]"
                 >
                   <template v-if="item.unlocked">
                     <div class="cell-emoji">{{ rarityEmoji(item.rarity) }}</div>
@@ -65,14 +45,6 @@
                   </template>
                 </div>
               </div>
-            </div>
-
-            <!-- 跨玩法 CTA：去人格 -->
-            <div v-if="!pokedexLoading && (pokedex.unlockedSlots || 0) > 0" class="cross-cta">
-              <el-button text type="primary" @click="activeTab = 'personality'">
-                探索你的食物人格
-                <el-icon class="el-icon--right"><ArrowRight /></el-icon>
-              </el-button>
             </div>
 
             <div v-if="!pokedexLoading && !pokedexCategories.length" class="empty-tip">
@@ -103,14 +75,9 @@
                 </div>
                 <div class="share-box">
                   <div class="share-text">{{ personality.shareText }}</div>
-                  <el-button
-                    size="small"
-                    type="primary"
-                    :loading="personalityShareLoading"
-                    @click="sharePersonality"
-                  >
-                    <el-icon><Share /></el-icon>
-                    分享
+                  <el-button size="small" type="primary" @click="copyShareText">
+                    <el-icon><CopyDocument /></el-icon>
+                    复制分享
                   </el-button>
                 </div>
               </div>
@@ -125,27 +92,12 @@
                 <div class="empty-meta">已记录 {{ personality.recordCount || 0 }} / 3</div>
               </div>
             </template>
-            <!-- 跨玩法 CTA：去时光机 -->
-            <div class="cross-cta">
-              <el-button text type="primary" @click="activeTab = 'timemachine'">
-                回顾往年今日
-                <el-icon class="el-icon--right"><ArrowRight /></el-icon>
-              </el-button>
-            </div>
           </div>
         </el-tab-pane>
 
         <!-- ========== Tab 3: 美食时光机 ========== -->
         <el-tab-pane label="美食时光机" name="timemachine">
           <div v-loading="timemachineLoading">
-            <!-- 节日 banner -->
-            <div v-if="timemachineFestival" class="wj-card festival-banner">
-              <el-icon :size="18" class="festival-icon"><Calendar /></el-icon>
-              <span class="festival-name">{{ timemachineFestival.name }}</span>
-              <el-tag v-if="timemachineFestival.isFamilyFeast" size="small" type="warning">
-                家宴日
-              </el-tag>
-            </div>
             <template v-if="timemachineMemories.length">
               <div
                 v-for="m in timemachineMemories"
@@ -155,15 +107,6 @@
                 <div class="memory-header">
                   <span class="memory-year">{{ m.year }} 年</span>
                   <span class="memory-date">{{ m.date }}</span>
-                  <el-button
-                    text
-                    size="small"
-                    class="memory-share-btn"
-                    @click="shareMemory(m)"
-                  >
-                    <el-icon><Share /></el-icon>
-                    分享
-                  </el-button>
                 </div>
                 <p v-if="m.caption" class="memory-caption">{{ m.caption }}</p>
                 <div class="memory-records no-scrollbar">
@@ -220,21 +163,14 @@
                   v-for="item in blindguessDetail.items"
                   :key="item.recordId"
                   class="round-item"
-                  :class="{ 'is-guessed': blindguessDetail.status === 'active' && isItemGuessed(item) }"
                 >
                   <img
                     :src="item.coverUrl"
-                    :alt="blindguessDetail.status === 'active' ? '待猜菜品' : (item.dishName || '')"
+                    :alt="item.dishName"
                     class="round-item-img"
                   />
                   <div class="round-item-info">
-                    <div class="round-item-name">
-                      {{
-                        blindguessDetail.status === 'revealed'
-                          ? (item.dishName || '未知菜名')
-                          : '???（待猜）'
-                      }}
-                    </div>
+                    <div class="round-item-name">{{ item.dishName }}</div>
                     <div class="round-item-author">
                       作者：{{
                         blindguessDetail.status === 'revealed'
@@ -242,45 +178,12 @@
                           : '???（待揭晓）'
                       }}
                     </div>
-                    <!-- 已猜测标记 -->
-                    <div
-                      v-if="blindguessDetail.status === 'active' && isItemGuessed(item)"
-                      class="guess-done"
-                    >
-                      <el-icon><Check /></el-icon> 已猜测
-                    </div>
-                    <!-- active 状态提交猜测（每题独立） -->
-                    <div
-                      v-else-if="blindguessDetail.status === 'active'"
-                      class="guess-form"
-                    >
-                      <el-select
-                        v-if="useMemberSelect"
-                        v-model="guessInputs[item.recordId].authorId"
-                        size="small"
-                        placeholder="猜作者"
-                        class="guess-author"
-                        filterable
-                      >
-                        <el-option
-                          v-for="m in familyMembers"
-                          :key="m.id || m.userId"
-                          :label="m.nickname || m.username || '成员'"
-                          :value="String(m.id || m.userId)"
-                        />
-                      </el-select>
+                    <!-- active 状态提交猜测 -->
+                    <div v-if="blindguessDetail.status === 'active'" class="guess-form">
                       <el-input
-                        v-else
-                        v-model="guessInputs[item.recordId].authorId"
-                        size="small"
-                        placeholder="猜作者名"
-                        class="guess-author"
-                      />
-                      <el-input
-                        v-model="guessInputs[item.recordId].dishName"
+                        v-model="guessInputs[item.recordId]"
                         size="small"
                         placeholder="猜菜名"
-                        class="guess-dish"
                       />
                       <el-button
                         size="small"
@@ -314,38 +217,17 @@
                 <div class="ranking-title">
                   <el-icon><Trophy /></el-icon> 排名
                 </div>
-                <el-table
-                  :data="sortedRanking"
-                  size="small"
-                  border
-                  class="ranking-table"
+                <div
+                  v-for="r in roundRanking"
+                  :key="r.userId"
+                  class="rank-item"
                 >
-                  <el-table-column prop="rank" label="名次" width="64" align="center">
-                    <template #default="{ row }">
-                      <span class="rank-no">第 {{ row.rank }} 名</span>
-                    </template>
-                  </el-table-column>
-                  <el-table-column prop="userNickname" label="成员" />
-                  <el-table-column label="成绩" align="center">
-                    <template #default="{ row }">
-                      <span class="rank-score">
-                        {{ row.totalScore }} 分 · {{ row.correctCount }} 道正确
-                      </span>
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="头衔" width="72" align="center">
-                    <template #default="{ row }">
-                      <el-tag v-if="row.isChef" size="small" type="warning">厨神</el-tag>
-                    </template>
-                  </el-table-column>
-                </el-table>
-
-                <!-- 跨玩法 CTA：揭晓后去图鉴 -->
-                <div class="cross-cta">
-                  <el-button text type="primary" @click="activeTab = 'pokedex'">
-                    去图鉴看看点亮了什么
-                    <el-icon class="el-icon--right"><ArrowRight /></el-icon>
-                  </el-button>
+                  <span class="rank-no">第 {{ r.rank }} 名</span>
+                  <span class="rank-name">{{ r.userNickname }}</span>
+                  <span class="rank-score">
+                    {{ r.totalScore }} 分 · {{ r.correctCount }} 道正确
+                  </span>
+                  <el-tag v-if="r.isChef" size="small" type="warning">厨神</el-tag>
                 </div>
               </div>
             </div>
@@ -422,31 +304,24 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import {
   Reading,
   MagicStick,
+  CopyDocument,
   Trophy,
   Lock,
   ArrowLeft,
-  ArrowRight,
-  Share,
-  Calendar,
-  Camera,
-  Check,
 } from '@element-plus/icons-vue';
 import Layout from '../components/Layout.vue';
 import { api } from '../api/client';
 import { useAuthStore } from '../stores/auth';
 
 const auth = useAuthStore();
-const router = useRouter();
 
 const activeTab = ref<'pokedex' | 'personality' | 'timemachine' | 'blindguess'>('pokedex');
 
 // ---- Tab 1: 美食图鉴 ----
-const POKEDEX_SEEN_KEY = 'admin_pokedex_seen_unlocked';
 const pokedex = ref<any>({});
 const pokedexLoading = ref(false);
 const pokedexLoaded = ref(false);
@@ -454,7 +329,6 @@ const pokedexCategories = computed<any[]>(() => pokedex.value?.categories || [])
 const completionPercent = computed(() =>
   Math.round((pokedex.value?.completionRate || 0) * 100)
 );
-const justUnlockedNames = ref<Set<string>>(new Set());
 
 function rarityClass(rarity: string) {
   return `rarity-${rarity || 'common'}`;
@@ -472,46 +346,11 @@ function rarityEmoji(rarity: string) {
   }
 }
 
-function readSeenUnlocked(): Set<string> {
-  try {
-    const raw = localStorage.getItem(POKEDEX_SEEN_KEY);
-    const arr = raw ? JSON.parse(raw) : [];
-    return Array.isArray(arr) ? new Set(arr.filter((x: any) => typeof x === 'string')) : new Set();
-  } catch {
-    return new Set();
-  }
-}
-function saveSeenUnlocked(names: string[]) {
-  try {
-    localStorage.setItem(POKEDEX_SEEN_KEY, JSON.stringify(names.slice(0, 200)));
-  } catch {
-    /* ignore */
-  }
-}
-
-function goToRecord() {
-  router.push('/ai-record');
-}
-
 async function loadPokedex() {
   pokedexLoading.value = true;
   try {
     const data: any = await api.getPokedex();
     pokedex.value = data || {};
-    // 计算本次新点亮（与 localStorage 已见集合做差）
-    const seen = readSeenUnlocked();
-    const currentNames: string[] = [];
-    const newlyUnlocked = new Set<string>();
-    (pokedexCategories.value || []).forEach((cat: any) => {
-      (cat?.items || []).forEach((item: any) => {
-        if (item?.unlocked && item?.dishName) {
-          currentNames.push(item.dishName);
-          if (!seen.has(item.dishName)) newlyUnlocked.add(item.dishName);
-        }
-      });
-    });
-    justUnlockedNames.value = newlyUnlocked;
-    saveSeenUnlocked(currentNames);
   } catch (err) {
     pokedex.value = {};
   } finally {
@@ -524,7 +363,6 @@ async function loadPokedex() {
 const personality = ref<any>({});
 const personalityLoading = ref(false);
 const personalityLoaded = ref(false);
-const personalityShareLoading = ref(false);
 const personalityProgress = computed(() =>
   Math.min(100, Math.round(((personality.value?.recordCount || 0) / 3) * 100))
 );
@@ -542,42 +380,14 @@ async function loadPersonality() {
   }
 }
 
-async function copyTextFallback(text: string): Promise<boolean> {
+async function copyShareText() {
+  const text = personality.value?.shareText || '';
+  if (!text) return;
   try {
     await navigator.clipboard.writeText(text);
-    return true;
+    ElMessage.success('已复制分享文案');
   } catch {
-    return false;
-  }
-}
-
-async function sharePersonality() {
-  const text = personality.value?.shareText || '';
-  if (!text) {
-    ElMessage.warning('暂无可分享内容');
-    return;
-  }
-  personalityShareLoading.value = true;
-  try {
-    const personalityType = personality.value?.personalityType || '';
-    // 优先调用原生分享
-    const nav: any = navigator;
-    if (nav.share) {
-      try {
-        await nav.share({ title: personalityType || '我的食物人格', text });
-        api.trackEvent('personality_share', { personalityType }).catch(() => {});
-        ElMessage.success('已分享');
-        return;
-      } catch {
-        // 用户取消或失败，降级到复制
-      }
-    }
-    const ok = await copyTextFallback(text);
-    api.trackEvent('personality_share', { personalityType }).catch(() => {});
-    if (ok) ElMessage.success('已复制分享文案');
-    else ElMessage.warning('复制失败，请手动复制');
-  } finally {
-    personalityShareLoading.value = false;
+    ElMessage.warning('复制失败，请手动复制');
   }
 }
 
@@ -591,41 +401,9 @@ const timemachineMemories = computed<any[]>(() => {
   // 按年份从新到旧
   return [...list].sort((a, b) => (b.year || 0) - (a.year || 0));
 });
-const timemachineFestival = computed(() => {
-  const f = timemachine.value?.festival;
-  return f && typeof f === 'object' && f.name ? f : null;
-});
 
 function recordThumb(r: any) {
   return r?.imageUrl || r?.beautifiedUrl || r?.coverUrl || '';
-}
-
-async function shareMemory(m: any) {
-  const year = m?.year || '';
-  const caption = m?.caption || '';
-  const names = (m?.records || [])
-    .map((r: any) => r?.dishName || r?.title || '')
-    .filter(Boolean)
-    .join('、');
-  const text = `${year}年的味记回忆：${caption}${names ? `（${names}）` : ''}`.trim();
-  if (!text) {
-    ElMessage.warning('暂无可分享内容');
-    return;
-  }
-  const nav: any = navigator;
-  if (nav.share) {
-    try {
-      await nav.share({ title: `${year}年的味记回忆`, text });
-      api.trackEvent('timemachine_share', { year }).catch(() => {});
-      return;
-    } catch {
-      // 降级到复制
-    }
-  }
-  const ok = await copyTextFallback(text);
-  api.trackEvent('timemachine_share', { year }).catch(() => {});
-  if (ok) ElMessage.success('已复制回忆文案');
-  else ElMessage.warning('复制失败，请手动复制');
 }
 
 async function loadTimemachine() {
@@ -639,13 +417,12 @@ async function loadTimemachine() {
     timemachineLoading.value = false;
     timemachineLoaded.value = true;
   }
-  api.trackEvent('timemachine_view').catch(() => {});
 }
 
 // ---- Tab 4: 家庭盲猜 ----
+const ROUNDS_KEY = 'admin_blindguess_rounds';
 const familyId = ref<string>('');
 const currentUserId = ref<string>('');
-const familyMembers = ref<any[]>([]);
 const recipes = ref<any[]>([]);
 const blindguessLoading = ref(false);
 const blindguessLoaded = ref(false);
@@ -656,13 +433,10 @@ const createRoundLoading = ref(false);
 
 const historyRounds = ref<any[]>([]);
 const blindguessDetail = ref<any>(null);
-const guessInputs = ref<Record<string, { authorId: string; dishName: string }>>({});
+const guessInputs = ref<Record<string, string>>({});
 const guessLoading = ref<string>('');
 const revealLoading = ref(false);
 const roundRanking = ref<any[]>([]);
-const guessedItemIds = ref<Set<string>>(new Set());
-
-const useMemberSelect = computed(() => familyMembers.value.length > 0);
 
 const isCreator = computed(
   () =>
@@ -671,35 +445,30 @@ const isCreator = computed(
     String(currentUserId.value) === String(blindguessDetail.value.creatorId)
 );
 
-const sortedRanking = computed(() => {
-  const list = roundRanking.value ? [...roundRanking.value] : [];
-  return list.sort((a, b) => (a?.rank || 0) - (b?.rank || 0));
-});
-
-function isItemGuessed(item: any): boolean {
-  const key = String(item?.recordId || '');
-  if (!key) return false;
-  if (guessedItemIds.value.has(key)) return true;
-  const round = blindguessDetail.value;
-  if (round?.guesses && currentUserId.value) {
-    return round.guesses.some(
-      (g: any) =>
-        String(g?.itemId || g?.recordId || '') === key &&
-        String(g?.userId || g?.user?.id || '') === String(currentUserId.value)
-    );
+function readRoundIds(): string[] {
+  try {
+    const raw = localStorage.getItem(ROUNDS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.filter((x: any) => typeof x === 'string') : [];
+  } catch {
+    return [];
   }
-  return false;
+}
+
+function saveRoundId(roundId: string) {
+  const ids = readRoundIds().filter((id) => id !== roundId);
+  ids.unshift(roundId);
+  localStorage.setItem(ROUNDS_KEY, JSON.stringify(ids.slice(0, 20)));
 }
 
 async function loadBlindguess() {
   blindguessLoading.value = true;
   try {
-    // 并行获取 family 信息、可选菜谱、当前用户身份、家庭成员
-    const [family, recipeData, profile, members] = await Promise.all([
+    // 并行获取 family 信息、可选菜谱、当前用户身份
+    const [family, recipeData, profile] = await Promise.all([
       api.getFamilyInfo().catch(() => null),
       api.getFamilyRecipes().catch(() => null),
       api.getUserProfile().catch(() => null),
-      api.getFamilyMembers().catch(() => null),
     ]);
     familyId.value = (family as any)?.id || (family as any)?.familyId || '';
     recipes.value = Array.isArray(recipeData)
@@ -707,16 +476,14 @@ async function loadBlindguess() {
       : (recipeData as any)?.list || (recipeData as any)?.recipes || [];
     currentUserId.value =
       (profile as any)?.id || (profile as any)?.userId || auth.user?.id || '';
-    familyMembers.value = Array.isArray(members)
-      ? members
-      : (members as any)?.list || (members as any)?.members || [];
 
-    // 拉取本 family 所有轮次
-    if (familyId.value) {
-      const rounds: any = await api.getBlindGuessRounds(familyId.value).catch(() => null);
-      historyRounds.value = Array.isArray(rounds)
-        ? rounds
-        : (rounds as any)?.list || (rounds as any)?.rounds || [];
+    // 并行拉取历史轮次
+    const ids = readRoundIds();
+    if (ids.length) {
+      const results = await Promise.all(
+        ids.map((id) => api.getBlindGuessRound(id).catch(() => null))
+      );
+      historyRounds.value = results.filter((r) => r) as any[];
     } else {
       historyRounds.value = [];
     }
@@ -726,14 +493,6 @@ async function loadBlindguess() {
     blindguessLoading.value = false;
     blindguessLoaded.value = true;
   }
-}
-
-async function refreshHistoryRounds() {
-  if (!familyId.value) return;
-  const rounds: any = await api.getBlindGuessRounds(familyId.value).catch(() => null);
-  historyRounds.value = Array.isArray(rounds)
-    ? rounds
-    : (rounds as any)?.list || (rounds as any)?.rounds || [];
 }
 
 async function handleCreateRound() {
@@ -752,17 +511,23 @@ async function handleCreateRound() {
   }
   createRoundLoading.value = true;
   try {
-    await api.createBlindGuessRound({
+    const data: any = await api.createBlindGuessRound({
       familyId: familyId.value,
       roundName: name,
       recordIds: selectedRecipeIds.value,
     });
+    const roundId = data?.id || data?.roundId;
+    if (roundId) saveRoundId(String(roundId));
     ElMessage.success('已发起盲猜轮次');
     // 重置表单
     newRoundName.value = '';
     selectedRecipeIds.value = [];
     // 刷新历史列表
-    await refreshHistoryRounds();
+    const ids = readRoundIds();
+    const results = await Promise.all(
+      ids.map((id) => api.getBlindGuessRound(id).catch(() => null))
+    );
+    historyRounds.value = results.filter((r) => r) as any[];
   } catch (err: any) {
     ElMessage.error(err.message || '发起失败');
   } finally {
@@ -773,13 +538,7 @@ async function handleCreateRound() {
 function openRoundDetail(round: any) {
   blindguessDetail.value = round;
   roundRanking.value = [];
-  guessedItemIds.value = new Set();
-  // 初始化每题的猜测输入
-  const inputs: Record<string, { authorId: string; dishName: string }> = {};
-  (round?.items || []).forEach((it: any) => {
-    inputs[it.recordId] = { authorId: '', dishName: '' };
-  });
-  guessInputs.value = inputs;
+  guessInputs.value = {};
   // revealed 状态：从 sessionStorage 读取排名
   if (round?.status === 'revealed' && round?.id) {
     try {
@@ -792,32 +551,13 @@ function openRoundDetail(round: any) {
   }
 }
 
-function resolveAuthor(recordId: string) {
-  const input = guessInputs.value[recordId];
-  const authorId = (input?.authorId || '').trim();
-  const dishName = (input?.dishName || '').trim();
-  if (useMemberSelect.value) {
-    const member = familyMembers.value.find(
-      (m) => String(m.id || m.userId) === String(authorId)
-    );
-    const guessAuthorName = member?.nickname || member?.username || authorId;
-    return { guessAuthorId: authorId, guessAuthorName, guessDishName: dishName };
-  }
-  // 无成员列表时，作者名作 fallback 作为 guessAuthorId
-  return { guessAuthorId: authorId, guessAuthorName: authorId, guessDishName: dishName };
-}
-
 async function handleSubmitGuess(recordId: string) {
   const round = blindguessDetail.value;
   if (!round) return;
   const item = (round.items || []).find((it: any) => it.recordId === recordId);
   if (!item) return;
-  const { guessAuthorId, guessAuthorName, guessDishName } = resolveAuthor(recordId);
-  if (!guessAuthorId) {
-    ElMessage.warning('请选择或输入猜测的作者');
-    return;
-  }
-  if (!guessDishName) {
+  const dishName = (guessInputs.value[recordId] || '').trim();
+  if (!dishName) {
     ElMessage.warning('请输入猜测的菜名');
     return;
   }
@@ -825,14 +565,11 @@ async function handleSubmitGuess(recordId: string) {
   try {
     await api.submitBlindGuess(round.id, {
       itemId: item.recordId,
-      guessAuthorId,
-      guessAuthorName,
-      guessDishName,
+      guessAuthorId: '',
+      guessDishName: dishName,
     });
     ElMessage.success('已提交猜测');
-    // 标记该题已猜测并清空输入
-    guessedItemIds.value.add(String(recordId));
-    guessInputs.value[recordId] = { authorId: '', dishName: '' };
+    guessInputs.value[recordId] = '';
     // 刷新轮次详情（更新 guesses 计数）
     const fresh: any = await api.getBlindGuessRound(round.id);
     if (fresh) blindguessDetail.value = fresh;
@@ -862,7 +599,8 @@ async function handleReveal() {
     const fresh: any = await api.getBlindGuessRound(round.id);
     if (fresh) blindguessDetail.value = fresh;
     // 同步历史列表中的状态
-    await refreshHistoryRounds();
+    const idx = historyRounds.value.findIndex((r) => r.id === round.id);
+    if (idx >= 0 && fresh) historyRounds.value[idx] = fresh;
   } catch (err: any) {
     ElMessage.error(err.message || '揭晓失败');
   } finally {
@@ -994,46 +732,6 @@ onMounted(() => loadPokedex());
 .lock-icon {
   margin-bottom: 2px;
 }
-.pokedex-empty-guide {
-  text-align: center;
-  padding: 24px 16px;
-  margin-bottom: 16px;
-}
-.pokedex-empty-guide .empty-emoji {
-  font-size: 36px;
-  margin-bottom: 8px;
-}
-.pokedex-empty-guide .empty-desc {
-  margin-bottom: 12px;
-}
-/* 新点亮格子动效 */
-.pokedex-cell.just-unlocked {
-  animation: wj-just-unlocked 1.2s ease-out 1;
-  box-shadow: 0 0 0 2px var(--primary-400);
-}
-@keyframes wj-just-unlocked {
-  0% {
-    transform: scale(0.6);
-    opacity: 0;
-    box-shadow: 0 0 0 0 var(--primary-400);
-  }
-  50% {
-    transform: scale(1.12);
-    opacity: 1;
-    box-shadow: 0 0 0 6px var(--primary-200);
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-    box-shadow: 0 0 0 2px var(--primary-400);
-  }
-}
-/* 跨玩法 CTA */
-.cross-cta {
-  display: flex;
-  justify-content: center;
-  margin: 16px 0 4px;
-}
 
 /* 人格 */
 .personality-card {
@@ -1101,24 +799,6 @@ onMounted(() => loadPokedex());
 }
 
 /* 时光机 */
-.festival-banner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  margin-bottom: 12px;
-  background: var(--accent-100);
-  color: var(--accent-700);
-}
-.festival-icon {
-  color: var(--accent-600);
-}
-.festival-name {
-  font-family: var(--font-heading);
-  font-weight: 600;
-  font-size: 14px;
-  flex: 1;
-}
 .memory-card {
   margin-bottom: 12px;
 }
@@ -1127,9 +807,6 @@ onMounted(() => loadPokedex());
   align-items: baseline;
   gap: 8px;
   margin-bottom: 4px;
-}
-.memory-share-btn {
-  margin-left: auto;
 }
 .memory-year {
   font-family: var(--font-heading);
@@ -1246,12 +923,6 @@ onMounted(() => loadPokedex());
   display: flex;
   gap: 12px;
 }
-.round-item.is-guessed {
-  opacity: 0.7;
-}
-.round-item.is-guessed .round-item-img {
-  filter: grayscale(0.4);
-}
 .round-item-img {
   width: 72px;
   height: 72px;
@@ -1275,30 +946,13 @@ onMounted(() => loadPokedex());
   color: var(--muted-foreground);
   margin-bottom: 8px;
 }
-.guess-done {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--primary-600);
-  padding: 4px 8px;
-  background: var(--primary-100);
-  border-radius: var(--radius-sm);
-  width: fit-content;
-}
 .guess-form {
   display: flex;
-  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
 }
-.guess-form .guess-author {
-  flex: 1 1 110px;
-  min-width: 110px;
-}
-.guess-form .guess-dish {
-  flex: 1 1 120px;
-  min-width: 120px;
+.guess-form .el-input {
+  flex: 1;
 }
 .reveal-btn {
   width: 100%;
@@ -1318,9 +972,6 @@ onMounted(() => loadPokedex());
   font-size: 14px;
   color: var(--foreground);
   margin-bottom: 10px;
-}
-.ranking-table {
-  margin-bottom: 8px;
 }
 .rank-item {
   display: flex;

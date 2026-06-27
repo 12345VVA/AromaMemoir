@@ -54,6 +54,12 @@ export const api = {
   saveRecord(data: any) {
     return instance.post('/record', data);
   },
+  updateRecord(id: string, data: any) {
+    return instance.patch(`/record/${id}`, data);
+  },
+  deleteRecord(id: string) {
+    return instance.delete(`/record/${id}`);
+  },
   // 家庭
   getFamilyInfo() {
     return instance.get('/family');
@@ -138,25 +144,10 @@ export const api = {
   getBlindGuessRound(roundId: string) {
     return instance.get(`/gamification/blindguess/round/${roundId}`);
   },
-  getBlindGuessRounds(familyId: string) {
-    return instance.get('/gamification/blindguess/rounds', { params: { familyId } });
-  },
-  submitBlindGuess(
-    roundId: string,
-    data: {
-      itemId: string;
-      guessAuthorId: string;
-      guessAuthorName?: string;
-      guessDishName: string;
-    }
-  ) {
+  submitBlindGuess(roundId: string, data: { itemId: string; guessAuthorId: string; guessDishName: string }) {
     return instance.post(`/gamification/blindguess/round/${roundId}/guess`, data);
   },
   revealBlindGuessRound(roundId: string) {
     return instance.post(`/gamification/blindguess/round/${roundId}/reveal`);
-  },
-  // 埋点上报
-  trackEvent(type: string, payload?: Record<string, any>) {
-    return instance.post('/analytics/track', { type, payload });
   },
 };

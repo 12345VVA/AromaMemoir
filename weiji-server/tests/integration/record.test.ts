@@ -98,4 +98,77 @@ describe('Record 控制器', () => {
     assert.strictEqual(res.body.code, 404);
     assert.ok(res.body.message);
   });
+
+  // PATCH /api/record/:id 更新自己的记录
+  it('PATCH /api/record/:id 更新自己的记录返回 code:0', async () => {
+    const res = await request
+      .patch('/api/record/record-0001')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ rating: 3, note: '更新后的备注' });
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.code, 0);
+    assert.strictEqual(res.body.data.record.id, 'record-0001');
+    assert.strictEqual(res.body.data.record.rating, 3);
+    assert.strictEqual(res.body.data.record.note, '更新后的备注');
+    assert.strictEqual(res.body.data.record.dishName, '红烧牛肉面'); // 未改字段保留
+  });
+
+  // PATCH /api/record/:id 更新他人记录返回 403
+  it('PATCH /api/record/:id 更新他人记录返回 403', async () => {
+    // 用 mom 用户登录
+    const momLogin = await request
+      .post('/api/auth/login')
+      .send({ username: 'mom', password: '123456' });
+    const momToken = momLogin.body.data.token;
+
+    const res = await request
+      .patch('/api/record/record-0001')
+      .set('Authorization', `Bearer ${momToken}`)
+      .send({ rating: 1 });
+
+    assert.strictEqual(res.body.code, 403);
+  });
+
+  // PATCH /api/record/:id 不存在返回 404
+  it('PATCH /api/record/:id 不存在返回 404', async () => {
+    const res = await request
+      .patch('/api/record/not-exist-id')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ rating: 5 });
+
+    assert.strictEqual(res.body.code, 404);
+  });
+
+  // DELETE /api/record/:id 删除自己的记录
+  it('DELETE /api/record/:id 软删除自己的记录返回 code:0', async () => {
+    // 先创建一条记录用于删除
+    const createRes = await request
+      .post('/api/record')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ dishName: '待删除记录', rating: 1 });
+    const recordId = createRes.body.data.id;
+
+    const res = await request
+      .delete('/api/record/' + recordId)
+      .set('Authorization', `Bearer ${token}`);
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.code, 0);
+    assert.strictEqual(res.body.message, '删除成功');
+  });
+
+  // DELETE /api/record/:id 删除他人记录返回 403
+  it('DELETE /api/record/:id 删除他人记录返回 403', async () => {
+    const momLogin = await request
+      .post('/api/auth/login')
+      .send({ username: 'mom', password: '123456' });
+    const momToken = momLogin.body.data.token;
+
+    const res = await request
+      .delete('/api/record/record-0001')
+      .set('Authorization', `Bearer ${momToken}`);
+
+    assert.strictEqual(res.body.code, 403);
+  });
 });

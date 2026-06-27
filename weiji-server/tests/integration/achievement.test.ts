@@ -61,4 +61,31 @@ describe('Achievement 控制器', () => {
     assert.strictEqual(data.exp, 250);
     assert.strictEqual(data.level, 3);
   });
+
+  // 创建记录后 first_record 自动解锁（幂等：已解锁不再重复）
+  it('创建记录后成就自动解锁检查不报错', async () => {
+    // demo 已解锁 first_record，再创建记录应触发检查但不重复解锁
+    const res = await request
+      .post('/api/record')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ dishName: '测试成就解锁', rating: 5 });
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.code, 0);
+    assert.ok(res.body.data.id);
+    // newAchievements 字段应存在（可能为空数组，因为 first_record 已解锁）
+    assert.ok(Array.isArray(res.body.data.newAchievements));
+  });
+
+  // 打卡后 streak 成就自动解锁检查
+  it('打卡后成就自动解锁检查不报错', async () => {
+    const res = await request
+      .post('/api/checkin')
+      .set('Authorization', `Bearer ${token}`);
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.code, 0);
+    // newAchievements 字段应存在
+    assert.ok(res.body.data.newAchievements !== undefined);
+  });
 });

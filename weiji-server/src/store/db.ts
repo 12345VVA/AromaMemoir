@@ -532,6 +532,16 @@ export const achievements: AchievementDef[] = [
     condition: { familyCreated: true },
     expReward: 100,
   },
+  {
+    id: 'ach-0007',
+    code: 'blindguess_chef',
+    name: '家庭厨神',
+    description: '在家庭盲猜中赢得厨神称号',
+    icon: '👑',
+    type: 'gameplay',
+    condition: { blindguessChef: true },
+    expReward: 200,
+  },
 ];
 
 // ============================================================

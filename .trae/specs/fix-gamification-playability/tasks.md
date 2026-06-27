@@ -40,10 +40,10 @@
   - [x] SubTask 7.2: 前端测试新增/扩展（盲猜逐题、人格分享、图鉴动效、节日）
   - [x] SubTask 7.3: 端到端验证四玩法闭环（F30 多人参与、F28 分享回流、F27 点亮动效、F29 节日推送）
 
-- [ ] Task 8: Git 提交与合并
-  - [ ] SubTask 8.1: 在功能分支 `fix/gamification-playability` 提交所有修复
-  - [ ] SubTask 8.2: 切回 main 执行 `git merge --no-ff fix/gamification-playability`
-  - [ ] SubTask 8.3: 执行 `git push origin main`
+- [x] Task 8: Git 提交与合并 — commit 2ca257b（39文件+1639/-139）、merge a62b1c8（42文件+1774/-139 无冲突）、push 35d6ff1..a62b1c8 成功
+  - [x] SubTask 8.1: 在功能分支 `fix/gamification-playability` 提交所有修复（commit 2ca257b，39 文件）
+  - [x] SubTask 8.2: 切回 main 执行 `git merge --no-ff fix/gamification-playability`（merge commit a62b1c8，42 文件，无冲突）
+  - [x] SubTask 8.3: 执行 `git push origin main`（35d6ff1..a62b1c8 推送成功，本地与 origin/main 同步）
 
 # Task Dependencies
 - Task 1-4 可并行（后端四块相互独立：F30 列表 / F28 卡片 / 埋点 / F29+徽章）

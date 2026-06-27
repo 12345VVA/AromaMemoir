@@ -56,7 +56,7 @@
 - [x] 端到端验证四玩法闭环（38/38 核查点通过）
 
 ## Git 流程
-- [ ] 功能分支 fix/gamification-playability 提交所有修复
-- [ ] git merge --no-ff 合并到 main
-- [ ] git push origin main 推送成功
-- [ ] 推送后远程 main 与本地一致
+- [x] 功能分支 fix/gamification-playability 提交所有修复（commit 2ca257b，39 文件 +1639/-139）
+- [x] git merge --no-ff 合并到 main（merge commit a62b1c8，42 文件 +1774/-139，无冲突）
+- [x] git push origin main 推送成功（35d6ff1..a62b1c8）
+- [x] 推送后远程 main 与本地一致（origin/main = a62b1c8）

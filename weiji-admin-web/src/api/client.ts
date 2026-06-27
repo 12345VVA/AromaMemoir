@@ -138,10 +138,25 @@ export const api = {
   getBlindGuessRound(roundId: string) {
     return instance.get(`/gamification/blindguess/round/${roundId}`);
   },
-  submitBlindGuess(roundId: string, data: { itemId: string; guessAuthorId: string; guessDishName: string }) {
+  getBlindGuessRounds(familyId: string) {
+    return instance.get('/gamification/blindguess/rounds', { params: { familyId } });
+  },
+  submitBlindGuess(
+    roundId: string,
+    data: {
+      itemId: string;
+      guessAuthorId: string;
+      guessAuthorName?: string;
+      guessDishName: string;
+    }
+  ) {
     return instance.post(`/gamification/blindguess/round/${roundId}/guess`, data);
   },
   revealBlindGuessRound(roundId: string) {
     return instance.post(`/gamification/blindguess/round/${roundId}/reveal`);
+  },
+  // 埋点上报
+  trackEvent(type: string, payload?: Record<string, any>) {
+    return instance.post('/analytics/track', { type, payload });
   },
 };

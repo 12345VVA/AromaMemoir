@@ -17,6 +17,7 @@ import { UserController } from './controller/user.controller';
 import { ChallengeController } from './controller/challenge.controller';
 import { AiController } from './controller/ai.controller';
 import { GamificationController } from './controller/gamification.controller';
+import { AnalyticsController } from './controller/analytics.controller';
 import { getControllerPrefix, getRouteDefinitions, RouteDefinition } from './common/decorators';
 import { jwtMiddleware } from './middleware/jwt.middleware';
 import { AiProxyService } from './service/ai-proxy.service';
@@ -35,6 +36,7 @@ const controllers: Array<{ new (...args: unknown[]): unknown }> = [
   ChallengeController,
   AiController,
   GamificationController,
+  AnalyticsController,
 ];
 
 // 将控制器内的路由元数据注册到 koa-router

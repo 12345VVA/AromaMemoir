@@ -3,6 +3,7 @@
 //   - GET  /api/gamification/pokedex                   美食图鉴
 //   - GET  /api/gamification/personality                食物人格测试
 //   - GET  /api/gamification/timemachine                 美食时光机
+//   - GET  /api/gamification/blindguess/rounds          盲猜轮次列表（F30 多人协同）
 //   - POST /api/gamification/blindguess/round            发起盲猜轮次
 //   - GET  /api/gamification/blindguess/round/:id        查看轮次详情
 //   - POST /api/gamification/blindguess/round/:id/guess  提交猜测
@@ -22,14 +23,17 @@ import { findByField, uuid } from '../store/helpers';
 import {
   aggregatePokedex,
   buildPersonalityReport,
+  persistPersonality,
   queryTimemachine,
   scoreBlindGuess,
 } from '../store/helpers';
+import { trackEvent } from '../store/analytics';
 import type {
   PokedexSummary,
   PersonalityReport,
   TimemachineResult,
   BlindGuessRound,
+  BlindGuessListItem,
   BlindGuessGuess,
   BlindGuessResult,
   BlindGuessItem,
@@ -85,15 +89,20 @@ export class GamificationController {
   @Get('/pokedex')
   async pokedex(ctx: Context): Promise<ApiResponse<PokedexSummary>> {
     const { userId } = ctx.state.user as AuthUser;
+    trackEvent('pokedex_view', userId);
     return ok(aggregatePokedex(userId));
   }
 
   // GET /api/gamification/personality
-  // 食物人格测试：基于近 30 天记录生成人格报告
+  // 食物人格测试：基于近 30 天记录生成人格报告；available 时持久化到 user_personalities
   @Get('/personality')
   async personality(ctx: Context): Promise<ApiResponse<PersonalityReport>> {
     const { userId } = ctx.state.user as AuthUser;
-    return ok(buildPersonalityReport(userId));
+    const report = buildPersonalityReport(userId);
+    trackEvent('personality_view', userId);
+    // 可用人格时落库（不阻塞返回）
+    persistPersonality(userId, report);
+    return ok(report);
   }
 
   // GET /api/gamification/timemachine
@@ -102,6 +111,38 @@ export class GamificationController {
   async timemachine(ctx: Context): Promise<ApiResponse<TimemachineResult>> {
     const { userId } = ctx.state.user as AuthUser;
     return ok(queryTimemachine(userId));
+  }
+
+  // GET /api/gamification/blindguess/rounds
+  // 盲猜轮次列表：返回当前家庭的所有轮次（按 createdAt 降序）
+  // active 状态轮次用 sanitizeActiveRound 脱敏；revealed 状态原样返回
+  @Get('/blindguess/rounds')
+  async listBlindGuessRounds(ctx: Context): Promise<ApiResponse<BlindGuessListItem[]>> {
+    const { userId } = ctx.state.user as AuthUser;
+    const familyId = (ctx.query.familyId as string | undefined) || '';
+
+    // 校验必填参数
+    if (!familyId) {
+      return fail('familyId 不能为空', 400);
+    }
+
+    // 校验当前用户是该 family 成员（仅家庭成员可查看列表）
+    const membership = family_members.find(
+      (m) => m.familyId === familyId && m.userId === userId,
+    );
+    if (!membership) {
+      return fail('当前用户不是该家庭组成员', 403);
+    }
+
+    // 过滤 + 按 createdAt 降序；active 脱敏，revealed 原样
+    const rounds: BlindGuessListItem[] = blindGuessRounds
+      .filter((r) => r.familyId === familyId)
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+      .map((r): BlindGuessListItem =>
+        r.status === 'active' ? (sanitizeActiveRound(r) as BlindGuessListItem) : r,
+      );
+
+    return ok(rounds);
   }
 
   // POST /api/gamification/blindguess/round
@@ -166,6 +207,9 @@ export class GamificationController {
     };
 
     blindGuessRounds.push(round);
+
+    // 埋点：盲猜轮次创建（携带 roundId 与 familyId）
+    trackEvent('blindguess_create', userId, { roundId: round.id }, body.familyId);
 
     // 创建后立即返回，但与 GET 详情一致：active 状态下脱敏 items 中的真实作者信息
     return ok(sanitizeActiveRound(round), '盲猜轮次创建成功');
@@ -270,6 +314,9 @@ export class GamificationController {
 
     round.guesses.push(guess);
 
+    // 埋点：提交猜测（携带 itemId 与 round.familyId）
+    trackEvent('blindguess_submit', userId, { itemId: body.itemId }, round.familyId);
+
     return ok(guess, '猜测已提交');
   }
 
@@ -308,6 +355,9 @@ export class GamificationController {
 
     // 重新计算一次结果以反映最新的 status
     const finalResult = scoreBlindGuess(roundId) || result;
+
+    // 埋点：揭晓结果（携带 round.familyId）
+    trackEvent('blindguess_reveal', userId, undefined, round.familyId);
 
     return ok(finalResult, '揭晓成功');
   }

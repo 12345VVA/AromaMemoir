@@ -733,7 +733,7 @@ async function saveRecord() {
   };
   try {
     await api.saveRecord(data);
-    showToast('"' + dishName + '" 保存成功！');
+    showToast('"' + dishName + '" 保存成功！去看看图鉴有没有新点亮');
     currentRecognizeData = null;
     setTimeout(() => {
       navigateTo('home');
@@ -1505,13 +1505,32 @@ function renderPokedex(data) {
       '</div>' +
       '<div class="pokedex-progress-bar"><div class="pokedex-progress-fill" style="width:' + rate + '%;"></div></div>';
   }
+  // 比对上次已点亮集合，找出本次新点亮的格子以播放动效
+  const prevUnlocked = JSON.parse(localStorage.getItem('pokedex_unlocked') || '[]');
+  const prevSet = new Set(prevUnlocked);
+  const justUnlockedSet = new Set();
+  const currentUnlocked = [];
+  (data.categories || []).forEach(cat => {
+    (cat.items || []).forEach(item => {
+      if (item.unlocked && item.dishName) {
+        currentUnlocked.push(item.dishName);
+        if (!prevSet.has(item.dishName)) justUnlockedSet.add(item.dishName);
+      }
+    });
+  });
+  localStorage.setItem('pokedex_unlocked', JSON.stringify(currentUnlocked));
+
   if (categoriesEl) {
-    if (!data.categories || !data.categories.length) {
-      categoriesEl.innerHTML = '<div class="caption" style="padding: var(--space-4); text-align:center;">开始记录第一道菜来点亮图鉴</div>';
+    // 空状态：以 unlockedSlots 判断（原代码误用 categories 判断，恒非空导致不可达）
+    if (!data.unlockedSlots) {
+      categoriesEl.innerHTML = '<div class="caption" style="padding: var(--space-4); text-align:center;">开始记录第一道菜来点亮图鉴</div>' +
+        '<div style="text-align:center;margin-top:var(--space-2);">' +
+          '<button class="btn btn-primary btn-sm" onclick="navigateTo(\'home\')">去记录 →</button>' +
+        '</div>';
       return;
     }
     categoriesEl.innerHTML = data.categories.map(cat => {
-      const cells = (cat.items || []).map(item => renderPokedexCell(item)).join('');
+      const cells = (cat.items || []).map(item => renderPokedexCell(item, justUnlockedSet)).join('');
       const catRate = cat.totalSlots ? Math.round((cat.unlockedSlots / cat.totalSlots) * 100) : 0;
       return '<div class="pokedex-category">' +
         '<div class="pokedex-category-title">' +
@@ -1520,15 +1539,20 @@ function renderPokedex(data) {
         '</div>' +
         '<div class="pokedex-grid">' + cells + '</div>' +
       '</div>';
-    }).join('');
+    }).join('') +
+    '<div style="text-align:center;margin-top:var(--space-4);display:flex;flex-direction:column;gap:var(--space-2);">' +
+      '<button class="btn btn-outline btn-sm" onclick="navigateTo(\'home\')">去记录解锁更多 →</button>' +
+      '<button class="btn btn-ghost btn-sm" onclick="navigateToGameplay(\'personality\')">想了解你的美食人格？→ 测一测</button>' +
+    '</div>';
   }
   lucide.createIcons();
 }
 
-function renderPokedexCell(item) {
+function renderPokedexCell(item, justUnlockedSet) {
   const rarityLabel = { common: '', rare: '·稀有', epic: '·史诗', legendary: '·传说' };
   if (item.unlocked) {
-    return '<div class="pokedex-cell unlocked rarity-' + item.rarity + '">' +
+    const isNew = !!(justUnlockedSet && justUnlockedSet.has(item.dishName));
+    return '<div class="pokedex-cell unlocked rarity-' + item.rarity + (isNew ? ' just-unlocked' : '') + '">' +
       '<div class="pokedex-cell-icon">' + rarityEmoji(item.rarity) + '</div>' +
       '<div class="pokedex-cell-name">' + escapeHTML(item.dishName) + '</div>' +
       '<div class="pokedex-cell-count">×' + (item.recordCount || 0) + '</div>' +
@@ -1565,27 +1589,70 @@ function renderPersonality(data) {
         '<div style="font-size: 36px; margin-bottom: var(--space-2);">🍽️</div>' +
         '<div style="color: var(--color-on-surface-variant);">' + escapeHTML(data.description) + '</div>' +
         '<div class="caption" style="margin-top: var(--space-2);">当前记录数：' + data.recordCount + ' / 3</div>' +
+        '<div style="margin-top:var(--space-3);text-align:center;">' +
+          '<button class="btn btn-ghost btn-sm" onclick="navigateToGameplay(\'pokedex\')">想点亮更多美食？→ 图鉴</button>' +
+        '</div>' +
       '</div>' +
     '</div>';
+    lucide.createIcons();
     return;
   }
   const traits = (data.traits || []).map(t => '<span class="personality-tag">' + escapeHTML(t) + '</span>').join('');
+  const personalityType = data.personalityType || '';
+  const shareText = data.shareText || '';
+  // 供分享按钮使用
+  window.__personalityShareData = { type: personalityType, text: shareText };
+  const coverHTML = data.coverImage
+    ? '<img class="personality-cover" src="' + escapeAttr(data.coverImage) + '" alt="' + escapeAttr(personalityType) + '">'
+    : '';
   el.innerHTML = '<div class="padding-x" style="padding-top: var(--space-4);">' +
     '<div class="card-white personality-card">' +
+      coverHTML +
       '<div style="font-size: 40px; margin-bottom: var(--space-2);">🎯</div>' +
-      '<div class="personality-type">' + escapeHTML(data.personalityType) + '</div>' +
+      '<div class="personality-type">' + escapeHTML(personalityType) + '</div>' +
       '<div class="personality-desc">' + escapeHTML(data.description) + '</div>' +
       '<div class="personality-traits">' + traits + '</div>' +
       '<div style="background: var(--primary-50); padding: var(--space-3); border-radius: 10px; margin-bottom: var(--space-3); text-align: left;">' +
         '<div class="caption" style="margin-bottom: 4px;">分享文案</div>' +
-        '<div style="font-size: var(--font-size-caption); color: var(--color-on-surface); line-height: 1.5;">' + escapeHTML(data.shareText) + '</div>' +
+        '<div style="font-size: var(--font-size-caption); color: var(--color-on-surface); line-height: 1.5;">' + escapeHTML(shareText) + '</div>' +
       '</div>' +
-      '<button class="btn btn-primary" onclick="copyPersonalityShareText(' + JSON.stringify(JSON.stringify(data.shareText)) + ')">' +
-        '<i data-lucide="copy" style="width:16px;height:16px;margin-right:4px;"></i>复制分享文案' +
-      '</button>' +
+      '<div style="display:flex;gap:var(--space-2);justify-content:center;flex-wrap:wrap;">' +
+        '<button class="btn btn-primary" onclick="sharePersonality()">' +
+          '<i data-lucide="share-2" style="width:16px;height:16px;margin-right:4px;"></i>分享' +
+        '</button>' +
+        '<button class="btn btn-outline" onclick="copyPersonalityShareText(' + JSON.stringify(JSON.stringify(shareText)) + ')">' +
+          '<i data-lucide="copy" style="width:16px;height:16px;margin-right:4px;"></i>复制文案' +
+        '</button>' +
+      '</div>' +
+      '<div style="margin-top:var(--space-4);text-align:center;">' +
+        '<button class="btn btn-ghost btn-sm" onclick="navigateToGameplay(\'timemachine\')">回顾往年今日的味道 → 时光机</button>' +
+      '</div>' +
     '</div>' +
   '</div>';
   lucide.createIcons();
+}
+
+async function sharePersonality() {
+  const d = window.__personalityShareData || {};
+  const text = d.text || '';
+  const personalityType = d.type || '';
+  try { await api.trackEvent('personality_share', { personalityType }); } catch (e) {}
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: '我的美食人格', text: text });
+      showToast('已分享');
+      return;
+    } catch (err) {
+      if (err && err.name === 'AbortError') return; // 用户取消
+    }
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text)
+      .then(() => showToast('已复制分享文案'))
+      .catch(() => showToast('复制失败，请手动复制'));
+  } else {
+    showToast('当前环境不支持分享');
+  }
 }
 
 function copyPersonalityShareText(text) {
@@ -1602,24 +1669,37 @@ async function loadTimemachine() {
   el.innerHTML = '<div class="timemachine-empty">寻找记忆中...</div>';
   try {
     const data = await api.getTimemachine();
+    // 进入时光机时上报埋点
+    try { await api.trackEvent('timemachine_view'); } catch (e) {}
     renderTimemachine(data);
   } catch (err) {
     el.innerHTML = '<div class="timemachine-empty">' + escapeHTML(err.message) + '</div>';
   }
 }
 
+let currentTimemachineMemories = [];
 function renderTimemachine(data) {
   const el = document.getElementById('gameplay-view-timemachine');
   if (!el) return;
   const memories = data.memories || [];
+  currentTimemachineMemories = memories;
   if (!memories.length) {
     el.innerHTML = '<div class="timemachine-empty">' +
       '<div style="font-size: 36px; margin-bottom: var(--space-2);">🕰️</div>' +
       '暂无往年今日回忆，再记录一年就有啦' +
+      '<div style="margin-top:var(--space-3);">' +
+        '<button class="btn btn-ghost btn-sm" onclick="navigateToGameplay(\'pokedex\')">想点亮更多美食？→ 图鉴</button>' +
+      '</div>' +
     '</div>';
+    lucide.createIcons();
     return;
   }
-  el.innerHTML = memories.map(mem => {
+  // 节日特别版 banner
+  const festival = data.festival;
+  const festivalBanner = (festival && festival.name)
+    ? '<div class="timemachine-festival-banner">🏮 ' + escapeHTML(festival.name) + (festival.isFamilyFeast ? ' · 家宴回忆' : '') + '</div>'
+    : '';
+  el.innerHTML = festivalBanner + memories.map((mem, idx) => {
     const records = (mem.records || []).map(r =>
       '<div class="timemachine-record">' +
         '<img src="' + escapeAttr(r.imageUrl || r.beautifiedUrl || '') + '" alt="" onerror="this.style.visibility=\'hidden\'">' +
@@ -1630,12 +1710,45 @@ function renderTimemachine(data) {
       '<div class="timemachine-year">' + mem.year + ' 年</div>' +
       '<div class="timemachine-caption">' + escapeHTML(mem.caption) + '</div>' +
       '<div class="timemachine-records">' + records + '</div>' +
+      '<button class="btn btn-outline btn-sm" style="margin-top:var(--space-2);" onclick="shareTimemachine(' + idx + ')">' +
+        '<i data-lucide="share-2" style="width:14px;height:14px;margin-right:4px;"></i>分享回忆' +
+      '</button>' +
     '</div>';
-  }).join('');
+  }).join('') +
+  '<div style="text-align:center;margin:var(--space-3) var(--space-5);">' +
+    '<button class="btn btn-ghost btn-sm" onclick="navigateToGameplay(\'pokedex\')">想点亮更多美食？→ 图鉴</button>' +
+  '</div>';
   lucide.createIcons();
 }
 
+async function shareTimemachine(idx) {
+  const mem = currentTimemachineMemories[idx];
+  const text = (mem && mem.caption) || '我在味记里翻到了一段往年今日的美食回忆';
+  try { await api.trackEvent('timemachine_view'); } catch (e) {}
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: '往年今日的味道', text: text });
+      showToast('已分享');
+      return;
+    } catch (err) {
+      if (err && err.name === 'AbortError') return; // 用户取消
+    }
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text)
+      .then(() => showToast('已复制回忆文案'))
+      .catch(() => showToast('复制失败，请手动复制'));
+  } else {
+    showToast('当前环境不支持分享');
+  }
+}
+
 let currentBlindGuessFamilyId = null;
+let currentBlindGuessMembers = [];
+function getCurrentUserId() {
+  const u = api.getCurrentUser();
+  return u ? String(u.id || u.userId || u._id || '') : '';
+}
 async function loadBlindguess() {
   const el = document.getElementById('gameplay-view-blindguess');
   if (!el) return;
@@ -1643,7 +1756,11 @@ async function loadBlindguess() {
   try {
     const familyInfo = await api.getFamilyInfo();
     currentBlindGuessFamilyId = familyInfo && familyInfo.id;
-    const recipes = await api.getFamilyRecipes();
+    const [recipes, members] = await Promise.all([
+      api.getFamilyRecipes().catch(() => []),
+      api.getFamilyMembers().catch(() => [])
+    ]);
+    currentBlindGuessMembers = members || [];
     renderBlindguess(recipes || []);
   } catch (err) {
     el.innerHTML = '<div class="blindguess-section"><div class="caption">' + escapeHTML(err.message) + '</div></div>';
@@ -1704,14 +1821,22 @@ async function createBlindGuessRound() {
 async function loadBlindGuessRounds() {
   const listEl = document.getElementById('blindguess-rounds-list');
   if (!listEl) return;
-  const roundIds = JSON.parse(localStorage.getItem('blindguess_rounds') || '[]');
-  if (!roundIds.length) {
-    listEl.innerHTML = '<div class="caption" style="text-align:center;padding:var(--space-4);">还没有发起过盲猜轮次</div>';
+  if (!currentBlindGuessFamilyId) {
+    listEl.innerHTML = '<div class="caption" style="text-align:center;padding:var(--space-4);">未找到家庭组</div>';
     return;
   }
-  const rounds = await Promise.all(roundIds.map(id => api.getBlindGuessRound(id).catch(() => null)));
-  listEl.innerHTML = rounds.filter(Boolean).map(r => renderBlindGuessRoundCard(r)).join('');
-  lucide.createIcons();
+  listEl.innerHTML = '<div class="caption" style="text-align:center;padding:var(--space-2);">加载中...</div>';
+  try {
+    const rounds = await api.getBlindGuessRounds(currentBlindGuessFamilyId);
+    if (!rounds || !rounds.length) {
+      listEl.innerHTML = '<div class="caption" style="text-align:center;padding:var(--space-4);">还没有发起过盲猜轮次</div>';
+      return;
+    }
+    listEl.innerHTML = rounds.map(r => renderBlindGuessRoundCard(r)).join('');
+    lucide.createIcons();
+  } catch (err) {
+    listEl.innerHTML = '<div class="caption" style="text-align:center;padding:var(--space-4);">' + escapeHTML(err.message) + '</div>';
+  }
 }
 
 function renderBlindGuessRoundCard(round) {
@@ -1729,41 +1854,79 @@ function renderBlindGuessRoundCard(round) {
 }
 
 async function showBlindGuessDetail(roundId) {
-  const ids = JSON.parse(localStorage.getItem('blindguess_rounds') || '[]');
-  if (!ids.includes(roundId)) {
-    ids.unshift(roundId);
-    localStorage.setItem('blindguess_rounds', JSON.stringify(ids.slice(0, 20)));
-  }
   try {
     const round = await api.getBlindGuessRound(roundId);
-    const items = (round.items || []).map(item => {
-      return '<div class="blindguess-item-card">' +
-        '<img src="' + escapeAttr(item.coverUrl || '') + '" alt="" onerror="this.style.visibility=\'hidden\'">' +
+    const myId = getCurrentUserId();
+    const isActive = round.status === 'active';
+    const isCreator = !!(round.creatorId && myId && String(round.creatorId) === myId);
+    // 当前用户已猜测的 itemId 集合（active 状态下用于禁用重复提交）
+    const myGuessedItemIds = new Set(
+      (round.guesses || []).filter(g => String(g.userId) === myId).map(g => String(g.itemId))
+    );
+    const itemsHTML = (round.items || []).map((item, idx) => {
+      const itemId = item.recordId || '';
+      const coverHTML = '<img src="' + escapeAttr(item.coverUrl || '') + '" alt="" onerror="this.style.visibility=\'hidden\'">';
+      // active：隐藏真实菜名与作者；revealed：展示真实菜名与作者
+      const dishLine = isActive
+        ? '<div style="font-weight:600;">菜名：???（待猜）</div>'
+        : '<div style="font-weight:600;">' + escapeHTML(item.dishName || '') + '</div>';
+      const authorLine = isActive
+        ? '<div class="caption">作者：???（待揭晓）</div>'
+        : '<div class="caption">作者：' + escapeHTML(item.realAuthorName || '') + '</div>';
+      let formHTML = '';
+      if (isActive) {
+        const alreadyGuessed = myGuessedItemIds.has(String(itemId));
+        if (alreadyGuessed) {
+          formHTML = '<div class="caption" style="color:var(--success-600);margin-top:var(--space-1);">✓ 已猜测</div>';
+        } else {
+          // 作者选择：优先用家庭成员列表，否则退化为作者名输入框（guessAuthorId 用作者名兜底）
+          const authorField = currentBlindGuessMembers.length
+            ? '<select class="blindguess-input blindguess-author-select" data-item-id="' + escapeAttr(itemId) + '">' +
+                '<option value="">选择作者</option>' +
+                currentBlindGuessMembers.map(m =>
+                  '<option value="' + escapeAttr(String(m.userId || m.id || '')) + '">' + escapeHTML(m.nickname || '') + '</option>'
+                ).join('') +
+              '</select>'
+            : '<input class="blindguess-input blindguess-author-input" data-item-id="' + escapeAttr(itemId) + '" placeholder="输入作者名">';
+          formHTML = '<div style="margin-top:var(--space-2);display:flex;flex-direction:column;gap:var(--space-1);">' +
+            '<div class="caption">这是谁做的？</div>' +
+            authorField +
+            '<div class="caption">你猜的菜名</div>' +
+            '<input class="blindguess-input blindguess-dish-input" data-item-id="' + escapeAttr(itemId) + '" placeholder="输入菜名">' +
+            '<button class="btn btn-primary btn-sm" style="align-self:flex-start;" onclick="submitBlindGuessItem(\'' + escapeAttr(round.id) + '\',\'' + escapeAttr(itemId) + '\')">提交</button>' +
+          '</div>';
+        }
+      }
+      return '<div class="blindguess-item-card blindguess-question" data-item-id="' + escapeAttr(itemId) + '" data-idx="' + idx + '">' +
+        coverHTML +
         '<div style="flex:1;">' +
-          '<div style="font-weight:600;">' + escapeHTML(item.dishName) + '</div>' +
-          (round.status === 'revealed' ? '<div class="caption">作者：' + escapeHTML(item.realAuthorName || '') + '</div>' : '<div class="caption">作者：???（待揭晓）</div>') +
+          dishLine +
+          authorLine +
+          formHTML +
         '</div>' +
       '</div>';
     }).join('');
-    const actionBtn = round.status === 'active'
-      ? '<button class="btn btn-primary" onclick="revealBlindGuess(\'' + escapeAttr(round.id) + '\')">揭晓结果</button>'
+
+    const actionBtn = isActive
+      ? (isCreator
+          ? '<button class="btn btn-primary" onclick="revealBlindGuess(\'' + escapeAttr(round.id) + '\')">揭晓结果</button>'
+          : '<div class="caption" style="color:var(--color-on-surface-variant);">等待发起人揭晓结果</div>')
       : '';
-    const guessForm = round.status === 'active'
-      ? '<div style="margin-top:var(--space-3);"><div class="caption" style="margin-bottom:var(--space-1);">提交一次猜测（选一道菜）</div>' +
-        '<div class="blindguess-form">' +
-          '<input class="blindguess-input" id="blindguess-dish-input" placeholder="你猜的菜名">' +
-          '<button class="btn btn-outline btn-sm" onclick="submitBlindGuessForm(\'' + escapeAttr(round.id) + '\')">提交猜测</button>' +
-        '</div></div>'
+    const ranking = !isActive ? renderBlindGuessRanking(round) : '';
+    const crossCTA = !isActive
+      ? '<div style="margin-top:var(--space-4);text-align:center;">' +
+          '<button class="btn btn-ghost btn-sm" onclick="navigateToGameplay(\'pokedex\')">去图鉴看看你的美食收集 →</button>' +
+        '</div>'
       : '';
-    const ranking = round.status === 'revealed' ? renderBlindGuessRanking(round) : '';
+
     const html = '<div class="blindguess-section">' +
       '<button class="btn btn-ghost btn-sm" onclick="loadBlindguess()" style="margin-bottom:var(--space-2);">← 返回</button>' +
       '<div class="blindguess-round-card">' +
         '<div style="font-weight:600;margin-bottom:var(--space-2);">' + escapeHTML(round.roundName) + '</div>' +
-        items +
-        guessForm +
+        itemsHTML +
+        (isActive ? '<div style="margin-top:var(--space-3);">' + actionBtn + '</div>' : '') +
         ranking +
-        '<div style="margin-top:var(--space-3);">' + actionBtn + '</div>' +
+        crossCTA +
       '</div>' +
     '</div>';
     document.getElementById('gameplay-view-blindguess').innerHTML = html;
@@ -1790,17 +1953,31 @@ function renderBlindGuessRanking(round) {
   }
 }
 
-async function submitBlindGuessForm(roundId) {
-  const dishInput = document.getElementById('blindguess-dish-input');
-  if (!dishInput || !dishInput.value.trim()) { showToast('请输入菜名'); return; }
+async function submitBlindGuessItem(roundId, itemId) {
+  const card = document.querySelector('.blindguess-question[data-item-id="' + itemId + '"]');
+  if (!card) { showToast('未找到该题'); return; }
+  const authorSelect = card.querySelector('.blindguess-author-select');
+  const authorInput = card.querySelector('.blindguess-author-input');
+  const dishInput = card.querySelector('.blindguess-dish-input');
+  let guessAuthorId = '';
+  let guessAuthorName = '';
+  if (authorSelect) {
+    guessAuthorId = authorSelect.value || '';
+    const m = currentBlindGuessMembers.find(mm => String(mm.userId || mm.id || '') === String(guessAuthorId));
+    guessAuthorName = m ? (m.nickname || '') : '';
+  } else if (authorInput) {
+    guessAuthorName = authorInput.value.trim();
+    guessAuthorId = guessAuthorName; // 无成员列表时用作者名作为 fallback
+  }
+  const guessDishName = dishInput ? dishInput.value.trim() : '';
+  if (!guessAuthorId) { showToast('请选择作者'); return; }
+  if (!guessDishName) { showToast('请输入菜名'); return; }
   try {
-    const round = await api.getBlindGuessRound(roundId);
-    const firstItem = (round.items || [])[0];
-    if (!firstItem) { showToast('轮次无菜品'); return; }
     await api.submitBlindGuess(roundId, {
-      itemId: firstItem.recordId,
-      guessAuthorId: '',
-      guessDishName: dishInput.value.trim()
+      itemId: itemId,
+      guessAuthorId: guessAuthorId,
+      guessAuthorName: guessAuthorName,
+      guessDishName: guessDishName
     });
     showToast('猜测已提交');
     showBlindGuessDetail(roundId);

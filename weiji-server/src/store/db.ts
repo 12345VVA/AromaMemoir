@@ -14,6 +14,7 @@ import type {
   ShoppingItem,
   AchievementDef,
   UserAchievement,
+  UserPersonality,
   CheckIn,
   Challenge,
   MealType,
@@ -532,6 +533,17 @@ export const achievements: AchievementDef[] = [
     condition: { familyCreated: true },
     expReward: 100,
   },
+  // F30 厨神徽章：家庭盲猜揭晓后本周厨神解锁
+  {
+    id: 'ach-blindguess-chef',
+    code: 'blindguess_chef',
+    name: '家庭厨神',
+    description: '在家庭盲猜中获得本周厨神',
+    icon: '👨‍🍳',
+    type: 'family',
+    condition: { blindguessChef: true },
+    expReward: 200,
+  },
 ];
 
 // ============================================================
@@ -749,6 +761,12 @@ export const personalityTypes: PersonalityTypeDef[] = [
 export const blindGuessRounds: BlindGuessRound[] = [];
 
 // ============================================================
+// 种子数据：user_personalities（用户人格报告持久化表）
+// 初始为空数组，运行时由 personality 端点 available 时写入（F28 分享卡片）
+// ============================================================
+export const user_personalities: UserPersonality[] = [];
+
+// ============================================================
 // 启动时打印种子数据统计（验证可见）
 // ============================================================
 console.log('[store] 种子数据加载完成:');
@@ -767,4 +785,5 @@ console.log(`  - challenges count: ${challenges.length}`);
 console.log(`  - pokedexCatalog count: ${pokedexCatalog.length}`);
 console.log(`  - personalityTypes count: ${personalityTypes.length}`);
 console.log(`  - blindGuessRounds count: ${blindGuessRounds.length}`);
+console.log(`  - user_personalities count: ${user_personalities.length}`);
 console.log(`[store] 演示账号：demo / 123456`);

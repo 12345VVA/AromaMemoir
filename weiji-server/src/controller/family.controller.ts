@@ -29,6 +29,8 @@ import type {
   VoteType,
   MenuVotes,
   ShoppingCategory,
+  RecipeIngredient,
+  RecipeStep,
 } from '../store/types';
 import { findUserFamily, getUserMembership, requireRole, getCurrentMonday } from '../service/family.service';
 
@@ -352,6 +354,58 @@ export class FamilyController {
     }
 
     return ok(list);
+  }
+
+  // POST /api/family/recipes
+  // 上传菜谱到家庭共享空间
+  @Post('/recipes')
+  async uploadRecipe(ctx: Context): Promise<ApiResponse> {
+    const { userId } = ctx.state.user as { userId: string; username: string };
+    const body = (ctx.request.body || {}) as {
+      name?: string;
+      category?: string;
+      ingredients?: RecipeIngredient[];
+      steps?: RecipeStep[];
+      coverUrl?: string;
+      difficulty?: string;
+      cookTime?: number;
+      visibility?: RecipeVisibility;
+    };
+
+    // 校验菜谱名称非空
+    if (!body.name || !body.name.trim()) {
+      return fail('菜谱名称不能为空', 400);
+    }
+    // 校验食材清单至少1项
+    if (!Array.isArray(body.ingredients) || body.ingredients.length === 0) {
+      return fail('食材清单不能为空', 400);
+    }
+
+    const family = findUserFamily(userId);
+    if (!family) {
+      return fail('未加入家庭组', 400);
+    }
+
+    const now = new Date().toISOString();
+    const newRecipe = insert<FamilyRecipe>(family_recipes, {
+      id: uuid(),
+      familyId: family.id,
+      name: body.name.trim(),
+      category: body.category || '家常菜',
+      ingredients: body.ingredients,
+      steps: Array.isArray(body.steps) ? body.steps : [],
+      coverUrl: body.coverUrl || '',
+      difficulty: body.difficulty || '简单',
+      cookTime: typeof body.cookTime === 'number' ? body.cookTime : 30,
+      uploaderId: userId,
+      visibility: body.visibility || 'family',
+      versionCount: 1,
+      isDeleted: false,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return ok(newRecipe, '上传成功');
   }
 
   // PATCH /api/family/recipes/:id/visibility

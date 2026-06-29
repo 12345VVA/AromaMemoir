@@ -193,6 +193,12 @@ const api = {
   joinFamily(code) {
     return request('POST', '/api/family/join', { code });
   },
+  uploadRecipe(data) {
+    return request('POST', '/api/family/recipes', data);
+  },
+  replenishCheckin() {
+    return request('POST', '/api/checkin/replenish');
+  },
   getRecipesFiltered(params) {
     const query = new URLSearchParams();
     if (params.visibility) query.set('visibility', params.visibility);

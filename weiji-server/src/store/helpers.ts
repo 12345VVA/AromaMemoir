@@ -74,6 +74,7 @@ import type {
   BlindGuessResult,
   BlindGuessRankEntry,
   Record,
+  AchievementDef,
 } from './types';
 
 // 肉类食材关键词（用于 meat_enthusiast 判定）
@@ -435,4 +436,78 @@ export function scoreBlindGuess(roundId: string): BlindGuessResult | null {
     ranking,
     chefWinner,
   };
+}
+
+// ============================================================
+// 成就自动解锁检查
+// ============================================================
+
+import { achievements, user_achievements, check_ins, families } from './db';
+import { CheckinService } from '../service/checkin.service';
+
+// 检查并解锁满足条件的成就
+// 在用户创建记录或打卡后调用
+// 返回新解锁的成就列表
+export function checkAndUnlockAchievements(userId: string): AchievementDef[] {
+  const newlyUnlocked: AchievementDef[] = [];
+
+  // 获取用户已解锁的成就ID集合
+  const unlockedIds = new Set<string>();
+  for (const ua of user_achievements) {
+    if (ua.userId === userId) {
+      unlockedIds.add(ua.achievementId);
+    }
+  }
+
+  // 统计用户数据
+  // 记录数
+  const recordCount = records.filter((r) => r.userId === userId && !r.isDeleted).length;
+  // 连续打卡天数
+  const streak = CheckinService.calculateStreak(userId);
+  // 是否创建过家庭组
+  const familyCreated = families.some((f) => f.ownerId === userId && !f.isDeleted);
+
+  // 遍历成就定义，检查解锁条件
+  for (const ach of achievements) {
+    // 跳过已解锁的
+    if (unlockedIds.has(ach.id)) continue;
+
+    let shouldUnlock = false;
+    const cond = ach.condition;
+
+    switch (ach.code) {
+      case 'first_record':
+        shouldUnlock = recordCount >= 1;
+        break;
+      case 'streak_7':
+        shouldUnlock = streak >= 7;
+        break;
+      case 'streak_30':
+        shouldUnlock = streak >= 30;
+        break;
+      case 'record_100':
+        shouldUnlock = recordCount >= 100;
+        break;
+      case 'family_create':
+        shouldUnlock = familyCreated;
+        break;
+      // cuisine_10 暂不实现自动解锁（需要菜系统计）
+      default:
+        break;
+    }
+
+    if (shouldUnlock) {
+      // 创建用户成就记录
+      const now = new Date().toISOString();
+      user_achievements.push({
+        id: crypto.randomUUID(),
+        userId,
+        achievementId: ach.id,
+        earnedAt: now,
+      });
+      newlyUnlocked.push(ach);
+    }
+  }
+
+  return newlyUnlocked;
 }

@@ -6,10 +6,11 @@
 
 import type { Context } from 'koa';
 import { Controller, Get, Post } from '../common/decorators';
-import { ok, type ApiResponse } from '../common/response';
+import { ok, fail, type ApiResponse } from '../common/response';
 import { check_ins } from '../store/db';
 import type { CheckIn } from '../store/types';
 import { insert, uuid } from '../store/helpers';
+import { checkAndUnlockAchievements } from '../store/helpers';
 import { CheckinService } from '../service/checkin.service';
 
 // 打卡状态返回结构
@@ -57,7 +58,7 @@ export class CheckinController {
   // 首次打卡增加天数；重复打卡返回提示（不重复增加天数）
   // 注意：路径写成 '/'，最终拼接为 /api/checkin/，由 koa-router 非严格模式匹配 /api/checkin
   @Post('')
-  async checkin(ctx: Context): Promise<ApiResponse<AlreadyCheckedResult | CheckinSuccessResult>> {
+  async checkin(ctx: Context): Promise<ApiResponse> {
     const userId = ctx.state.user.userId;
 
     const today = CheckinService.todayStr();
@@ -88,10 +89,75 @@ export class CheckinController {
     // 重新计算最新连续天数
     const streak = CheckinService.calculateStreak(userId);
 
+    // 自动检查并解锁成就
+    const newlyUnlocked = checkAndUnlockAchievements(userId);
+
     return ok({
       todayChecked: true,
       streak,
       message: '打卡成功',
+      newAchievements: newlyUnlocked,
+    });
+  }
+
+  // POST /api/checkin/replenish
+  // 补签昨日记录（每周限1次）
+  @Post('/replenish')
+  async replenish(ctx: Context): Promise<ApiResponse> {
+    const userId = ctx.state.user.userId;
+
+    const today = CheckinService.todayStr();
+    const yesterday = CheckinService.daysAgo(1);
+
+    // 检查昨天是否已打卡（已打卡则无需补签）
+    const yesterdayCheckin = CheckinService.findCheckin(userId, yesterday);
+    if (yesterdayCheckin) {
+      return fail('昨日已有打卡记录，无需补签', 400);
+    }
+
+    // 检查今日是否已打卡
+    const todayCheckin = CheckinService.findCheckin(userId, today);
+    if (!todayCheckin) {
+      return fail('请先完成今日打卡，再补签昨日', 400);
+    }
+
+    // 检查本周是否已补签过
+    // 获取本周一日期
+    const now = new Date();
+    const dayOfWeek = now.getDay() || 7; // 周日=0转为7
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - dayOfWeek + 1);
+    const mondayStr = monday.toISOString().split('T')[0];
+
+    // 检查本周是否有补签记录
+    const weekReplenished = check_ins.some(
+      (c) => c.userId === userId && c.isReplenish && c.checkDate >= mondayStr
+    );
+    if (weekReplenished) {
+      return fail('本周补签次数已用完', 400);
+    }
+
+    // 创建补签记录
+    const newCheckIn: CheckIn = {
+      id: uuid(),
+      userId,
+      checkDate: yesterday,
+      recordCount: 0,
+      isReplenish: true,
+      createdAt: new Date().toISOString(),
+    };
+    insert(check_ins, newCheckIn);
+
+    // 重新计算连续天数
+    const streak = CheckinService.calculateStreak(userId);
+
+    // 检查成就解锁
+    const newlyUnlocked = checkAndUnlockAchievements(userId);
+
+    return ok({
+      streak,
+      message: '补签成功',
+      newAchievements: newlyUnlocked,
     });
   }
 }

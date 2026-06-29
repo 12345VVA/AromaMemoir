@@ -178,6 +178,16 @@ async function loadFamilyData() {
   showLoading(gridEl);
   showLoading(membersEl);
   try {
+    const familyInfo = await api.getFamilyInfo();
+    // 如果未加入家庭组，显示创建入口
+    const createFamilyBtn = document.getElementById('create-family-entry');
+    if (createFamilyBtn) {
+      if (!familyInfo) {
+        createFamilyBtn.style.display = 'flex';
+      } else {
+        createFamilyBtn.style.display = 'none';
+      }
+    }
     const [recipes, members] = await Promise.all([
       api.getFamilyRecipes(),
       api.getFamilyMembers()
@@ -201,7 +211,14 @@ async function loadAchievementsData() {
     ]);
     renderAchievements(achievements || []);
     renderLevel(level);
-    renderChallenges(CHALLENGES);
+    // 加载挑战赛数据（从后端获取，失败时降级为空）
+    let challenges = [];
+    try {
+      challenges = await api.getChallenges();
+    } catch (e) {
+      challenges = [];
+    }
+    renderChallenges(challenges);
   } catch (err) {
     hideLoading(badgeEl);
     showToast(err.message);
@@ -349,11 +366,12 @@ function closeRecommendModal() {
 function renderCheckin(data) {
   if (!data) return;
   const text = document.getElementById('checkin-text');
-  if (text) text.textContent = '已坚持 ' + data.streakDays + ' 天';
+  if (text) text.textContent = '已坚持 ' + (data.streak != null ? data.streak : data.streakDays) + ' 天';
 
   const btn = document.getElementById('checkin-btn');
   if (btn) {
-    if (data.checkedInToday) {
+    const checked = data.todayChecked != null ? data.todayChecked : data.checkedInToday;
+    if (checked) {
       btn.textContent = '已打卡';
       btn.disabled = true;
       btn.style.opacity = '0.6';
@@ -369,6 +387,21 @@ function renderCheckin(data) {
     days.innerHTML = data.calendar.map(d =>
       '<div class="checkin-day ' + escapeAttr(d.status) + '" data-day="' + escapeAttr(d.day) + '">' + escapeHTML(d.label) + '</div>'
     ).join('');
+  }
+
+  // 补签按钮：今日已打卡但昨日未打卡时显示
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
+  const replenishBtn = document.getElementById('replenish-btn');
+  if (replenishBtn) {
+    const checked = data.todayChecked != null ? data.todayChecked : data.checkedInToday;
+    const lastDate = data.lastCheckDate;
+    if (checked && lastDate !== yesterdayStr) {
+      replenishBtn.style.display = 'block';
+    } else {
+      replenishBtn.style.display = 'none';
+    }
   }
 }
 
@@ -566,13 +599,32 @@ async function doCheckin() {
   const btn = document.getElementById('checkin-btn');
   if (btn) { btn.disabled = true; }
   try {
-    await api.doCheckin();
+    const result = await api.doCheckin();
     showToast('打卡成功！🔥');
+    // 成就解锁提示
+    if (result && result.newAchievements && result.newAchievements.length > 0) {
+      setTimeout(() => {
+        result.newAchievements.forEach(ach => {
+          showToast('🎉 解锁成就：' + ach.name + '！');
+        });
+      }, 1000);
+    }
     const status = await api.getCheckinStatus();
     renderCheckin(status);
   } catch (err) {
     showToast(err.message);
     if (btn) { btn.disabled = false; }
+  }
+}
+
+async function handleReplenish() {
+  try {
+    const data = await api.replenishCheckin();
+    showToast('补签成功！连续' + data.streak + '天');
+    const status = await api.getCheckinStatus();
+    renderCheckin(status);
+  } catch (e) {
+    showToast(e.message || '补签失败');
   }
 }
 
@@ -732,8 +784,16 @@ async function saveRecord() {
     aiConfidence: currentRecognizeData ? (currentRecognizeData.confidence != null ? currentRecognizeData.confidence : null) : null
   };
   try {
-    await api.saveRecord(data);
+    const result = await api.saveRecord(data);
     showToast('"' + dishName + '" 保存成功！');
+    // 成就解锁提示
+    if (result && result.newAchievements && result.newAchievements.length > 0) {
+      setTimeout(() => {
+        result.newAchievements.forEach(ach => {
+          showToast('🎉 解锁成就：' + ach.name + '！');
+        });
+      }, 1000);
+    }
     currentRecognizeData = null;
     setTimeout(() => {
       navigateTo('home');
@@ -1123,6 +1183,78 @@ function showAddToMenuDialog(recipeId) {
   });
 }
 
+function showCreateFamilyDialog() {
+  document.getElementById('create-family-modal').style.display = 'flex';
+  document.getElementById('create-family-name').value = '';
+}
+
+function closeCreateFamilyModal() {
+  document.getElementById('create-family-modal').style.display = 'none';
+}
+
+async function handleCreateFamily() {
+  const name = document.getElementById('create-family-name').value.trim();
+  if (!name) {
+    showToast('请输入家庭组名称');
+    return;
+  }
+  try {
+    await api.createFamily(name);
+    closeCreateFamilyModal();
+    showToast('创建成功');
+    loadFamilyData();
+  } catch (e) {
+    showToast(e.message || '创建失败');
+  }
+}
+
+function showUploadRecipeDialog() {
+  document.getElementById('upload-recipe-modal').style.display = 'flex';
+}
+
+function closeUploadRecipeModal() {
+  document.getElementById('upload-recipe-modal').style.display = 'none';
+}
+
+async function handleUploadRecipe() {
+  const name = document.getElementById('recipe-name').value.trim();
+  const category = document.getElementById('recipe-category').value;
+  const difficulty = document.getElementById('recipe-difficulty').value;
+  const cookTime = parseInt(document.getElementById('recipe-cooktime').value, 10) || 30;
+  const ingredientsText = document.getElementById('recipe-ingredients').value.trim();
+  const stepsText = document.getElementById('recipe-steps').value.trim();
+
+  if (!name) {
+    showToast('请填写菜谱名称');
+    return;
+  }
+  if (!ingredientsText) {
+    showToast('请填写食材清单');
+    return;
+  }
+
+  // 解析食材：每行一项，格式 名称,用量,单位
+  const ingredients = ingredientsText.split('\n').filter(l => l.trim()).map(line => {
+    const parts = line.split(',').map(p => p.trim());
+    return { name: parts[0] || '', amount: parts[1] || '', unit: parts[2] || '' };
+  }).filter(i => i.name);
+
+  // 解析步骤：每行一步
+  const steps = stepsText ? stepsText.split('\n').filter(l => l.trim()).map((line, i) => ({
+    stepNum: i + 1,
+    text: line.replace(/^\d+\.\s*/, '').trim()
+  })) : [];
+
+  try {
+    await api.uploadRecipe({ name, category, difficulty, cookTime, ingredients, steps, visibility: 'family' });
+    closeUploadRecipeModal();
+    showToast('上传成功');
+    loadFamilyData();
+  } catch (e) {
+    showToast(e.message || '上传失败');
+  }
+}
+
 async function showInvitationDialog() {
   const existing = document.getElementById('invitation-dialog');
   if (existing) existing.remove();
@@ -1262,6 +1394,70 @@ function toggleRecordTag(el) {
   document.querySelectorAll('#record-tags .chip.selected').forEach(c => {
     selectedTags.push(c.textContent.trim());
   });
+}
+
+function showCustomTagInput() {
+  // 检查标签数量
+  const tags = document.querySelectorAll('#record-tags .chip:not(#add-tag-btn)');
+  if (tags.length >= 5) {
+    showToast('最多5个标签');
+    return;
+  }
+  document.getElementById('add-tag-btn').style.display = 'none';
+  const input = document.getElementById('custom-tag-input');
+  input.style.display = 'inline-block';
+  input.value = '';
+  input.focus();
+}
+
+function hideCustomTagInput() {
+  document.getElementById('custom-tag-input').style.display = 'none';
+  document.getElementById('add-tag-btn').style.display = 'inline-flex';
+}
+
+function addCustomTag() {
+  const input = document.getElementById('custom-tag-input');
+  const value = input.value.trim();
+  if (!value) {
+    hideCustomTagInput();
+    return;
+  }
+  if (value.length > 10) {
+    showToast('标签最多10个字');
+    return;
+  }
+  // 检查是否已存在
+  const existing = Array.from(document.querySelectorAll('#record-tags .chip')).map(c => c.textContent.trim());
+  if (existing.includes(value)) {
+    showToast('标签已存在');
+    return;
+  }
+  // 检查数量
+  const tags = document.querySelectorAll('#record-tags .chip:not(#add-tag-btn)');
+  if (tags.length >= 5) {
+    showToast('最多5个标签');
+    hideCustomTagInput();
+    return;
+  }
+  // 添加到选中标签
+  if (!selectedTags.includes(value)) {
+    selectedTags.push(value);
+  }
+  // 创建chip元素
+  const container = document.getElementById('record-tags');
+  const chip = document.createElement('button');
+  chip.className = 'chip selected';
+  chip.textContent = value;
+  chip.onclick = function() {
+    const idx = selectedTags.indexOf(value);
+    if (idx > -1) selectedTags.splice(idx, 1);
+    chip.remove();
+    if (selectedTags.length < 5) {
+      document.getElementById('add-tag-btn').style.display = 'inline-flex';
+    }
+  };
+  container.insertBefore(chip, document.getElementById('add-tag-btn'));
+  hideCustomTagInput();
 }
 
 /* ===== 文件选择 ===== */

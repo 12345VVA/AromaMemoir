@@ -8,6 +8,7 @@ import { Controller, Get, Post } from '../common/decorators';
 import { ok, fail, type ApiResponse } from '../common/response';
 import { records } from '../store/db';
 import { findById, insert, uuid } from '../store/helpers';
+import { checkAndUnlockAchievements } from '../store/helpers';
 import type { Record, IngredientWithConfidence, Nutrition } from '../store/types';
 
 // JWT 中间件挂载到 ctx.state.user 的用户信息
@@ -85,7 +86,7 @@ export class RecordController {
   // body: CreateRecordBody（dishName 必填非空）
   // 写入内存存储后返回带 id 的新记录；list 已按 createdAt 降序，故新记录会出现在列表顶部
   @Post('')
-  async create(ctx: Context): Promise<ApiResponse<Record>> {
+  async create(ctx: Context): Promise<ApiResponse> {
     const user = ctx.state.user as AuthUser;
     const userId = user.userId;
     const body = (ctx.request.body || {}) as CreateRecordBody;
@@ -124,7 +125,10 @@ export class RecordController {
     // 由于 list 按 createdAt 降序，新记录 createdAt 为当前时间，会排在种子数据之前
     insert(records, newRecord);
 
-    return ok(newRecord, '保存成功');
+    // 自动检查并解锁成就
+    const newlyUnlocked = checkAndUnlockAchievements(userId);
+
+    return ok({ record: newRecord, newAchievements: newlyUnlocked }, '保存成功');
   }
 
   // GET /api/record/:id

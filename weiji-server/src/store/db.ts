@@ -21,6 +21,8 @@ import type {
   PokedexCatalogEntry,
   PersonalityTypeDef,
   BlindGuessRound,
+  RecordLike,
+  RecordComment,
 } from './types';
 
 // ============================================================
@@ -749,6 +751,46 @@ export const personalityTypes: PersonalityTypeDef[] = [
 export const blindGuessRounds: BlindGuessRound[] = [];
 
 // ============================================================
+// 种子数据：record_likes（记录点赞）
+// ============================================================
+export const record_likes: RecordLike[] = [
+  {
+    id: 'rl-0001',
+    recordId: 'rec-0001',
+    userId: 'user-demo-0002',
+    createdAt: daysAgoIso(2),
+  },
+  {
+    id: 'rl-0002',
+    recordId: 'rec-0001',
+    userId: 'user-demo-0003',
+    createdAt: daysAgoIso(1),
+  },
+];
+
+// ============================================================
+// 种子数据：record_comments（记录评论）
+// ============================================================
+export const record_comments: RecordComment[] = [
+  {
+    id: 'rc-0001',
+    recordId: 'rec-0001',
+    userId: 'user-demo-0002',
+    userNickname: '妈妈',
+    content: '看起来好好吃！下次回家也做给我尝尝',
+    createdAt: daysAgoIso(2),
+  },
+  {
+    id: 'rc-0002',
+    recordId: 'rec-0001',
+    userId: 'user-demo-0003',
+    userNickname: '爸爸',
+    content: '记录得很详细，赞一个',
+    createdAt: daysAgoIso(1),
+  },
+];
+
+// ============================================================
 // 启动时打印种子数据统计（验证可见）
 // ============================================================
 console.log('[store] 种子数据加载完成:');
@@ -767,4 +809,6 @@ console.log(`  - challenges count: ${challenges.length}`);
 console.log(`  - pokedexCatalog count: ${pokedexCatalog.length}`);
 console.log(`  - personalityTypes count: ${personalityTypes.length}`);
 console.log(`  - blindGuessRounds count: ${blindGuessRounds.length}`);
+console.log(`  - record_likes count: ${record_likes.length}`);
+console.log(`  - record_comments count: ${record_comments.length}`);
 console.log(`[store] 演示账号：demo / 123456`);

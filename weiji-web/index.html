@@ -2412,7 +2412,7 @@ body {
                     <div class="input-search">
                         <span class="ico"><i data-lucide="search" style="width: 20px; height: 20px;"></i></span>
                         <input type="text" placeholder="搜索菜谱或食材" id="home-search" />
-                        <span class="ico" style="cursor: pointer;" onclick="showToast('语音搜索功能')">
+                        <span class="ico" id="voice-record-btn" style="cursor: pointer;" onclick="startVoiceRecording()">
                             <i data-lucide="mic" style="width: 20px; height: 20px;"></i>
                         </span>
                     </div>
@@ -2440,6 +2440,11 @@ body {
                 </div>
 
                 <div class="section-title">美食日记</div>
+                <div style="display:flex;gap:8px;margin-bottom:12px;">
+                  <button id="btn-list-view" onclick="switchDiaryView('list')" style="padding:6px 16px;border:none;border-radius:20px;font-size:13px;cursor:pointer;background:var(--color-primary);color:#fff;">列表</button>
+                  <button id="btn-calendar-view" onclick="switchDiaryView('calendar')" style="padding:6px 16px;border:none;border-radius:20px;font-size:13px;cursor:pointer;background:transparent;color:var(--color-on-surface-variant);">日历</button>
+                </div>
+                <div id="calendar-view" style="display:none;"></div>
                 <div class="food-list" id="food-diary-list"></div>
 
                 <div class="recommend-section" id="recommend-section" style="display:none;">
@@ -2470,6 +2475,8 @@ body {
                 <div class="tabs-bar" id="family-view-tabs">
                     <button class="tab-item active" data-view="recipes">菜谱</button>
                     <button class="tab-item" data-view="weekly">本周菜单</button>
+                    <button class="family-tab-btn" onclick="switchFamilyTab('records')" data-tab="records">家庭动态</button>
+                    <button class="family-tab-btn" onclick="switchFamilyTab('report')" data-tab="report">饮食报告</button>
                 </div>
 
                 <div id="recipe-view">
@@ -2513,12 +2520,28 @@ body {
                             <div class="shopping-title">购物清单</div>
                             <div class="shopping-subtitle">根据本周菜单自动生成</div>
                         </div>
+                        <button class="btn btn-outline btn-sm" onclick="handleGenerateShopping()" style="margin-left:auto;">
+                            <i data-lucide="sparkles" style="width:14px;height:14px;"></i>
+                            <span>根据菜单生成</span>
+                        </button>
                         <button class="btn btn-primary btn-sm" onclick="handleAddShoppingItem()">
                             <i data-lucide="plus" style="width: 16px; height: 16px; margin-right: 4px;"></i>
                             添加物品
                         </button>
                     </div>
                     <div id="shopping-list" class="shopping-list"></div>
+                </div>
+
+                <div id="family-records-view" style="display:none;padding:0 16px;">
+                  <div id="family-records-list"></div>
+                </div>
+
+                <div id="family-report-view" class="family-tab-content" style="display:none;">
+                  <div class="report-toolbar" style="display:flex;align-items:center;gap:12px;padding:12px 0;">
+                    <label style="font-size:14px;color:var(--color-on-surface-variant);">选择月份：</label>
+                    <input type="month" id="report-month-input" onchange="changeReportMonth()" style="padding:6px 10px;border:1px solid var(--color-outline);border-radius:8px;" />
+                  </div>
+                  <div id="family-report-content"></div>
                 </div>
             </div>
 
@@ -2561,6 +2584,7 @@ body {
 
                 <div class="padding-x padding-bottom">
                     <div id="nutrition-cards" style="display: none; gap: var(--space-2); margin-bottom: var(--space-3);"></div>
+                    <div id="confidence-warn" style="display:none;padding:8px 12px;background:#FFF3CD;color:#856404;border-radius:8px;font-size:13px;margin-bottom:8px;"></div>
                     <div class="food-card food-card--h" style="width: 100%; box-shadow: var(--shadow-1);">
                         <div class="card-img" style="width: 96px; height: 96px; flex-shrink: 0; border-radius: var(--radius-lg); overflow: hidden;">
                             <img src="assets/food-camera-preview.jpg" alt="Food thumbnail" id="dish-thumbnail" style="width: 100%; height: 100%; object-fit: cover;">
@@ -3014,6 +3038,18 @@ body {
     </div>
 
     <div class="toast" id="toast"></div>
+
+    <div id="voice-recording-indicator" onclick="stopVoiceRecording()" style="display:none;position:fixed;top:20px;left:50%;transform:translateX(-50%);background:rgba(255,94,26,0.95);color:white;padding:8px 16px;border-radius:20px;z-index:9999;align-items:center;gap:8px;font-size:14px;cursor:pointer;">
+      <span class="voice-pulse-dot" style="width:10px;height:10px;background:white;border-radius:50%;animation:voicePulse 1.2s infinite;"></span>
+      <span id="voice-record-text">录音中... 点击停止</span>
+    </div>
+    <style>
+    @keyframes voicePulse {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.5); opacity: 0.6; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    </style>
 
     <script src="api.js"></script>
     <script src="app.js"></script>

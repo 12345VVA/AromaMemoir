@@ -14,8 +14,11 @@ import {
   weekly_menu,
   shopping_items,
   users,
+  records,
+  record_likes,
+  record_comments,
 } from '../store/db';
-import { findById, findByField, filterBy, insert, updateById, uuid } from '../store/helpers';
+import { findById, findByField, filterBy, insert, updateById, uuid, generateFamilyDietReport } from '../store/helpers';
 import type {
   Family,
   FamilyMember,
@@ -31,6 +34,11 @@ import type {
   ShoppingCategory,
   RecipeIngredient,
   RecipeStep,
+  RecordLike,
+  RecordComment,
+  FamilyRecordItem,
+  FamilyDietReport,
+  ShoppingGenerateResult,
 } from '../store/types';
 import { findUserFamily, getUserMembership, requireRole, getCurrentMonday } from '../service/family.service';
 
@@ -662,5 +670,239 @@ export class FamilyController {
     }
     shopping_items.splice(idx, 1);
     return ok(null, '已删除');
+  }
+
+  // POST /api/family/shopping/generate
+  // 根据本周菜单自动生成购物清单：聚合菜单中各菜谱的食材，去重后批量插入
+  @Post('/shopping/generate')
+  async generateShopping(ctx: Context): Promise<ApiResponse> {
+    const { userId } = ctx.state.user as { userId: string; username: string };
+    const family = findUserFamily(userId);
+
+    // 未加入家庭组
+    if (!family) {
+      return ok({ added: 0, skipped: 0, message: '未加入家庭组' } as ShoppingGenerateResult);
+    }
+
+    // 获取本周菜单
+    const menuItems = filterBy(weekly_menu, (m) => m.familyId === family.id);
+    if (menuItems.length === 0) {
+      return ok({ added: 0, skipped: 0, message: '本周菜单为空，请先添加菜单' } as ShoppingGenerateResult);
+    }
+
+    // 聚合食材：Map<name+unit, RecipeIngredient> 用于跨菜谱去重
+    const ingredientMap = new Map<string, RecipeIngredient>();
+    for (const menu of menuItems) {
+      const recipe = findById(family_recipes, menu.recipeId);
+      if (!recipe || recipe.isDeleted) continue;
+      for (const ing of recipe.ingredients) {
+        const key = `${ing.name}|${ing.unit}`;
+        if (!ingredientMap.has(key)) {
+          ingredientMap.set(key, ing);
+        }
+      }
+    }
+
+    // 计算当前家庭组最大 sort，新条目依次递增
+    const familyItems = filterBy(shopping_items, (i) => i.familyId === family.id);
+    const maxSort = familyItems.reduce((max, i) => Math.max(max, i.sort), 0);
+
+    let added = 0;
+    let skipped = 0;
+    let nextSort = maxSort + 1;
+    const now = new Date().toISOString();
+
+    for (const ing of ingredientMap.values()) {
+      // 检查 shopping_items 中是否已存在相同 name 的条目（shopping_items 无独立 unit 字段，按名称去重）
+      const exists = shopping_items.some(
+        (i) => i.familyId === family.id && i.name === ing.name
+      );
+      if (exists) {
+        skipped += 1;
+        continue;
+      }
+      insert<ShoppingItem>(shopping_items, {
+        id: uuid(),
+        familyId: family.id,
+        name: ing.name,
+        category: '其他',
+        quantity: `${ing.amount}${ing.unit}`,
+        checked: false,
+        sort: nextSort++,
+        createdAt: now,
+        updatedAt: now,
+      });
+      added += 1;
+    }
+
+    return ok({ added, skipped } as ShoppingGenerateResult);
+  }
+
+  // ============================================================
+  // 家庭动态端点（F16）
+  // ============================================================
+
+  // GET /api/family/records?page=1&pageSize=20
+  // 返回家庭成员的饮食记录（按时间倒序），附带点赞数/评论数/是否已点赞
+  @Get('/records')
+  async listFamilyRecords(ctx: Context): Promise<ApiResponse> {
+    const { userId } = ctx.state.user as { userId: string; username: string };
+    const family = findUserFamily(userId);
+
+    if (!family) {
+      return ok({ list: [], total: 0, page: 1, pageSize: 20 });
+    }
+
+    // 获取家庭成员的 userId 列表
+    const memberUserIds = filterBy(family_members, (m) => m.familyId === family.id).map((m) => m.userId);
+
+    // 分页参数
+    const page = Math.max(1, Number(ctx.query.page) || 1);
+    const pageSize = Math.max(1, Number(ctx.query.pageSize) || 20);
+
+    // 过滤：属于家庭成员 + 未删除
+    let list = filterBy(records, (r) => memberUserIds.includes(r.userId) && !r.isDeleted);
+
+    // 按 createdAt 降序
+    list.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
+
+    const total = list.length;
+    const start = (page - 1) * pageSize;
+    const pagedList = list.slice(start, start + pageSize);
+
+    // 构造 FamilyRecordItem
+    const items: FamilyRecordItem[] = pagedList.map((record) => {
+      const user = findByField(users, 'id', record.userId);
+      const likes = filterBy(record_likes, (l) => l.recordId === record.id);
+      const comments = filterBy(record_comments, (c) => c.recordId === record.id);
+      const likedByMe = likes.some((l) => l.userId === userId);
+
+      return {
+        id: record.id,
+        userId: record.userId,
+        userNickname: user?.nickname ?? '',
+        userAvatar: user?.avatar ?? '',
+        dishName: record.dishName,
+        imageUrl: record.imageUrl,
+        beautifiedUrl: record.beautifiedUrl,
+        rating: record.rating,
+        tags: record.tags,
+        recordDate: record.recordDate,
+        cookingMethod: record.cookingMethod,
+        likeCount: likes.length,
+        commentCount: comments.length,
+        likedByMe,
+        comments: comments.sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1)),
+      };
+    });
+
+    return ok({ list: items, total, page, pageSize });
+  }
+
+  // POST /api/family/records/:id/like
+  // 点赞/取消点赞（toggle）
+  @Post('/records/:id/like')
+  async toggleLike(ctx: Context): Promise<ApiResponse> {
+    const { userId } = ctx.state.user as { userId: string; username: string };
+    const recordId = ctx.params.id as string;
+
+    // 检查记录是否存在
+    const record = findById(records, recordId);
+    if (!record || record.isDeleted) {
+      return fail('记录不存在', 404);
+    }
+
+    // 检查是否已点赞
+    const existingLike = record_likes.find(
+      (l) => l.recordId === recordId && l.userId === userId
+    );
+
+    if (existingLike) {
+      // 已点赞 → 取消点赞
+      const idx = record_likes.indexOf(existingLike);
+      record_likes.splice(idx, 1);
+      return ok({ liked: false, message: '已取消点赞' });
+    }
+
+    // 未点赞 → 新增点赞
+    insert<RecordLike>(record_likes, {
+      id: uuid(),
+      recordId,
+      userId,
+      createdAt: new Date().toISOString(),
+    });
+    return ok({ liked: true, message: '点赞成功' });
+  }
+
+  // POST /api/family/records/:id/comments
+  // 添加评论
+  @Post('/records/:id/comments')
+  async addComment(ctx: Context): Promise<ApiResponse> {
+    const { userId } = ctx.state.user as { userId: string; username: string };
+    const recordId = ctx.params.id as string;
+    const { content } = (ctx.request.body || {}) as { content?: string };
+
+    if (!content || !content.trim()) {
+      return fail('评论内容不能为空', 400);
+    }
+
+    // 检查记录是否存在
+    const record = findById(records, recordId);
+    if (!record || record.isDeleted) {
+      return fail('记录不存在', 404);
+    }
+
+    // 获取用户昵称
+    const user = findByField(users, 'id', userId);
+    const userNickname = user?.nickname ?? '匿名';
+
+    const newComment = insert<RecordComment>(record_comments, {
+      id: uuid(),
+      recordId,
+      userId,
+      userNickname,
+      content: content.trim(),
+      createdAt: new Date().toISOString(),
+    });
+
+    return ok(newComment, '评论成功');
+  }
+
+  // ============================================================
+  // 家庭饮食月度报告（F17）
+  // ============================================================
+
+  // GET /api/family/report?month=YYYY-MM
+  // 聚合家庭成员当月饮食记录生成报告
+  // - 从 ctx.state.user 获取 userId
+  // - 调用 findUserFamily 查家庭，不存在返回空报告
+  // - 从 ctx.query.month 获取月份，默认当月（YYYY-MM 格式）
+  // - 调用 generateFamilyDietReport(family.id, month) 返回
+  @Get('/report')
+  async getReport(ctx: Context): Promise<ApiResponse> {
+    const { userId } = ctx.state.user as { userId: string; username: string };
+    const family = findUserFamily(userId);
+
+    // 默认当月 YYYY-MM
+    const now = new Date();
+    const currentMonth = now.toISOString().slice(0, 7);
+    const month = (ctx.query.month as string) || currentMonth;
+
+    // 未加入家庭组 → 返回空报告
+    if (!family) {
+      const emptyReport: FamilyDietReport = {
+        month,
+        totalRecords: 0,
+        prevMonthRecords: 0,
+        memberContributions: [],
+        topDishes: [],
+        avgRating: 0,
+        tagDistribution: [],
+      };
+      return ok(emptyReport);
+    }
+
+    const report = generateFamilyDietReport(family.id, month);
+    return ok(report);
   }
 }

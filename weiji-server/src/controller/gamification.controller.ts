@@ -107,7 +107,7 @@ export class GamificationController {
   // POST /api/gamification/blindguess/round
   // 发起盲猜轮次：从家庭菜谱中选若干条记录让其他成员猜作者/菜名
   @Post('/blindguess/round')
-  async createBlindGuessRound(ctx: Context): Promise<ApiResponse<BlindGuessRound>> {
+  async createBlindGuessRound(ctx: Context): Promise<ApiResponse<BlindGuessRound | object>> {
     const { userId } = ctx.state.user as AuthUser;
     const body = (ctx.request.body || {}) as CreateRoundBody;
 

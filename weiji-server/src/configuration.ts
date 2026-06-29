@@ -27,7 +27,7 @@ export const appConfig: AppConfig = {
   port: 8001,
   cors: {
     // 允许前端开发端口跨域
-    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000', 'http://127.0.0.1:3000'],
     // 允许携带 Authorization header
     credentials: true,
     allowMethods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],

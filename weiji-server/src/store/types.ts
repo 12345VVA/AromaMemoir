@@ -15,7 +15,7 @@ export type RecipeVisibility = 'family' | 'private';
 export type ShoppingCategory = '蔬菜' | '肉类' | '水产' | '调料' | '乳制品' | '干货' | '其他';
 
 // 成就类型
-export type AchievementType = 'record' | 'streak' | 'variety' | 'family' | 'gameplay';
+export type AchievementType = 'record' | 'streak' | 'variety' | 'family';
 
 // 餐次类型
 export type MealType = 'breakfast' | 'lunch' | 'dinner';

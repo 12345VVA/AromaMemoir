@@ -54,12 +54,6 @@ export const api = {
   saveRecord(data: any) {
     return instance.post('/record', data);
   },
-  updateRecord(id: string, data: any) {
-    return instance.patch(`/record/${id}`, data);
-  },
-  deleteRecord(id: string) {
-    return instance.delete(`/record/${id}`);
-  },
   // 家庭
   getFamilyInfo() {
     return instance.get('/family');

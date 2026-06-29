@@ -6,9 +6,6 @@ import Koa from 'koa';
 import Router from '@koa/router';
 import cors from '@koa/cors';
 import bodyParser from 'koa-bodyparser';
-import serve from 'koa-static';
-import send from 'koa-send';
-import path from 'path';
 import { appConfig, Configuration } from './configuration';
 import { HealthController } from './controller/health.controller';
 import { AuthController } from './controller/auth.controller';
@@ -20,7 +17,6 @@ import { UserController } from './controller/user.controller';
 import { ChallengeController } from './controller/challenge.controller';
 import { AiController } from './controller/ai.controller';
 import { GamificationController } from './controller/gamification.controller';
-import { AnalyticsController } from './controller/analytics.controller';
 import { getControllerPrefix, getRouteDefinitions, RouteDefinition } from './common/decorators';
 import { jwtMiddleware } from './middleware/jwt.middleware';
 import { AiProxyService } from './service/ai-proxy.service';
@@ -39,7 +35,6 @@ const controllers: Array<{ new (...args: unknown[]): unknown }> = [
   ChallengeController,
   AiController,
   GamificationController,
-  AnalyticsController,
 ];
 
 // 将控制器内的路由元数据注册到 koa-router
@@ -103,42 +98,25 @@ export async function createApp(): Promise<Koa> {
   // 2. body parser（解析 JSON / form / multipart 文本部分）
   app.use(bodyParser({ jsonLimit: '20mb', formLimit: '10mb' }));
 
-  // 3. JWT 认证中间件（白名单：/health、登录/注册、静态资源、OPTIONS 预检）
-  // 顺序：cors → bodyParser → jwtMiddleware → 静态文件 → router.routes()
+  // 3. JWT 认证中间件（白名单：/health、/api/auth/login、/api/auth/register、OPTIONS 预检）
+  // 顺序：cors → bodyParser → jwtMiddleware → router.routes()
   app.use(jwtMiddleware);
 
-  // 4. 挂载 weiji-web 静态文件服务（优先处理静态资源）
-  // 同源提供前端页面，避免 CORS/API_BASE 配置问题
-  const webStaticDir = path.resolve(__dirname, '../../weiji-web');
-  app.use(serve(webStaticDir, { index: 'index.html' }));
-
-  // 5. 全局错误兜底
+  // 4. 全局错误兜底
   app.on('error', (err, ctx) => {
     console.error('[koa error]', err.message, ctx?.request?.url);
   });
 
-  // 6. 注册所有控制器
+  // 5. 注册所有控制器
   for (const ControllerClass of controllers) {
     registerController(router, ControllerClass);
   }
 
-  // 7. 挂载路由
+  // 6. 挂载路由
   app.use(router.routes());
   app.use(router.allowedMethods());
 
-  // 8. SPA 兜底：所有未匹配到 API 也未匹配到静态文件的非文件 GET 请求，返回 index.html
-  app.use(async (ctx, next) => {
-    if (ctx.method === 'GET' && !ctx.body && !ctx.path.startsWith('/api/')) {
-      const hasFileExt = /\.[a-zA-Z0-9]+$/.test(ctx.path);
-      if (!hasFileExt) {
-        await send(ctx, 'index.html', { root: webStaticDir });
-        return;
-      }
-    }
-    await next();
-  });
-
-  // 9. 触发 Configuration onReady 钩子
+  // 7. 触发 Configuration onReady 钩子
   const configuration = new Configuration();
   await configuration.onReady();
 

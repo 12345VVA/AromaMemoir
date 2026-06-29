@@ -113,12 +113,6 @@ const api = {
   saveRecord(data) {
     return request('POST', '/api/record', data);
   },
-  updateRecord(id, data) {
-    return request('PATCH', '/api/record/' + encodeURIComponent(id), data);
-  },
-  deleteRecord(id) {
-    return request('DELETE', '/api/record/' + encodeURIComponent(id));
-  },
   recognizeFood(file) {
     const fd = new FormData();
     fd.append('image', file);

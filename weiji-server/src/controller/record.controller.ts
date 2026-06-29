@@ -4,11 +4,10 @@
 // 所有端点受 JWT 中间件保护，ctx.state.user 由中间件挂载（{ userId, username }）
 
 import type { Context } from 'koa';
-import { Controller, Get, Post, Patch, Delete } from '../common/decorators';
-import { ok, fail, forbidden, type ApiResponse } from '../common/response';
+import { Controller, Get, Post } from '../common/decorators';
+import { ok, fail, type ApiResponse } from '../common/response';
 import { records } from '../store/db';
-import { findById, insert, updateById, uuid } from '../store/helpers';
-import { AchievementService } from '../service/achievement.service';
+import { findById, insert, uuid } from '../store/helpers';
 import type { Record, IngredientWithConfidence, Nutrition } from '../store/types';
 
 // JWT 中间件挂载到 ctx.state.user 的用户信息
@@ -86,7 +85,7 @@ export class RecordController {
   // body: CreateRecordBody（dishName 必填非空）
   // 写入内存存储后返回带 id 的新记录；list 已按 createdAt 降序，故新记录会出现在列表顶部
   @Post('')
-  async create(ctx: Context): Promise<ApiResponse> {
+  async create(ctx: Context): Promise<ApiResponse<Record>> {
     const user = ctx.state.user as AuthUser;
     const userId = user.userId;
     const body = (ctx.request.body || {}) as CreateRecordBody;
@@ -125,12 +124,7 @@ export class RecordController {
     // 由于 list 按 createdAt 降序，新记录 createdAt 为当前时间，会排在种子数据之前
     insert(records, newRecord);
 
-    // 创建记录后触发 record/variety 类成就自动解锁
-    const newAchievements = AchievementService.checkAndUnlockRecordAchievements(userId);
-
-    // 附加 newAchievements 到响应；用展开保持新记录字段位于 data 顶层
-    // （与既有 /api/record 契约一致：data.id / data.dishName 等仍可直接读取）
-    return ok({ ...newRecord, newAchievements }, '保存成功');
+    return ok(newRecord, '保存成功');
   }
 
   // GET /api/record/:id
@@ -145,71 +139,5 @@ export class RecordController {
     }
 
     return ok(record);
-  }
-
-  // PATCH /api/record/:id
-  // 更新记录（仅作者可改），合并 patch 字段并刷新 updatedAt
-  @Patch('/:id')
-  async update(ctx: Context): Promise<ApiResponse> {
-    const user = ctx.state.user as AuthUser;
-    const userId = user.userId;
-    const id = ctx.params.id;
-    const body = (ctx.request.body || {}) as Partial<CreateRecordBody>;
-
-    const record = findById(records, id);
-    if (!record || record.isDeleted) {
-      return fail('记录不存在', 404);
-    }
-
-    // 仅作者可修改
-    if (record.userId !== userId) {
-      return forbidden('无权限修改他人记录');
-    }
-
-    // 合并更新字段（仅更新提供的字段）
-    const patch: Partial<Record> = {};
-    if (body.dishName !== undefined) patch.dishName = body.dishName.trim();
-    if (body.cookingMethod !== undefined) patch.cookingMethod = body.cookingMethod;
-    if (typeof body.rating === 'number') patch.rating = body.rating;
-    if (body.note !== undefined) patch.note = body.note;
-    if (body.tags !== undefined) patch.tags = Array.isArray(body.tags) ? body.tags : [];
-    if (body.mealType !== undefined) patch.mealType = body.mealType;
-    if (body.imageUrl !== undefined) patch.imageUrl = body.imageUrl;
-    if (body.beautifiedUrl !== undefined) patch.beautifiedUrl = body.beautifiedUrl;
-
-    const updated = updateById(records, id, patch);
-    if (!updated) {
-      return fail('更新失败', 500);
-    }
-
-    // 更新后重新触发 record 类成就检查（dishName/tags 可能变化影响 cuisine_10）
-    const newAchievements = AchievementService.checkAndUnlockRecordAchievements(userId);
-
-    return ok({ record: updated, newAchievements }, '更新成功');
-  }
-
-  // DELETE /api/record/:id
-  // 软删除记录（仅作者可删）
-  @Delete('/:id')
-  async remove(ctx: Context): Promise<ApiResponse> {
-    const user = ctx.state.user as AuthUser;
-    const userId = user.userId;
-    const id = ctx.params.id;
-
-    const record = findById(records, id);
-    if (!record || record.isDeleted) {
-      return fail('记录不存在', 404);
-    }
-
-    // 仅作者可删除
-    if (record.userId !== userId) {
-      return forbidden('无权限删除他人记录');
-    }
-
-    // 软删除
-    record.isDeleted = true;
-    record.updatedAt = new Date().toISOString();
-
-    return ok(null, '删除成功');
   }
 }

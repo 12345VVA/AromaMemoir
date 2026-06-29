@@ -19,24 +19,6 @@ const WHITELIST: Array<{ method: string; path: string }> = [
 function isWhitelisted(method: string, path: string): boolean {
   // OPTIONS 预检请求一律放行（CORS 预检不携带 token）
   if (method === 'OPTIONS') return true;
-  // 静态资源直接放行（前端页面、JS、CSS、图片等）
-  if (method === 'GET' && (
-    path === '/' ||
-    path === '/index.html' ||
-    path.startsWith('/assets/') ||
-    path.endsWith('.js') ||
-    path.endsWith('.css') ||
-    path.endsWith('.html') ||
-    path.endsWith('.ico') ||
-    path.endsWith('.png') ||
-    path.endsWith('.jpg') ||
-    path.endsWith('.jpeg') ||
-    path.endsWith('.svg') ||
-    path.endsWith('.gif') ||
-    path.endsWith('.webp')
-  )) {
-    return true;
-  }
   return WHITELIST.some((item) => item.method === method && item.path === path);
 }
 

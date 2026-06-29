@@ -8,8 +8,6 @@ let currentOriginalUrl = null;
 let selectedImageVersion = 'original';
 let currentRecommendations = [];
 let currentRecipeVisibility = null;
-let currentRecords = [];
-let currentRecipes = [];
 
 /* ===== 静态挑战数据（无对应后端接口，作为前端兜底） ===== */
 const CHALLENGES = [
@@ -160,8 +158,7 @@ async function loadHomeData() {
       api.getCheckinStatus(),
       api.getRecommendations().catch(() => null)
     ]);
-    currentRecords = (recordsRes && recordsRes.list) || [];
-    renderRecords(currentRecords);
+    renderRecords((recordsRes && recordsRes.list) || []);
     renderCheckin(checkin);
     if (recommendations && recommendations.length) {
       renderRecommendations(recommendations);
@@ -185,8 +182,7 @@ async function loadFamilyData() {
       api.getFamilyRecipes(),
       api.getFamilyMembers()
     ]);
-    currentRecipes = recipes || [];
-    renderRecipes(currentRecipes);
+    renderRecipes(recipes || []);
     renderMembers(members || []);
   } catch (err) {
     hideLoading(gridEl);
@@ -330,7 +326,15 @@ function showRecommendDetail(item) {
 
   const ingEl = document.getElementById('recommend-modal-ingredients');
   if (ingEl) {
-    ingEl.innerHTML = renderIngredientsChips(item.ingredients);
+    const ingredients = item.ingredients || [];
+    if (ingredients.length === 0) {
+      ingEl.innerHTML = '<span style="font-size:var(--font-size-caption);color:var(--color-on-surface-variant);">暂无食材信息</span>';
+    } else {
+      ingEl.innerHTML = ingredients.map(i => {
+        const name = typeof i === 'string' ? i : (i.name || '');
+        return '<span class="chip filled">' + escapeHTML(name) + '</span>';
+      }).join('');
+    }
   }
 
   modal.classList.add('show');
@@ -340,151 +344,6 @@ function showRecommendDetail(item) {
 function closeRecommendModal() {
   const modal = document.getElementById('recommend-modal');
   if (modal) modal.classList.remove('show');
-}
-
-/* ===== 食材解析工具函数 ===== */
-function parseIngredients(ingredients) {
-  if (!ingredients) return [];
-  let list = ingredients;
-  if (typeof ingredients === 'string') {
-    try {
-      list = JSON.parse(ingredients);
-    } catch (e) {
-      return [{ name: ingredients }];
-    }
-  }
-  if (!Array.isArray(list)) return [];
-  return list.map(item => {
-    if (typeof item === 'string') return { name: item };
-    return {
-      name: item.name || '',
-      amount: item.amount || item.quantity || '',
-      unit: item.unit || ''
-    };
-  }).filter(item => item.name);
-}
-
-function renderIngredientsChips(ingredients) {
-  const list = parseIngredients(ingredients);
-  if (list.length === 0) {
-    return '<span style="font-size:var(--font-size-caption);color:var(--color-on-surface-variant);">暂无食材信息</span>';
-  }
-  return list.map(i => {
-    let label = escapeHTML(i.name);
-    if (i.amount || i.unit) {
-      label += ' ' + escapeHTML(String(i.amount || '') + (i.unit || ''));
-    }
-    return '<span class="chip filled">' + label + '</span>';
-  }).join('');
-}
-
-/* ===== 通用详情弹窗 ===== */
-function closeDetailModal() {
-  const modal = document.getElementById('detail-modal');
-  if (modal) modal.classList.remove('show');
-}
-
-function showRecordDetail(record) {
-  if (!record) return;
-  const modal = document.getElementById('detail-modal');
-  if (!modal) return;
-
-  const img = document.getElementById('detail-modal-img');
-  if (img) img.src = record.imageUrl || record.beautifiedUrl || '';
-
-  const body = document.getElementById('detail-modal-body');
-  if (!body) return;
-
-  const rating = Number(record.rating) || 0;
-  const tags = record.tags || [];
-  const tagsHTML = tags.map(t => '<span class="chip filled">' + escapeHTML(t) + '</span>').join('');
-  const mealChip = record.mealType ? '<span class="chip accent">' + escapeHTML(record.mealType) + '</span>' : '';
-  const dateStr = formatRecordDate(record.recordDate);
-
-  let nutritionHTML = '';
-  if (record.nutrition) {
-    const n = record.nutrition;
-    nutritionHTML =
-      '<div class="recommend-modal-section-title" style="margin-top:var(--space-3);">营养信息</div>' +
-      '<div style="display:flex;gap:var(--space-2);flex-wrap:wrap;">' +
-        (n.calories != null ? '<span class="chip outline">🔥 ' + escapeHTML(n.calories) + ' kcal</span>' : '') +
-        (n.protein != null ? '<span class="chip outline">🥚 ' + escapeHTML(n.protein) + 'g 蛋白质</span>' : '') +
-        (n.fat != null ? '<span class="chip outline">🥑 ' + escapeHTML(n.fat) + 'g 脂肪</span>' : '') +
-        (n.carbs != null ? '<span class="chip outline">🌾 ' + escapeHTML(n.carbs) + 'g 碳水</span>' : '') +
-      '</div>';
-  }
-
-  let noteHTML = '';
-  if (record.note) {
-    noteHTML =
-      '<div class="recommend-modal-section-title" style="margin-top:var(--space-3);">备注</div>' +
-      '<p style="font-size:var(--font-size-body);color:var(--color-on-surface-variant);line-height:1.6;">' + escapeHTML(record.note) + '</p>';
-  }
-
-  body.innerHTML =
-    '<h3 class="recommend-modal-title">' + escapeHTML(record.dishName || '') + '</h3>' +
-    '<div class="recommend-modal-meta">' +
-      '<div class="stars" data-rating="' + rating + '">' + renderStarsHTML(rating, 14) +
-        '<span class="rating-num" style="margin-left:var(--space-2);">' + rating.toFixed(1) + '</span>' +
-      '</div>' +
-    '</div>' +
-    '<div style="display:flex;gap:var(--space-1);flex-wrap:wrap;margin-bottom:var(--space-3);">' + mealChip + tagsHTML + '</div>' +
-    '<div style="font-size:var(--font-size-caption);color:var(--color-on-surface-variant);margin-bottom:var(--space-3);">' + escapeHTML(dateStr) + '</div>' +
-    '<div class="recommend-modal-section-title">食材清单</div>' +
-    '<div class="recommend-modal-ingredients">' + renderIngredientsChips(record.ingredients) + '</div>' +
-    nutritionHTML +
-    noteHTML;
-
-  modal.classList.add('show');
-  lucide.createIcons();
-}
-
-function showRecipeDetail(recipe) {
-  if (!recipe) return;
-  const modal = document.getElementById('detail-modal');
-  if (!modal) return;
-
-  const img = document.getElementById('detail-modal-img');
-  if (img) img.src = recipe.coverUrl || '';
-
-  const body = document.getElementById('detail-modal-body');
-  if (!body) return;
-
-  const diffTag = recipe.difficulty
-    ? '<span class="difficulty-tag ' + difficultyClass(recipe.difficulty) + '">' + escapeHTML(recipe.difficulty) + '</span>'
-    : '';
-  const cookTime = (recipe.cookTime !== undefined && recipe.cookTime !== null && recipe.cookTime !== '')
-    ? '<span style="font-size:var(--font-size-caption);color:var(--color-on-surface-variant);display:inline-flex;align-items:center;gap:4px;"><i data-lucide="clock" style="width:12px;height:12px;"></i>' + escapeHTML(recipe.cookTime) + '分钟</span>'
-    : '';
-  const category = recipe.category
-    ? '<span class="chip outline">' + escapeHTML(recipe.category) + '</span>'
-    : '';
-
-  let stepsHTML = '';
-  const steps = recipe.steps || [];
-  if (steps.length > 0) {
-    stepsHTML =
-      '<div class="recommend-modal-section-title" style="margin-top:var(--space-3);">做法步骤</div>' +
-      '<ol style="padding-left:var(--space-5);font-size:var(--font-size-body);color:var(--color-on-surface);line-height:1.8;">' +
-        steps.map(s => '<li style="margin-bottom:var(--space-2);">' + escapeHTML(s.text || '') + '</li>').join('') +
-      '</ol>';
-  }
-
-  const uploader = recipe.uploaderName
-    ? '<div style="font-size:var(--font-size-caption);color:var(--color-on-surface-variant);margin-top:var(--space-3);">上传者：' + escapeHTML(recipe.uploaderName) + '</div>'
-    : '';
-
-  body.innerHTML =
-    '<h3 class="recommend-modal-title">' + escapeHTML(recipe.name || '') + '</h3>' +
-    '<div class="recommend-modal-meta">' + diffTag + cookTime + '</div>' +
-    '<div style="display:flex;gap:var(--space-1);flex-wrap:wrap;margin-bottom:var(--space-3);">' + category + '</div>' +
-    '<div class="recommend-modal-section-title">食材清单</div>' +
-    '<div class="recommend-modal-ingredients">' + renderIngredientsChips(recipe.ingredients) + '</div>' +
-    stepsHTML +
-    uploader;
-
-  modal.classList.add('show');
-  lucide.createIcons();
 }
 
 function renderCheckin(data) {
@@ -1489,20 +1348,8 @@ function initInteractions() {
     }
     const card = e.target.closest('.food-card');
     if (card && !e.target.closest('.chip') && !e.target.closest('.star') && !e.target.closest('.add-menu-btn') && !e.target.closest('.visibility-btn')) {
-      const cardId = card.dataset.id;
-      if (!cardId) return;
-
-      const record = currentRecords.find(r => r.id === cardId);
-      if (record) {
-        showRecordDetail(record);
-        return;
-      }
-
-      const recipe = currentRecipes.find(r => r.id === cardId);
-      if (recipe) {
-        showRecipeDetail(recipe);
-        return;
-      }
+      const title = card.querySelector('.card-title');
+      if (title) showToast('查看：' + title.textContent);
     }
   });
 

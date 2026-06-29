@@ -11,7 +11,6 @@ import { check_ins } from '../store/db';
 import type { CheckIn } from '../store/types';
 import { insert, uuid } from '../store/helpers';
 import { CheckinService } from '../service/checkin.service';
-import { AchievementService } from '../service/achievement.service';
 
 // 打卡状态返回结构
 interface CheckinStatus {
@@ -58,7 +57,7 @@ export class CheckinController {
   // 首次打卡增加天数；重复打卡返回提示（不重复增加天数）
   // 注意：路径写成 '/'，最终拼接为 /api/checkin/，由 koa-router 非严格模式匹配 /api/checkin
   @Post('')
-  async checkin(ctx: Context): Promise<ApiResponse> {
+  async checkin(ctx: Context): Promise<ApiResponse<AlreadyCheckedResult | CheckinSuccessResult>> {
     const userId = ctx.state.user.userId;
 
     const today = CheckinService.todayStr();
@@ -67,14 +66,11 @@ export class CheckinController {
     if (existing) {
       // 今日已打卡，不重复增加天数
       const streak = CheckinService.calculateStreak(userId);
-      // 重复打卡分支也触发 streak 类成就检查，保持一致性
-      const newAchievements = AchievementService.checkAndUnlockStreakAchievements(userId, streak);
       return ok({
         todayChecked: true,
         streak,
         alreadyChecked: true,
         message: '今日已打卡',
-        newAchievements,
       });
     }
 
@@ -92,14 +88,10 @@ export class CheckinController {
     // 重新计算最新连续天数
     const streak = CheckinService.calculateStreak(userId);
 
-    // 打卡成功后触发 streak 类成就自动解锁
-    const newAchievements = AchievementService.checkAndUnlockStreakAchievements(userId, streak);
-
     return ok({
       todayChecked: true,
       streak,
       message: '打卡成功',
-      newAchievements,
     });
   }
 }

@@ -19,14 +19,12 @@ import {
   blindGuessRounds,
 } from '../store/db';
 import { findByField, uuid } from '../store/helpers';
-import { trackEvent } from '../store/analytics';
 import {
   aggregatePokedex,
   buildPersonalityReport,
   queryTimemachine,
   scoreBlindGuess,
 } from '../store/helpers';
-import { AchievementService } from '../service/achievement.service';
 import type {
   PokedexSummary,
   PersonalityReport,
@@ -87,7 +85,6 @@ export class GamificationController {
   @Get('/pokedex')
   async pokedex(ctx: Context): Promise<ApiResponse<PokedexSummary>> {
     const { userId } = ctx.state.user as AuthUser;
-    trackEvent('pokedex_view', userId);
     return ok(aggregatePokedex(userId));
   }
 
@@ -104,7 +101,6 @@ export class GamificationController {
   @Get('/timemachine')
   async timemachine(ctx: Context): Promise<ApiResponse<TimemachineResult>> {
     const { userId } = ctx.state.user as AuthUser;
-    trackEvent('timemachine_view', userId);
     return ok(queryTimemachine(userId));
   }
 
@@ -280,7 +276,7 @@ export class GamificationController {
   // POST /api/gamification/blindguess/round/:id/reveal
   // 揭晓结果：仅 creator 可操作；计算排名并更新轮次状态
   @Post('/blindguess/round/:id/reveal')
-  async revealRound(ctx: Context): Promise<ApiResponse> {
+  async revealRound(ctx: Context): Promise<ApiResponse<BlindGuessResult>> {
     const { userId } = ctx.state.user as AuthUser;
     const roundId = ctx.params.id as string;
 
@@ -313,14 +309,6 @@ export class GamificationController {
     // 重新计算一次结果以反映最新的 status
     const finalResult = scoreBlindGuess(roundId) || result;
 
-    // 揭晓后对厨神触发 gameplay 类成就解锁
-    let newAchievements: any[] = [];
-    if (finalResult.chefWinner) {
-      newAchievements = AchievementService.checkAndUnlockGameplayAchievements(finalResult.chefWinner.userId);
-    }
-
-    // 附加 newAchievements 到响应；用展开保持揭晓结果字段位于 data 顶层
-    // （与既有 /api/gamification/blindguess/.../reveal 契约一致：data.status / data.ranking 仍可直接读取）
-    return ok({ ...finalResult, newAchievements }, '揭晓成功');
+    return ok(finalResult, '揭晓成功');
   }
 }

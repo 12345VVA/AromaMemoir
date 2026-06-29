@@ -31,7 +31,6 @@ import type {
   ShoppingCategory,
 } from '../store/types';
 import { findUserFamily, getUserMembership, requireRole, getCurrentMonday } from '../service/family.service';
-import { AchievementService } from '../service/achievement.service';
 
 // 餐次排序权重：breakfast < lunch < dinner
 const MEAL_ORDER: Record<MealType, number> = { breakfast: 1, lunch: 2, dinner: 3 };
@@ -100,10 +99,7 @@ export class FamilyController {
       joinedAt: now,
     });
 
-    // 创建家庭组后触发 family 类成就自动解锁
-    const newAchievements = AchievementService.checkAndUnlockFamilyAchievements(userId);
-
-    return ok({ family, newAchievements }, '创建成功');
+    return ok(family, '创建成功');
   }
 
   // ============================================================

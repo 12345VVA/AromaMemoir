@@ -22,47 +22,48 @@ const NON_EXIST_USER_ID = 'user-not-exist-9999';
 // 测试期间临时插入到 blindGuessRounds 的 mock 轮次 id，afterEach 统一清理，避免状态污染
 const mockRoundIds: string[] = [];
 
-function cleanupMockRounds(): void {
+async function cleanupMockRounds(): Promise<void> {
+  const arr = await blindGuessRounds.toArray();
   for (const id of mockRoundIds) {
-    const idx = blindGuessRounds.findIndex((r) => r.id === id);
-    if (idx >= 0) blindGuessRounds.splice(idx, 1);
+    const idx = arr.findIndex((r) => r.id === id);
+    if (idx >= 0) arr.splice(idx, 1);
   }
   mockRoundIds.length = 0;
 }
 
-afterEach(() => {
-  cleanupMockRounds();
+afterEach(async () => {
+  await cleanupMockRounds();
 });
 
 describe('aggregatePokedex', () => {
-  it('demo 用户返回非空 categories 数组', () => {
-    const summary = aggregatePokedex(DEMO_USER_ID);
+  it('demo 用户返回非空 categories 数组', async () => {
+    const summary = await aggregatePokedex(DEMO_USER_ID);
     assert.ok(Array.isArray(summary.categories), 'categories 应为数组');
     assert.ok(summary.categories.length > 0, 'categories 应非空');
   });
 
-  it('totalSlots 等于 pokedexCatalog 长度', () => {
-    const summary = aggregatePokedex(DEMO_USER_ID);
+  it('totalSlots 等于 pokedexCatalog 长度', async () => {
+    const summary = await aggregatePokedex(DEMO_USER_ID);
     assert.strictEqual(summary.totalSlots, pokedexCatalog.length);
   });
 
-  it('demo 用户 unlockedSlots >= 1（3 条种子记录均命中 catalog）', () => {
-    const summary = aggregatePokedex(DEMO_USER_ID);
+  it('demo 用户 unlockedSlots >= 1（3 条种子记录均命中 catalog）', async () => {
+    const summary = await aggregatePokedex(DEMO_USER_ID);
     assert.ok(summary.unlockedSlots >= 1, 'unlockedSlots 应 >= 1');
     // 种子记录 dishName：红烧牛肉面 / 番茄炒蛋 / 清炒西兰花，三者均在 catalog 中
     assert.strictEqual(summary.unlockedSlots, 3);
   });
 
-  it('completionRate 在 0-1 之间', () => {
-    const summary = aggregatePokedex(DEMO_USER_ID);
+  it('completionRate 在 0-1 之间', async () => {
+    const summary = await aggregatePokedex(DEMO_USER_ID);
     assert.ok(
       summary.completionRate >= 0 && summary.completionRate <= 1,
       'completionRate 应在 0-1 之间',
     );
   });
 
-  it('不存在的用户返回 unlockedSlots=0、completionRate=0、categories 非空且 items 全部未解锁', () => {
-    const summary = aggregatePokedex(NON_EXIST_USER_ID);
+  it('不存在的用户返回 unlockedSlots=0、completionRate=0、categories 非空且 items 全部未解锁', async () => {
+    const summary = await aggregatePokedex(NON_EXIST_USER_ID);
     assert.strictEqual(summary.unlockedSlots, 0);
     assert.strictEqual(summary.completionRate, 0);
     assert.ok(Array.isArray(summary.categories), 'categories 应为数组');
@@ -79,22 +80,22 @@ describe('aggregatePokedex', () => {
 });
 
 describe('buildPersonalityReport', () => {
-  it('demo 用户近 30 天 >= 3 条记录，available=true 且 recordCount=3', () => {
-    const report = buildPersonalityReport(DEMO_USER_ID);
+  it('demo 用户近 30 天 >= 3 条记录，available=true 且 recordCount=3', async () => {
+    const report = await buildPersonalityReport(DEMO_USER_ID);
     assert.strictEqual(report.available, true);
     assert.strictEqual(report.recordCount, 3);
   });
 
-  it('available=true 时 personalityType / description / traits 字段存在', () => {
-    const report = buildPersonalityReport(DEMO_USER_ID);
+  it('available=true 时 personalityType / description / traits 字段存在', async () => {
+    const report = await buildPersonalityReport(DEMO_USER_ID);
     assert.ok(report.personalityType, 'personalityType 应为非空字符串');
     assert.strictEqual(typeof report.personalityType, 'string');
     assert.ok(report.description, 'description 应非空');
     assert.ok(Array.isArray(report.traits), 'traits 应为数组');
   });
 
-  it('shareText 包含人格名', () => {
-    const report = buildPersonalityReport(DEMO_USER_ID);
+  it('shareText 包含人格名', async () => {
+    const report = await buildPersonalityReport(DEMO_USER_ID);
     assert.ok(report.personalityType, '前置：personalityType 应非空');
     assert.ok(
       report.shareText.includes(report.personalityType!),
@@ -102,8 +103,8 @@ describe('buildPersonalityReport', () => {
     );
   });
 
-  it('不存在的用户 available=false、recordCount=0、description 含"记录不足"', () => {
-    const report = buildPersonalityReport(NON_EXIST_USER_ID);
+  it('不存在的用户 available=false、recordCount=0、description 含"记录不足"', async () => {
+    const report = await buildPersonalityReport(NON_EXIST_USER_ID);
     assert.strictEqual(report.available, false);
     assert.strictEqual(report.recordCount, 0);
     assert.ok(
@@ -114,8 +115,8 @@ describe('buildPersonalityReport', () => {
 });
 
 describe('queryTimemachine', () => {
-  it('demo 用户种子记录均为今年，memories 为空数组、todayDate 非空', () => {
-    const result = queryTimemachine(DEMO_USER_ID);
+  it('demo 用户种子记录均为今年，memories 为空数组、todayDate 非空', async () => {
+    const result = await queryTimemachine(DEMO_USER_ID);
     assert.ok(Array.isArray(result.memories), 'memories 应为数组');
     assert.strictEqual(result.memories.length, 0, '种子记录均为今年，应无往年回忆');
     assert.ok(
@@ -124,8 +125,8 @@ describe('queryTimemachine', () => {
     );
   });
 
-  it('不存在的用户返回空 memories', () => {
-    const result = queryTimemachine(NON_EXIST_USER_ID);
+  it('不存在的用户返回空 memories', async () => {
+    const result = await queryTimemachine(NON_EXIST_USER_ID);
     assert.ok(Array.isArray(result.memories));
     assert.strictEqual(result.memories.length, 0);
     assert.ok(typeof result.todayDate === 'string');
@@ -133,13 +134,13 @@ describe('queryTimemachine', () => {
 });
 
 describe('scoreBlindGuess', () => {
-  it('不存在的 roundId 返回 null', () => {
-    const result = scoreBlindGuess('round-not-exist-9999');
+  it('不存在的 roundId 返回 null', async () => {
+    const result = await scoreBlindGuess('round-not-exist-9999');
     assert.strictEqual(result, null);
   });
 
-  it('mock 轮次：ranking 按 totalScore 降序、rank 1-based、最高分者 isChef=true', () => {
-    // 构造一个 mock 轮次直接 push 到 blindGuessRounds
+  it('mock 轮次：ranking 按 totalScore 降序、rank 1-based、最高分者 isChef=true', async () => {
+    // 构造一个 mock 轮次直接 insert 到 blindGuessRounds
     const mockRound: BlindGuessRound = {
       id: 'test-round-mock-001',
       familyId: 'family-0001',
@@ -193,10 +194,10 @@ describe('scoreBlindGuess', () => {
       createdAt: '',
       revealedAt: null,
     };
-    blindGuessRounds.push(mockRound);
+    await blindGuessRounds.insert(mockRound);
     mockRoundIds.push(mockRound.id);
 
-    const result = scoreBlindGuess(mockRound.id);
+    const result = await scoreBlindGuess(mockRound.id);
     assert.ok(result, '应返回非 null 结果');
     assert.strictEqual(result!.roundId, mockRound.id);
     assert.ok(Array.isArray(result!.ranking), 'ranking 应为数组');

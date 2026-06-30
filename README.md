@@ -77,6 +77,21 @@ npm run dev
 
 家庭组：王家厨房（inviteCode: `WJ1234`）
 
+### 持久化与后端配置（可选）
+
+weiji-server 默认以**内存模式**运行（`DB_DRIVER=memory`，重启后数据丢失，适合本地开发与测试）。需要数据持久化时切换为 MySQL：
+
+```bash
+cd weiji-server
+cp .env.example .env              # 复制样例配置（.env 已在 .gitignore，不会提交）
+# 编辑 .env：DB_DRIVER=mysql，并填写 DB_HOST / DB_PORT / DB_USER / DB_PASSWORD / DB_NAME
+# 生产环境（NODE_ENV=production）务必同时设置 JWT_SECRET，否则启动即报错退出
+mysql -u root -p < db/init.sql    # 初始化 weiji 库 + 12 张业务表 + 种子数据（幂等可重复执行）
+npm run dev                       # 启动时自动校验 MySQL 连通性与 users 表存在性
+```
+
+完整环境变量清单见 [weiji-server/.env.example](file:///workspace/weiji-server/.env.example)；MySQL 模式启用步骤与表清单见 [weiji-server/db/README.md](file:///workspace/weiji-server/db/README.md)。
+
 ---
 
 ## 配置 AI 能力（可选）
@@ -159,13 +174,13 @@ workspace/
 ├── weiji-server/             # Koa 业务后端 (:8001)
 │   ├── src/
 │   │   ├── bootstrap.ts         # 应用启动入口（createApp + 路由扫描）
-│   │   ├── configuration.ts     # 端口 / CORS / JWT / AI 服务地址
+│   │   ├── configuration.ts     # 端口 / CORS / JWT / AI 服务地址 / 存储驱动
 │   │   ├── common/decorators.ts # Midway 风格 @Controller / @Get / @Post ...
 │   │   ├── common/response.ts   # ok() / fail() / unauthorized() 统一响应
 │   │   ├── middleware/jwt.middleware.ts
-│   │   ├── controller/          # health/auth/record/family/achievement/checkin/user/challenge/ai
-│   │   ├── service/             # auth/family/checkin/ai-proxy
-│   │   └── store/               # 内存存储 + 种子数据 + 查询辅助
+│   │   ├── controller/          # health/auth/record/family/achievement/checkin/user/challenge/ai/gamification/analytics
+│   │   ├── service/             # auth/family/checkin/achievement/ai-proxy
+│   │   └── store/               # Repository 抽象（内存 / MySQL）+ 种子数据 + 查询辅助
 │   ├── tests/                   # unit/ + integration/ + helpers/
 │   └── package.json
 ├── weiji-ai/                 # FastAPI AI 服务 (:8002)
@@ -175,6 +190,10 @@ workspace/
 │   ├── services/                # baidu/openai/tencent/volcano/qwen/xfyun 6 个厂商模块
 │   ├── tests/                   # unit/ + integration/
 │   └── requirements.txt
+├── weiji-web/                # 原生 HTML+JS 原型前端（与 admin-web 并存，功能更全）
+│   ├── api.js
+│   ├── app.js
+│   └── index.html
 ├── scripts/
 │   └── run-all-tests.sh         # 统一测试入口
 ├── 味记PRD.md                 # 产品需求文档
@@ -229,7 +248,7 @@ workspace/
 ## 相关文档
 
 - [味记PRD.md](file:///workspace/味记PRD.md) — 产品需求文档（功能全景、AI 规格、路线图）
-- [weiji-admin-web README](file:///workspace/weiji-admin-web) — 前端说明（待补）
+- [weiji-admin-web README](file:///workspace/weiji-admin-web) — 前端说明（Vue3 管理后台）
 - [weiji-server README](file:///workspace/weiji-server/README.md) — 业务后端说明（端点、种子数据、技术说明）
 - [weiji-ai README](file:///workspace/weiji-ai/README.md) — AI 服务说明（环境变量、降级策略、目录结构）
 - [MVP开发速查手册.md](file:///workspace/MVP开发速查手册.md) — MVP 功能与数据模型速查

@@ -9,16 +9,16 @@ import { uuid } from '../store/helpers';
 
 export class AchievementService {
   // 按成就类型过滤出相关成就定义
-  private static getByType(type: AchievementType): AchievementDef[] {
-    return achievements.filter((a) => a.type === type);
+  private static async getByType(type: AchievementType): Promise<AchievementDef[]> {
+    return achievements.findAll((a) => a.type === type);
   }
 
   // 通用解锁尝试：检查幂等性后插入 user_achievements 记录
   // 已存在则返回 null，否则创建并返回新记录
-  private static tryUnlock(userId: string, achievement: AchievementDef): UserAchievement | null {
-    const exists = user_achievements.some(
+  private static async tryUnlock(userId: string, achievement: AchievementDef): Promise<UserAchievement | null> {
+    const exists = (await user_achievements.count(
       (ua) => ua.userId === userId && ua.achievementId === achievement.id
-    );
+    )) > 0;
     if (exists) return null;
 
     const newRecord: UserAchievement = {
@@ -27,14 +27,14 @@ export class AchievementService {
       achievementId: achievement.id,
       earnedAt: new Date().toISOString(),
     };
-    user_achievements.push(newRecord);
+    await user_achievements.insert(newRecord);
     return newRecord;
   }
 
   // 评估并解锁 record / variety 类成就
   // 基于 records 数组统计：记录总数、不同 cookingMethod（为空时用 dishName 兜底）去重数
-  static checkAndUnlockRecordAchievements(userId: string): UserAchievement[] {
-    const userRecords = records.filter((r) => r.userId === userId && !r.isDeleted);
+  static async checkAndUnlockRecordAchievements(userId: string): Promise<UserAchievement[]> {
+    const userRecords = await records.findAll((r) => r.userId === userId && !r.isDeleted);
     const recordCount = userRecords.length;
 
     // 菜系去重计数：优先用 cookingMethod，为空时用 dishName 兜底
@@ -47,7 +47,7 @@ export class AchievementService {
 
     const unlocked: UserAchievement[] = [];
 
-    for (const ach of achievements) {
+    for (const ach of await achievements.toArray()) {
       if (ach.type !== 'record' && ach.type !== 'variety') continue;
 
       let matched = false;
@@ -60,7 +60,7 @@ export class AchievementService {
       }
 
       if (matched) {
-        const result = AchievementService.tryUnlock(userId, ach);
+        const result = await AchievementService.tryUnlock(userId, ach);
         if (result) unlocked.push(result);
       }
     }
@@ -69,13 +69,13 @@ export class AchievementService {
 
   // 评估并解锁 streak 类成就
   // 由调用方传入当前连续打卡天数 streak，满足条件即解锁
-  static checkAndUnlockStreakAchievements(userId: string, streak: number): UserAchievement[] {
+  static async checkAndUnlockStreakAchievements(userId: string, streak: number): Promise<UserAchievement[]> {
     const unlocked: UserAchievement[] = [];
 
-    for (const ach of AchievementService.getByType('streak')) {
+    for (const ach of await AchievementService.getByType('streak')) {
       const cond = ach.condition;
       if (typeof cond.streakDays === 'number' && streak >= cond.streakDays) {
-        const result = AchievementService.tryUnlock(userId, ach);
+        const result = await AchievementService.tryUnlock(userId, ach);
         if (result) unlocked.push(result);
       }
     }
@@ -84,15 +84,15 @@ export class AchievementService {
 
   // 评估并解锁 family 类成就
   // 检查 families 数组中是否存在 ownerId === userId 且 !isDeleted 的家庭组
-  static checkAndUnlockFamilyAchievements(userId: string): UserAchievement[] {
-    const familyCreated = families.some((f) => f.ownerId === userId && !f.isDeleted);
+  static async checkAndUnlockFamilyAchievements(userId: string): Promise<UserAchievement[]> {
+    const familyCreated = (await families.count((f) => f.ownerId === userId && !f.isDeleted)) > 0;
 
     const unlocked: UserAchievement[] = [];
 
-    for (const ach of AchievementService.getByType('family')) {
+    for (const ach of await AchievementService.getByType('family')) {
       const cond = ach.condition;
       if (cond.familyCreated === true && familyCreated) {
-        const result = AchievementService.tryUnlock(userId, ach);
+        const result = await AchievementService.tryUnlock(userId, ach);
         if (result) unlocked.push(result);
       }
     }
@@ -101,13 +101,13 @@ export class AchievementService {
 
   // 评估并解锁 gameplay 类成就
   // 仅在用户赢得家庭盲猜厨神称号后调用，blindguess_chef 直接解锁
-  static checkAndUnlockGameplayAchievements(userId: string): UserAchievement[] {
+  static async checkAndUnlockGameplayAchievements(userId: string): Promise<UserAchievement[]> {
     const unlocked: UserAchievement[] = [];
 
-    for (const ach of AchievementService.getByType('gameplay')) {
+    for (const ach of await AchievementService.getByType('gameplay')) {
       const cond = ach.condition;
       if (cond.blindguessChef === true) {
-        const result = AchievementService.tryUnlock(userId, ach);
+        const result = await AchievementService.tryUnlock(userId, ach);
         if (result) unlocked.push(result);
       }
     }

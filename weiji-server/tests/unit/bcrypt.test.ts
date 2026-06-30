@@ -4,7 +4,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import bcrypt from 'bcryptjs';
-import { findByField } from '../../src/store/helpers';
 import { users } from '../../src/store/db';
 
 describe('bcryptjs hash + compare 往返', () => {
@@ -38,21 +37,21 @@ describe('bcryptjs hash + compare 往返', () => {
 });
 
 describe('种子数据密码哈希一致性', () => {
-  it('demo 用户密码哈希与 123456 匹配', () => {
-    const demo = findByField(users, 'username', 'demo');
+  it('demo 用户密码哈希与 123456 匹配', async () => {
+    const demo = await users.findByField('username', 'demo');
     assert.ok(demo, 'demo 用户应存在');
     assert.strictEqual(bcrypt.compareSync('123456', demo!.password), true);
   });
 
-  it('错误密码与 demo 用户哈希不匹配', () => {
-    const demo = findByField(users, 'username', 'demo');
+  it('错误密码与 demo 用户哈希不匹配', async () => {
+    const demo = await users.findByField('username', 'demo');
     assert.ok(demo);
     assert.strictEqual(bcrypt.compareSync('000000', demo!.password), false);
   });
 
-  it('所有种子用户密码均为 123456', () => {
-    assert.ok(users.length >= 4);
-    for (const u of users) {
+  it('所有种子用户密码均为 123456', async () => {
+    assert.ok((await users.count()) >= 4);
+    for (const u of await users.toArray()) {
       assert.strictEqual(
         bcrypt.compareSync('123456', u.password),
         true,
@@ -61,8 +60,8 @@ describe('种子数据密码哈希一致性', () => {
     }
   });
 
-  it('种子用户密码字段为 bcrypt 哈希而非明文', () => {
-    for (const u of users) {
+  it('种子用户密码字段为 bcrypt 哈希而非明文', async () => {
+    for (const u of await users.toArray()) {
       assert.match(u.password, /^\$2[ab]\$/, `用户 ${u.username} 密码应为 bcrypt 哈希`);
       assert.notStrictEqual(u.password, '123456');
     }

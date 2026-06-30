@@ -16,7 +16,7 @@ export class ChallengeController {
   @Get('/list')
   async list(_ctx: Context): Promise<ApiResponse<Challenge[]>> {
     // 过滤出 isActive 为 true 的挑战
-    const activeChallenges = challenges.filter((c) => c.isActive === true);
+    const activeChallenges = await challenges.findAll((c) => c.isActive === true);
     return ok(activeChallenges);
   }
 }

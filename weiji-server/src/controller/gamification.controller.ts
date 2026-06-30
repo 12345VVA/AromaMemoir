@@ -18,7 +18,7 @@ import {
   users,
   blindGuessRounds,
 } from '../store/db';
-import { findByField, uuid } from '../store/helpers';
+import { uuid } from '../store/helpers';
 import {
   aggregatePokedex,
   buildPersonalityReport,
@@ -85,7 +85,7 @@ export class GamificationController {
   @Get('/pokedex')
   async pokedex(ctx: Context): Promise<ApiResponse<PokedexSummary>> {
     const { userId } = ctx.state.user as AuthUser;
-    return ok(aggregatePokedex(userId));
+    return ok(await aggregatePokedex(userId));
   }
 
   // GET /api/gamification/personality
@@ -93,7 +93,7 @@ export class GamificationController {
   @Get('/personality')
   async personality(ctx: Context): Promise<ApiResponse<PersonalityReport>> {
     const { userId } = ctx.state.user as AuthUser;
-    return ok(buildPersonalityReport(userId));
+    return ok(await buildPersonalityReport(userId));
   }
 
   // GET /api/gamification/timemachine
@@ -101,7 +101,7 @@ export class GamificationController {
   @Get('/timemachine')
   async timemachine(ctx: Context): Promise<ApiResponse<TimemachineResult>> {
     const { userId } = ctx.state.user as AuthUser;
-    return ok(queryTimemachine(userId));
+    return ok(await queryTimemachine(userId));
   }
 
   // POST /api/gamification/blindguess/round
@@ -123,16 +123,16 @@ export class GamificationController {
     }
 
     // 校验当前用户是该 family 成员
-    const membership = family_members.find(
+    const membership = (await family_members.findAll(
       (m) => m.familyId === body.familyId && m.userId === userId
-    );
+    ))[0];
     if (!membership) {
       return fail('当前用户不是该家庭组成员', 403);
     }
 
     // 取出 family_recipes 中 id 在 recordIds 中的菜谱（且未删除）
     const wantedIds = new Set(body.recordIds);
-    const pickedRecipes = family_recipes.filter(
+    const pickedRecipes = await family_recipes.findAll(
       (r) => wantedIds.has(r.id) && !r.isDeleted
     );
     if (pickedRecipes.length === 0) {
@@ -140,17 +140,18 @@ export class GamificationController {
     }
 
     // 组装 BlindGuessItem
-    const items: BlindGuessItem[] = pickedRecipes.map((recipe) => {
-      const author = findByField(users, 'id', recipe.uploaderId);
-      return {
+    const items: BlindGuessItem[] = [];
+    for (const recipe of pickedRecipes) {
+      const author = await users.findById(recipe.uploaderId);
+      items.push({
         recordId: recipe.id,
         recipeId: recipe.id,
         dishName: recipe.name,
         coverUrl: recipe.coverUrl,
         realAuthorId: recipe.uploaderId,
         realAuthorName: author?.nickname ?? '',
-      };
-    });
+      });
+    }
 
     const now = new Date().toISOString();
     const round: BlindGuessRound = {
@@ -165,7 +166,7 @@ export class GamificationController {
       revealedAt: null,
     };
 
-    blindGuessRounds.push(round);
+    await blindGuessRounds.insert(round);
 
     // 创建后立即返回，但与 GET 详情一致：active 状态下脱敏 items 中的真实作者信息
     return ok(sanitizeActiveRound(round), '盲猜轮次创建成功');
@@ -177,15 +178,15 @@ export class GamificationController {
   async getBlindGuessRound(ctx: Context): Promise<ApiResponse<BlindGuessRound | object>> {
     const { userId } = ctx.state.user as AuthUser;
     const roundId = ctx.params.id as string;
-    const round = findByField(blindGuessRounds, 'id', roundId);
+    const round = await blindGuessRounds.findById(roundId);
     if (!round) {
       return fail('轮次不存在', 404);
     }
 
     // 校验当前用户是该 family 成员（仅家庭成员可查看）
-    const membership = family_members.find(
+    const membership = (await family_members.findAll(
       (m) => m.familyId === round.familyId && m.userId === userId
-    );
+    ))[0];
     if (!membership) {
       return fail('当前用户不是该家庭组成员', 403);
     }
@@ -206,7 +207,7 @@ export class GamificationController {
     const roundId = ctx.params.id as string;
     const body = (ctx.request.body || {}) as SubmitGuessBody;
 
-    const round = findByField(blindGuessRounds, 'id', roundId);
+    const round = await blindGuessRounds.findById(roundId);
     if (!round) {
       return fail('轮次不存在', 404);
     }
@@ -217,9 +218,9 @@ export class GamificationController {
     }
 
     // 校验当前用户是 family 成员
-    const membership = family_members.find(
+    const membership = (await family_members.findAll(
       (m) => m.familyId === round.familyId && m.userId === userId
-    );
+    ))[0];
     if (!membership) {
       return fail('当前用户不是该家庭组成员', 403);
     }
@@ -247,11 +248,11 @@ export class GamificationController {
     }
 
     // 查询用户昵称
-    const user = findByField(users, 'id', userId);
+    const user = await users.findById(userId);
     // 查询被猜作者昵称（前端可能只传 guessAuthorId，由后端补全昵称）
     let guessAuthorName = body.guessAuthorName || '';
     if (!guessAuthorName) {
-      const author = findByField(users, 'id', body.guessAuthorId);
+      const author = await users.findById(body.guessAuthorId);
       guessAuthorName = author?.nickname ?? '';
     }
 
@@ -280,7 +281,7 @@ export class GamificationController {
     const { userId } = ctx.state.user as AuthUser;
     const roundId = ctx.params.id as string;
 
-    const round = findByField(blindGuessRounds, 'id', roundId);
+    const round = await blindGuessRounds.findById(roundId);
     if (!round) {
       return fail('轮次不存在', 404);
     }
@@ -296,7 +297,7 @@ export class GamificationController {
     }
 
     // 计算得分排名（不修改数据库 status，由控制器负责更新）
-    const result = scoreBlindGuess(roundId);
+    const result = await scoreBlindGuess(roundId);
     if (!result) {
       // 兜底，理论上不会走到（前面已校验存在）
       return fail('揭晓失败', 500);
@@ -307,7 +308,7 @@ export class GamificationController {
     round.revealedAt = new Date().toISOString();
 
     // 重新计算一次结果以反映最新的 status
-    const finalResult = scoreBlindGuess(roundId) || result;
+    const finalResult = (await scoreBlindGuess(roundId)) || result;
 
     return ok(finalResult, '揭晓成功');
   }

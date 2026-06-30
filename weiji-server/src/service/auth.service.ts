@@ -7,7 +7,7 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 import { appConfig } from '../configuration';
 import { users } from '../store/db';
 import { User } from '../store/types';
-import { findByField, insert, uuid } from '../store/helpers';
+import { uuid } from '../store/helpers';
 
 // 安全用户对象（去除 password 字段）
 export type SafeUser = Omit<User, 'password'>;
@@ -71,7 +71,7 @@ export class AuthService {
     }
 
     // 用户名查重
-    const existed = findByField(users, 'username', username);
+    const existed = await users.findByField('username', username);
     if (existed) {
       throw new Error('用户名已存在');
     }
@@ -83,7 +83,7 @@ export class AuthService {
     const avatar = `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(username)}`;
 
     // 插入新用户，id 使用 uuid 生成
-    const newUser = insert(users, {
+    const newUser = await users.insert({
       id: uuid(),
       username,
       password: passwordHash,
@@ -102,7 +102,7 @@ export class AuthService {
   // 用户登录
   // 校验账号密码后签发 token，返回 { token, user }
   static async login(username: string, password: string): Promise<LoginResult> {
-    const user = findByField(users, 'username', username);
+    const user = await users.findByField('username', username);
     if (!user) {
       throw new Error('用户名或密码错误');
     }

@@ -7,7 +7,6 @@ import type { Context } from 'koa';
 import { Controller, Get } from '../common/decorators';
 import { ok, fail, type ApiResponse } from '../common/response';
 import { users, records, family_recipes, user_achievements } from '../store/db';
-import { findByField } from '../store/helpers';
 import { CheckinService } from '../service/checkin.service';
 
 // 用户档案中的统计数据
@@ -39,7 +38,7 @@ export class UserController {
   async profile(ctx: Context): Promise<ApiResponse<UserProfile>> {
     const userId = ctx.state.user.userId;
 
-    const user = findByField(users, 'id', userId);
+    const user = await users.findById(userId);
     if (!user) {
       // 用户不存在时返回业务错误码 404
       // 注：与 auth.controller 一致，仅设置响应体 code 字段，不改 HTTP 状态码
@@ -49,15 +48,15 @@ export class UserController {
 
     // 统计数据计算
     // recordCount：用户未删除的饮食记录数
-    const recordCount = records.filter((r) => r.userId === userId && !r.isDeleted).length;
+    const recordCount = await records.count((r) => r.userId === userId && !r.isDeleted);
     // recipeCount：用户上传且未删除的家庭菜谱数
-    const recipeCount = family_recipes.filter(
+    const recipeCount = await family_recipes.count(
       (r) => r.uploaderId === userId && !r.isDeleted
-    ).length;
+    );
     // streak：连续打卡天数，复用 checkin service 逻辑
-    const streak = CheckinService.calculateStreak(userId);
+    const streak = await CheckinService.calculateStreak(userId);
     // achievementCount：用户已解锁的成就数
-    const achievementCount = user_achievements.filter((ua) => ua.userId === userId).length;
+    const achievementCount = await user_achievements.count((ua) => ua.userId === userId);
 
     // 组装安全用户对象（剔除 password）
     const profile: UserProfile = {

@@ -18,7 +18,7 @@ import {
   record_likes,
   record_comments,
 } from '../store/db';
-import { findById, findByField, filterBy, insert, updateById, uuid, generateFamilyDietReport } from '../store/helpers';
+import { uuid, generateFamilyDietReport } from '../store/helpers';
 import type {
   Family,
   FamilyMember,
@@ -67,7 +67,7 @@ export class FamilyController {
   @Get('')
   async getFamily(ctx: Context): Promise<ApiResponse> {
     const { userId } = ctx.state.user as { userId: string; username: string };
-    const family = findUserFamily(userId);
+    const family = await findUserFamily(userId);
     // 未加入任何家庭组 → 返回 ok(null)
     if (!family) return ok(null);
     return ok(family);
@@ -89,7 +89,7 @@ export class FamilyController {
     const familyId = uuid();
 
     // 创建家庭组：memberCount=1，inviteCode 为随机 6 位码
-    const family = insert<Family>(families, {
+    const family = await families.insert({
       id: familyId,
       name: name.trim(),
       ownerId: userId,
@@ -101,7 +101,7 @@ export class FamilyController {
     });
 
     // 同步创建 owner 成员关系
-    insert<FamilyMember>(family_members, {
+    await family_members.insert({
       id: uuid(),
       familyId,
       userId,
@@ -121,21 +121,23 @@ export class FamilyController {
   @Get('/members')
   async getMembers(ctx: Context): Promise<ApiResponse> {
     const { userId } = ctx.state.user as { userId: string; username: string };
-    const membership = getUserMembership(userId);
+    const membership = await getUserMembership(userId);
     // 未加入家庭组 → 返回空列表
     if (!membership) return ok([]);
 
-    const list = filterBy(family_members, (m) => m.familyId === membership.familyId).map((m) => {
-      const user = findByField(users, 'id', m.userId);
-      return {
+    const members = await family_members.findAll((m) => m.familyId === membership.familyId);
+    const list = [];
+    for (const m of members) {
+      const user = await users.findById(m.userId);
+      list.push({
         id: m.id,
         userId: m.userId,
         nickname: user?.nickname ?? '',
         avatar: user?.avatar ?? '',
         role: m.role,
         joinedAt: m.joinedAt,
-      };
-    });
+      });
+    }
     return ok(list);
   }
 
@@ -148,7 +150,7 @@ export class FamilyController {
     const { role } = (ctx.request.body || {}) as { role?: UserRole };
 
     // 权限校验：当前用户必须是 owner 或 admin
-    if (!requireRole(userId, ['owner', 'admin'])) {
+    if (!(await requireRole(userId, ['owner', 'admin']))) {
       return forbidden('无权限操作');
     }
 
@@ -157,7 +159,7 @@ export class FamilyController {
       return fail('角色不合法', 400);
     }
 
-    const target = findById(family_members, memberRecordId);
+    const target = await family_members.findById(memberRecordId);
     if (!target) {
       return fail('成员不存在', 404);
     }
@@ -167,7 +169,7 @@ export class FamilyController {
       return fail('不能修改 owner 角色', 400);
     }
 
-    const updated = updateById(family_members, memberRecordId, { role });
+    const updated = await family_members.updateById(memberRecordId, { role });
     return ok(updated);
   }
 
@@ -179,11 +181,11 @@ export class FamilyController {
     const memberRecordId = ctx.params.id as string;
 
     // 权限校验：当前用户必须是 owner
-    if (!requireRole(userId, ['owner'])) {
+    if (!(await requireRole(userId, ['owner']))) {
       return forbidden('无权限操作');
     }
 
-    const target = findById(family_members, memberRecordId);
+    const target = await family_members.findById(memberRecordId);
     if (!target) {
       return fail('成员不存在', 404);
     }
@@ -194,15 +196,16 @@ export class FamilyController {
     }
 
     // 从 family_members 数组中删除该记录
-    const idx = family_members.findIndex((m) => m.id === memberRecordId);
+    const membersArr = await family_members.toArray();
+    const idx = membersArr.findIndex((m) => m.id === memberRecordId);
     if (idx !== -1) {
-      family_members.splice(idx, 1);
+      membersArr.splice(idx, 1);
     }
 
     // 更新对应家庭组 memberCount - 1
-    const family = findByField(families, 'id', target.familyId);
+    const family = await families.findById(target.familyId);
     if (family) {
-      updateById(families, family.id, { memberCount: Math.max(0, family.memberCount - 1) });
+      await families.updateById(family.id, { memberCount: Math.max(0, family.memberCount - 1) });
     }
 
     return ok(null, '移除成功');
@@ -217,14 +220,14 @@ export class FamilyController {
   @Post('/invitations')
   async createInvitation(ctx: Context): Promise<ApiResponse> {
     const { userId } = ctx.state.user as { userId: string; username: string };
-    const family = findUserFamily(userId);
+    const family = await findUserFamily(userId);
 
     if (!family) {
       return fail('未加入家庭组', 400);
     }
 
     // 权限校验：owner 或 admin
-    if (!requireRole(userId, ['owner', 'admin'])) {
+    if (!(await requireRole(userId, ['owner', 'admin']))) {
       return forbidden('无权限操作');
     }
 
@@ -232,7 +235,7 @@ export class FamilyController {
     const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
     const code = generateInviteCode();
 
-    const newInvitation = insert<Invitation>(invitations, {
+    const newInvitation = await invitations.insert({
       id: uuid(),
       code,
       familyId: family.id,
@@ -250,19 +253,18 @@ export class FamilyController {
   @Get('/invitations')
   async listInvitations(ctx: Context): Promise<ApiResponse> {
     const { userId } = ctx.state.user as { userId: string; username: string };
-    const family = findUserFamily(userId);
+    const family = await findUserFamily(userId);
 
     if (!family) {
       return fail('未加入家庭组', 400);
     }
 
-    if (!requireRole(userId, ['owner', 'admin'])) {
+    if (!(await requireRole(userId, ['owner', 'admin']))) {
       return forbidden('无权限操作');
     }
 
     const now = new Date();
-    const list = filterBy(
-      invitations,
+    const list = await invitations.findAll(
       (i) => i.familyId === family.id && !i.used && new Date(i.expiresAt) > now
     );
     return ok(list);
@@ -279,7 +281,7 @@ export class FamilyController {
       return fail('邀请码不能为空', 400);
     }
 
-    const invitation = findByField(invitations, 'code', code.trim());
+    const invitation = await invitations.findByField('code', code.trim());
     // 找不到 / 已过期 → 统一返回"邀请码无效或已过期"
     if (!invitation || new Date(invitation.expiresAt) <= new Date()) {
       return fail('邀请码无效或已过期', 400);
@@ -290,9 +292,10 @@ export class FamilyController {
     }
 
     // 校验当前用户是否已加入该家庭组
-    const existed = family_members.find(
+    const existedArr = await family_members.findAll(
       (m) => m.familyId === invitation.familyId && m.userId === userId
     );
+    const existed = existedArr[0];
     if (existed) {
       return fail('已加入该家庭组', 400);
     }
@@ -300,7 +303,7 @@ export class FamilyController {
     const now = new Date().toISOString();
 
     // 创建成员关系：role='member'
-    insert<FamilyMember>(family_members, {
+    await family_members.insert({
       id: uuid(),
       familyId: invitation.familyId,
       userId,
@@ -309,12 +312,12 @@ export class FamilyController {
     });
 
     // 标记邀请码已使用
-    updateById(invitations, invitation.id, { used: true });
+    await invitations.updateById(invitation.id, { used: true });
 
     // 更新家庭组 memberCount + 1
-    const family = findByField(families, 'id', invitation.familyId);
+    const family = await families.findById(invitation.familyId);
     if (family) {
-      updateById(families, family.id, { memberCount: family.memberCount + 1 });
+      await families.updateById(family.id, { memberCount: family.memberCount + 1 });
     }
 
     return ok(family, '加入成功');
@@ -329,7 +332,7 @@ export class FamilyController {
   @Get('/recipes')
   async listRecipes(ctx: Context): Promise<ApiResponse> {
     const { userId } = ctx.state.user as { userId: string; username: string };
-    const family = findUserFamily(userId);
+    const family = await findUserFamily(userId);
 
     if (!family) {
       return ok([]);
@@ -340,7 +343,7 @@ export class FamilyController {
     const category = ctx.query.category as string | undefined;
 
     // 基础过滤：同家庭组 + 未删除
-    let list = filterBy(family_recipes, (r) => r.familyId === family.id && !r.isDeleted);
+    let list = await family_recipes.findAll((r) => r.familyId === family.id && !r.isDeleted);
 
     // 可见性过滤
     if (visibility === 'family') {
@@ -389,13 +392,13 @@ export class FamilyController {
       return fail('食材清单不能为空', 400);
     }
 
-    const family = findUserFamily(userId);
+    const family = await findUserFamily(userId);
     if (!family) {
       return fail('未加入家庭组', 400);
     }
 
     const now = new Date().toISOString();
-    const newRecipe = insert<FamilyRecipe>(family_recipes, {
+    const newRecipe = await family_recipes.insert({
       id: uuid(),
       familyId: family.id,
       name: body.name.trim(),
@@ -424,7 +427,7 @@ export class FamilyController {
     const recipeId = ctx.params.id as string;
     const { visibility } = (ctx.request.body || {}) as { visibility?: RecipeVisibility };
 
-    const recipe = findById(family_recipes, recipeId);
+    const recipe = await family_recipes.findById(recipeId);
     // 找不到或已删除 → 菜谱不存在
     if (!recipe || recipe.isDeleted) {
       return fail('菜谱不存在', 404);
@@ -440,7 +443,7 @@ export class FamilyController {
       return fail('visibility 参数不合法', 400);
     }
 
-    const updated = updateById<FamilyRecipe>(family_recipes, recipeId, { visibility });
+    const updated = await family_recipes.updateById(recipeId, { visibility });
     return ok(updated);
   }
 
@@ -453,13 +456,13 @@ export class FamilyController {
   @Get('/menu')
   async getMenu(ctx: Context): Promise<ApiResponse> {
     const { userId } = ctx.state.user as { userId: string; username: string };
-    const family = findUserFamily(userId);
+    const family = await findUserFamily(userId);
 
     if (!family) {
       return ok([]);
     }
 
-    const list = filterBy(weekly_menu, (m) => m.familyId === family.id);
+    const list = await weekly_menu.findAll((m) => m.familyId === family.id);
     // 排序：先按天，再按餐次
     list.sort((a, b) => {
       if (a.dayOfWeek !== b.dayOfWeek) return a.dayOfWeek - b.dayOfWeek;
@@ -492,17 +495,18 @@ export class FamilyController {
       return fail('recipeId 和 recipeName 不能为空', 400);
     }
 
-    const family = findUserFamily(userId);
+    const family = await findUserFamily(userId);
     if (!family) {
       return fail('未加入家庭组', 400);
     }
 
     // 若该天该餐次已有菜单项 → 替换（更新 recipeId / recipeName / 重置投票）
-    const existing = weekly_menu.find(
+    const existingArr = await weekly_menu.findAll(
       (m) => m.familyId === family.id && m.dayOfWeek === dayOfWeek && m.mealType === mealType
     );
+    const existing = existingArr[0];
     if (existing) {
-      const updated = updateById<WeeklyMenuItem>(weekly_menu, existing.id, {
+      const updated = await weekly_menu.updateById(existing.id, {
         recipeId,
         recipeName,
         votes: { likes: 0, dislikes: 0 },
@@ -511,7 +515,7 @@ export class FamilyController {
     }
 
     // 否则插入新项
-    const newItem = insert<WeeklyMenuItem>(weekly_menu, {
+    const newItem = await weekly_menu.insert({
       id: uuid(),
       familyId: family.id,
       weekStart: getCurrentMonday(),
@@ -537,7 +541,7 @@ export class FamilyController {
       return fail('vote 参数不合法', 400);
     }
 
-    const item = findById(weekly_menu, menuItemId);
+    const item = await weekly_menu.findById(menuItemId);
     if (!item) {
       return fail('菜单项不存在', 404);
     }
@@ -568,7 +572,7 @@ export class FamilyController {
     }
 
     const updatedVotes: MenuVotes = { likes, dislikes, voters };
-    updateById<WeeklyMenuItem>(weekly_menu, menuItemId, { votes: updatedVotes });
+    await weekly_menu.updateById(menuItemId, { votes: updatedVotes });
 
     return ok({ likes, dislikes });
   }
@@ -582,13 +586,13 @@ export class FamilyController {
   @Get('/shopping')
   async getShopping(ctx: Context): Promise<ApiResponse> {
     const { userId } = ctx.state.user as { userId: string; username: string };
-    const family = findUserFamily(userId);
+    const family = await findUserFamily(userId);
 
     if (!family) {
       return ok([]);
     }
 
-    const list = filterBy(shopping_items, (i) => i.familyId === family.id);
+    const list = await shopping_items.findAll((i) => i.familyId === family.id);
     return ok(list);
   }
 
@@ -608,17 +612,17 @@ export class FamilyController {
       return fail('名称不能为空', 400);
     }
 
-    const family = findUserFamily(userId);
+    const family = await findUserFamily(userId);
     if (!family) {
       return fail('未加入家庭组', 400);
     }
 
     // 计算当前家庭组最大 sort，+1 作为新项 sort
-    const familyItems = filterBy(shopping_items, (i) => i.familyId === family.id);
+    const familyItems = await shopping_items.findAll((i) => i.familyId === family.id);
     const maxSort = familyItems.reduce((max, i) => Math.max(max, i.sort), 0);
     const now = new Date().toISOString();
 
-    const newItem = insert<ShoppingItem>(shopping_items, {
+    const newItem = await shopping_items.insert({
       id: uuid(),
       familyId: family.id,
       name: name.trim(),
@@ -640,7 +644,7 @@ export class FamilyController {
     const itemId = ctx.params.id as string;
     const { checked } = (ctx.request.body || {}) as { checked?: boolean };
 
-    const item = findById(shopping_items, itemId);
+    const item = await shopping_items.findById(itemId);
     if (!item) {
       return fail('购物项不存在', 404);
     }
@@ -654,7 +658,7 @@ export class FamilyController {
       patch.checkedAt = new Date().toISOString();
     }
 
-    const updated = updateById<ShoppingItem>(shopping_items, itemId, patch);
+    const updated = await shopping_items.updateById(itemId, patch);
     return ok(updated);
   }
 
@@ -664,11 +668,12 @@ export class FamilyController {
   async deleteShopping(ctx: Context): Promise<ApiResponse> {
     const itemId = ctx.params.id as string;
 
-    const idx = shopping_items.findIndex((i) => i.id === itemId);
+    const shoppingArr = await shopping_items.toArray();
+    const idx = shoppingArr.findIndex((i) => i.id === itemId);
     if (idx === -1) {
       return fail('购物项不存在', 404);
     }
-    shopping_items.splice(idx, 1);
+    shoppingArr.splice(idx, 1);
     return ok(null, '已删除');
   }
 
@@ -677,7 +682,7 @@ export class FamilyController {
   @Post('/shopping/generate')
   async generateShopping(ctx: Context): Promise<ApiResponse> {
     const { userId } = ctx.state.user as { userId: string; username: string };
-    const family = findUserFamily(userId);
+    const family = await findUserFamily(userId);
 
     // 未加入家庭组
     if (!family) {
@@ -685,7 +690,7 @@ export class FamilyController {
     }
 
     // 获取本周菜单
-    const menuItems = filterBy(weekly_menu, (m) => m.familyId === family.id);
+    const menuItems = await weekly_menu.findAll((m) => m.familyId === family.id);
     if (menuItems.length === 0) {
       return ok({ added: 0, skipped: 0, message: '本周菜单为空，请先添加菜单' } as ShoppingGenerateResult);
     }
@@ -693,7 +698,7 @@ export class FamilyController {
     // 聚合食材：Map<name+unit, RecipeIngredient> 用于跨菜谱去重
     const ingredientMap = new Map<string, RecipeIngredient>();
     for (const menu of menuItems) {
-      const recipe = findById(family_recipes, menu.recipeId);
+      const recipe = await family_recipes.findById(menu.recipeId);
       if (!recipe || recipe.isDeleted) continue;
       for (const ing of recipe.ingredients) {
         const key = `${ing.name}|${ing.unit}`;
@@ -704,7 +709,7 @@ export class FamilyController {
     }
 
     // 计算当前家庭组最大 sort，新条目依次递增
-    const familyItems = filterBy(shopping_items, (i) => i.familyId === family.id);
+    const familyItems = await shopping_items.findAll((i) => i.familyId === family.id);
     const maxSort = familyItems.reduce((max, i) => Math.max(max, i.sort), 0);
 
     let added = 0;
@@ -714,14 +719,14 @@ export class FamilyController {
 
     for (const ing of ingredientMap.values()) {
       // 检查 shopping_items 中是否已存在相同 name 的条目（shopping_items 无独立 unit 字段，按名称去重）
-      const exists = shopping_items.some(
+      const exists = (await shopping_items.count(
         (i) => i.familyId === family.id && i.name === ing.name
-      );
+      )) > 0;
       if (exists) {
         skipped += 1;
         continue;
       }
-      insert<ShoppingItem>(shopping_items, {
+      await shopping_items.insert({
         id: uuid(),
         familyId: family.id,
         name: ing.name,
@@ -747,21 +752,22 @@ export class FamilyController {
   @Get('/records')
   async listFamilyRecords(ctx: Context): Promise<ApiResponse> {
     const { userId } = ctx.state.user as { userId: string; username: string };
-    const family = findUserFamily(userId);
+    const family = await findUserFamily(userId);
 
     if (!family) {
       return ok({ list: [], total: 0, page: 1, pageSize: 20 });
     }
 
     // 获取家庭成员的 userId 列表
-    const memberUserIds = filterBy(family_members, (m) => m.familyId === family.id).map((m) => m.userId);
+    const members = await family_members.findAll((m) => m.familyId === family.id);
+    const memberUserIds = members.map((m) => m.userId);
 
     // 分页参数
     const page = Math.max(1, Number(ctx.query.page) || 1);
     const pageSize = Math.max(1, Number(ctx.query.pageSize) || 20);
 
     // 过滤：属于家庭成员 + 未删除
-    let list = filterBy(records, (r) => memberUserIds.includes(r.userId) && !r.isDeleted);
+    let list = await records.findAll((r) => memberUserIds.includes(r.userId) && !r.isDeleted);
 
     // 按 createdAt 降序
     list.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
@@ -771,13 +777,14 @@ export class FamilyController {
     const pagedList = list.slice(start, start + pageSize);
 
     // 构造 FamilyRecordItem
-    const items: FamilyRecordItem[] = pagedList.map((record) => {
-      const user = findByField(users, 'id', record.userId);
-      const likes = filterBy(record_likes, (l) => l.recordId === record.id);
-      const comments = filterBy(record_comments, (c) => c.recordId === record.id);
+    const items: FamilyRecordItem[] = [];
+    for (const record of pagedList) {
+      const user = await users.findById(record.userId);
+      const likes = await record_likes.findAll((l) => l.recordId === record.id);
+      const comments = await record_comments.findAll((c) => c.recordId === record.id);
       const likedByMe = likes.some((l) => l.userId === userId);
 
-      return {
+      items.push({
         id: record.id,
         userId: record.userId,
         userNickname: user?.nickname ?? '',
@@ -793,8 +800,8 @@ export class FamilyController {
         commentCount: comments.length,
         likedByMe,
         comments: comments.sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1)),
-      };
-    });
+      });
+    }
 
     return ok({ list: items, total, page, pageSize });
   }
@@ -807,25 +814,27 @@ export class FamilyController {
     const recordId = ctx.params.id as string;
 
     // 检查记录是否存在
-    const record = findById(records, recordId);
+    const record = await records.findById(recordId);
     if (!record || record.isDeleted) {
       return fail('记录不存在', 404);
     }
 
     // 检查是否已点赞
-    const existingLike = record_likes.find(
+    const existingLikeArr = await record_likes.findAll(
       (l) => l.recordId === recordId && l.userId === userId
     );
+    const existingLike = existingLikeArr[0];
 
     if (existingLike) {
       // 已点赞 → 取消点赞
-      const idx = record_likes.indexOf(existingLike);
-      record_likes.splice(idx, 1);
+      const likesArr = await record_likes.toArray();
+      const idx = likesArr.indexOf(existingLike);
+      likesArr.splice(idx, 1);
       return ok({ liked: false, message: '已取消点赞' });
     }
 
     // 未点赞 → 新增点赞
-    insert<RecordLike>(record_likes, {
+    await record_likes.insert({
       id: uuid(),
       recordId,
       userId,
@@ -847,16 +856,16 @@ export class FamilyController {
     }
 
     // 检查记录是否存在
-    const record = findById(records, recordId);
+    const record = await records.findById(recordId);
     if (!record || record.isDeleted) {
       return fail('记录不存在', 404);
     }
 
     // 获取用户昵称
-    const user = findByField(users, 'id', userId);
+    const user = await users.findById(userId);
     const userNickname = user?.nickname ?? '匿名';
 
-    const newComment = insert<RecordComment>(record_comments, {
+    const newComment = await record_comments.insert({
       id: uuid(),
       recordId,
       userId,
@@ -881,7 +890,7 @@ export class FamilyController {
   @Get('/report')
   async getReport(ctx: Context): Promise<ApiResponse> {
     const { userId } = ctx.state.user as { userId: string; username: string };
-    const family = findUserFamily(userId);
+    const family = await findUserFamily(userId);
 
     // 默认当月 YYYY-MM
     const now = new Date();
@@ -902,7 +911,7 @@ export class FamilyController {
       return ok(emptyReport);
     }
 
-    const report = generateFamilyDietReport(family.id, month);
+    const report = await generateFamilyDietReport(family.id, month);
     return ok(report);
   }
 }

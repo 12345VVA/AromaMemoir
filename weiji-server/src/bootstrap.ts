@@ -1,6 +1,12 @@
 // 应用启动入口
 // 简化方案：koa + 装饰器扫描，规避 Midway.js DI 容器复杂性，保证 dev 命令可稳定启动
 // 与 Midway 风格保持兼容：装饰器 API（@Controller/@Get/@Post）一致，后续可平滑迁移
+//
+// 配置外置（production-readiness-backend Task 6）：
+// 必须在 configuration / db 等 import 之前加载 .env，故 `import 'dotenv/config'` 置于首个 import。
+// 测试入口（createApp）不经过 bootstrap() 的启动校验，且 memory 模式 + 开发默认 JWT 不依赖 .env。
+
+import 'dotenv/config';
 
 import Koa from 'koa';
 import Router from '@koa/router';
@@ -20,6 +26,7 @@ import { GamificationController } from './controller/gamification.controller';
 import { getControllerPrefix, getRouteDefinitions, RouteDefinition } from './common/decorators';
 import { jwtMiddleware } from './middleware/jwt.middleware';
 import { AiProxyService } from './service/ai-proxy.service';
+import { getPool, testConnection } from './store/mysql-pool';
 // 引入 db.ts 以在启动时初始化种子数据并打印统计日志
 import './store/db';
 
@@ -126,6 +133,37 @@ export async function createApp(): Promise<Koa> {
 // 启动 HTTP 服务（含 AI 健康检查定时任务）
 async function bootstrap(): Promise<void> {
   const app = await createApp();
+
+  // MySQL 模式启动校验（仅 driver=mysql 时执行；createApp 测试入口不触发，CI 无需 MySQL）
+  if (appConfig.storage.driver === 'mysql') {
+    const mysqlCfg = appConfig.storage.mysql;
+    // 1. 连通性校验：失败打印明确错误（含 host/port/database）并退出
+    try {
+      await testConnection();
+    } catch (err) {
+      console.error(
+        `[weiji-server] MySQL 连接失败：host=${mysqlCfg.host} port=${mysqlCfg.port} database=${mysqlCfg.database}`,
+      );
+      console.error('  原因：', err instanceof Error ? err.message : err);
+      process.exit(1);
+    }
+    // 2. 关键表存在性校验（不自动建表）：缺失则打印 init.sql 执行指引并退出
+    try {
+      const [tableRows] = await getPool().query('SHOW TABLES LIKE ?', ['users']);
+      if (!Array.isArray(tableRows) || tableRows.length === 0) {
+        console.error(
+          `[weiji-server] MySQL 库 \`${mysqlCfg.database}\` 中缺少 \`users\` 表，请先执行：mysql -u root -p < db/init.sql`,
+        );
+        process.exit(1);
+      }
+    } catch (err) {
+      console.error('[weiji-server] MySQL 表校验失败：', err instanceof Error ? err.message : err);
+      process.exit(1);
+    }
+    console.log(
+      `[weiji-server] MySQL 连接就绪：${mysqlCfg.host}:${mysqlCfg.port}/${mysqlCfg.database}`,
+    );
+  }
 
   // AI 服务健康检查：启动时立即检查一次，之后每 60 秒定时检查
   // 维护 AiProxyService.aiStatus 供 /health 端点动态暴露

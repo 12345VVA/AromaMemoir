@@ -1,8 +1,18 @@
 // 内存数据存储层 + 种子数据
 // 预填充与设计稿一致的种子数据，保证前端首次启动即可看到完整数据
 // 实体字段参考 /workspace/MVP开发速查手册.md 第 2.2 节
+//
+// 存储驱动（production-readiness-backend Task 5）：
+// - driver=memory（默认）：12 个实体走 InMemoryRepository + 种子数据
+// - driver=mysql：12 个实体走 MysqlRepository 直接读写数据库（init.sql 自带种子，代码层不注入）
+//   pokedexCatalog / personalityTypes（无 id 的裸数组）与 blindGuessRounds / record_likes /
+//   record_comments（不在 init.sql 12 表内）在任何驱动下均保持内存实现。
 
 import bcrypt from 'bcryptjs';
+import { appConfig } from '../configuration';
+import { InMemoryRepository } from './in-memory-repository';
+import { MysqlRepository } from './mysql-repository';
+import type { Repository } from './repository';
 import type {
   User,
   Family,
@@ -24,6 +34,29 @@ import type {
   RecordLike,
   RecordComment,
 } from './types';
+
+// ============================================================
+// 存储驱动工厂
+// ============================================================
+
+const isMysql = appConfig.storage.driver === 'mysql';
+
+// 工厂：根据驱动选择 Repository 实现
+// - memory 模式：InMemoryRepository + 种子数据
+// - mysql 模式：MysqlRepository 直接读写数据库（不注入种子，由 init.sql 提供）
+//   Repository 接口已统一为 async，MysqlRepository 与 InMemoryRepository 均 implements Repository<T>，
+//   故 mysql 分支可直接返回 MysqlRepository 实例，无需类型桥接。
+function createRepo<T extends { id: string }>(
+  tableName: string,
+  jsonFields: string[],
+  softDelete: boolean,
+  seed: T[],
+): Repository<T> {
+  if (isMysql) {
+    return new MysqlRepository<T>(tableName, jsonFields, softDelete);
+  }
+  return new InMemoryRepository<T>(seed);
+}
 
 // ============================================================
 // 工具函数：日期计算
@@ -79,7 +112,7 @@ const PASSWORD_HASH = bcrypt.hashSync('123456', 10);
 // 4 名用户：demo + 妈妈 + 爸爸 + 奶奶
 // demo 用户昵称"小明"，为家庭组 owner
 // ============================================================
-export const users: User[] = [
+const usersSeed: User[] = [
   {
     id: 'user-demo-0001',
     username: 'demo',
@@ -125,12 +158,13 @@ export const users: User[] = [
     updatedAt: ISO_NOW,
   },
 ];
+export const users = createRepo<User>('users', [], false, usersSeed);
 
 // ============================================================
 // 种子数据：families
 // 1 个家庭组："王家厨房"，demo 用户为 owner，4 名成员
 // ============================================================
-export const families: Family[] = [
+const familiesSeed: Family[] = [
   {
     id: 'family-0001',
     name: '王家厨房',
@@ -142,12 +176,13 @@ export const families: Family[] = [
     updatedAt: ISO_NOW,
   },
 ];
+export const families = createRepo<Family>('families', [], true, familiesSeed);
 
 // ============================================================
 // 种子数据：family_members
 // 4 条记录：demo(owner) + 妈妈(admin) + 爸爸(member) + 奶奶(member)
 // ============================================================
-export const family_members: FamilyMember[] = [
+const family_membersSeed: FamilyMember[] = [
   {
     id: 'fm-0001',
     familyId: 'family-0001',
@@ -177,6 +212,7 @@ export const family_members: FamilyMember[] = [
     joinedAt: ISO_NOW,
   },
 ];
+export const family_members = createRepo<FamilyMember>('family_members', [], false, family_membersSeed);
 
 // ============================================================
 // 种子数据：family_recipes
@@ -184,7 +220,7 @@ export const family_members: FamilyMember[] = [
 // 3 道 family 可见，1 道 private（桂花糕）
 // coverUrl 使用 /workspace/weiji-web/assets/ 下的图片 URL
 // ============================================================
-export const family_recipes: FamilyRecipe[] = [
+const family_recipesSeed: FamilyRecipe[] = [
   {
     id: 'recipe-0001',
     familyId: 'family-0001',
@@ -296,12 +332,13 @@ export const family_recipes: FamilyRecipe[] = [
     updatedAt: ISO_NOW,
   },
 ];
+export const family_recipes = createRepo<FamilyRecipe>('family_recipes', ['ingredients', 'steps'], true, family_recipesSeed);
 
 // ============================================================
 // 种子数据：invitations
 // 1 条有效邀请码：WJ1234，24 小时后过期
 // ============================================================
-export const invitations: Invitation[] = [
+const invitationsSeed: Invitation[] = [
   {
     id: 'inv-0001',
     code: 'WJ1234',
@@ -312,12 +349,13 @@ export const invitations: Invitation[] = [
     createdAt: ISO_NOW,
   },
 ];
+export const invitations = createRepo<Invitation>('invitations', [], false, invitationsSeed);
 
 // ============================================================
 // 种子数据：records
 // 3 条美食记录（demo 用户的）
 // ============================================================
-export const records: Record[] = [
+const recordsSeed: Record[] = [
   {
     id: 'record-0001',
     userId: 'user-demo-0001',
@@ -386,6 +424,7 @@ export const records: Record[] = [
     updatedAt: ISO_NOW,
   },
 ];
+export const records = createRepo<Record>('records', ['nutrition', 'ingredients', 'tags'], true, recordsSeed);
 
 // ============================================================
 // 种子数据：weekly_menu
@@ -417,7 +456,7 @@ for (let day = 1; day <= 7; day++) {
   });
 }
 
-export const weekly_menu: WeeklyMenuItem[] = WEEK_RECIPES.map((item, i) => ({
+const weekly_menuSeed: WeeklyMenuItem[] = WEEK_RECIPES.map((item, i) => ({
   id: `menu-${String(i + 1).padStart(4, '0')}`,
   familyId: 'family-0001',
   weekStart: MONDAY,
@@ -427,6 +466,7 @@ export const weekly_menu: WeeklyMenuItem[] = WEEK_RECIPES.map((item, i) => ({
   recipeName: item.recipeName,
   votes: { likes: 0, dislikes: 0 },
 }));
+export const weekly_menu = createRepo<WeeklyMenuItem>('weekly_menu', ['votes'], false, weekly_menuSeed);
 
 // ============================================================
 // 种子数据：shopping_items
@@ -455,7 +495,7 @@ const SHOP_BASE: Array<{
   { name: '牛奶', category: '乳制品', quantity: '1L', checked: true, checkedBy: 'user-dad-0003', sort: 7 },
 ];
 
-export const shopping_items: ShoppingItem[] = SHOP_BASE.map((item, i) => ({
+const shopping_itemsSeed: ShoppingItem[] = SHOP_BASE.map((item, i) => ({
   id: `shop-${String(i + 1).padStart(4, '0')}`,
   familyId: 'family-0001',
   name: item.name,
@@ -468,12 +508,13 @@ export const shopping_items: ShoppingItem[] = SHOP_BASE.map((item, i) => ({
   createdAt: ISO_NOW,
   updatedAt: ISO_NOW,
 }));
+export const shopping_items = createRepo<ShoppingItem>('shopping_items', [], false, shopping_itemsSeed);
 
 // ============================================================
 // 种子数据：achievements
 // 6 枚徽章（与 MVP 速查手册表 2.2 一致）
 // ============================================================
-export const achievements: AchievementDef[] = [
+const achievementsSeed: AchievementDef[] = [
   {
     id: 'ach-0001',
     code: 'first_record',
@@ -535,12 +576,13 @@ export const achievements: AchievementDef[] = [
     expReward: 100,
   },
 ];
+export const achievements = createRepo<AchievementDef>('achievements', ['condition'], false, achievementsSeed);
 
 // ============================================================
 // 种子数据：user_achievements
 // 2 条：demo 用户已解锁 first_record 和 streak_7
 // ============================================================
-export const user_achievements: UserAchievement[] = [
+const user_achievementsSeed: UserAchievement[] = [
   {
     id: 'ua-0001',
     userId: 'user-demo-0001',
@@ -554,16 +596,17 @@ export const user_achievements: UserAchievement[] = [
     earnedAt: daysAgoIso(1),
   },
 ];
+export const user_achievements = createRepo<UserAchievement>('user_achievements', [], false, user_achievementsSeed);
 
 // ============================================================
 // 种子数据：check_ins
 // 演示账号最近 7 天的打卡记录（7 条），用于连续天数计算
 // ============================================================
-export const check_ins: CheckIn[] = [];
+const check_insSeed: CheckIn[] = [];
 const DEMO_CHECKIN_COUNTS = [1, 2, 1, 3, 2, 1, 1]; // 固定值，避免随机性带来的不可重现
 for (let i = 6; i >= 0; i--) {
   const seq = 7 - i; // 1..7
-  check_ins.push({
+  check_insSeed.push({
     id: `ci-${String(seq).padStart(4, '0')}`,
     userId: 'user-demo-0001',
     checkDate: daysAgo(i),
@@ -572,12 +615,13 @@ for (let i = 6; i >= 0; i--) {
     createdAt: daysAgoIso(i),
   });
 }
+export const check_ins = createRepo<CheckIn>('check_ins', [], false, check_insSeed);
 
 // ============================================================
 // 种子数据：challenges
 // 3 个挑战：一周素食挑战 / 环球美食月 / 家庭厨艺大赛
 // ============================================================
-export const challenges: Challenge[] = [
+const challengesSeed: Challenge[] = [
   {
     id: 'chal-0001',
     title: '一周素食挑战',
@@ -627,6 +671,7 @@ export const challenges: Challenge[] = [
     createdAt: ISO_NOW,
   },
 ];
+export const challenges = createRepo<Challenge>('challenges', ['rules'], false, challengesSeed);
 
 // ============================================================
 // 种子数据：pokedexCatalog（美食图鉴全量目录）
@@ -634,7 +679,7 @@ export const challenges: Challenge[] = [
 // 这些是"图鉴全部格子"，与用户是否记录过无关；运行时由 aggregatePokedex 与用户记录交叉对比
 // 稀有度分布约 60% common / 25% rare / 10% epic / 5% legendary
 // ============================================================
-export const pokedexCatalog: PokedexCatalogEntry[] = [
+const pokedexCatalogSeed: PokedexCatalogEntry[] = [
   // 家常菜（6 道）
   { dishName: '番茄炒蛋', category: '家常菜', rarity: 'common' },
   { dishName: '红烧肉', category: '家常菜', rarity: 'common' },
@@ -679,13 +724,16 @@ export const pokedexCatalog: PokedexCatalogEntry[] = [
   { dishName: '寿喜烧', category: '日料', rarity: 'rare' },
   { dishName: '怀石料理', category: '日料', rarity: 'legendary' },
 ];
+// 注：pokedexCatalog / personalityTypes 为无 id 的目录/映射表数据，
+// 不符合 Repository<T extends { id: string }> 约束，保持裸数组导出（与 spec Task 5 列出的 12 个实体一致）
+export const pokedexCatalog: PokedexCatalogEntry[] = pokedexCatalogSeed;
 
 // ============================================================
 // 种子数据：personalityTypes（人格类型映射表）
 // 8 种美食人格，含 code/name/description/traits[]/shareText
 // shareText 为预格式化的社交分享文案；buildPersonalityReport 也可使用模板动态生成
 // ============================================================
-export const personalityTypes: PersonalityTypeDef[] = [
+const personalityTypesSeed: PersonalityTypeDef[] = [
   {
     code: 'carb_lover',
     name: '碳水爱好者',
@@ -743,17 +791,18 @@ export const personalityTypes: PersonalityTypeDef[] = [
     shareText: '我是「美食冒险家」——你的味蕾永远在路上，乐于尝试各种风格与新颖的菜品。来味记测测你的美食人格！',
   },
 ];
+export const personalityTypes: PersonalityTypeDef[] = personalityTypesSeed;
 
 // ============================================================
 // 种子数据：blindGuessRounds（盲猜轮次内存表）
 // 初始为空数组，运行时由控制器动态创建
 // ============================================================
-export const blindGuessRounds: BlindGuessRound[] = [];
+export const blindGuessRounds = new InMemoryRepository<BlindGuessRound>([]);
 
 // ============================================================
 // 种子数据：record_likes（记录点赞）
 // ============================================================
-export const record_likes: RecordLike[] = [
+const record_likesSeed: RecordLike[] = [
   {
     id: 'rl-0001',
     recordId: 'rec-0001',
@@ -767,11 +816,12 @@ export const record_likes: RecordLike[] = [
     createdAt: daysAgoIso(1),
   },
 ];
+export const record_likes = new InMemoryRepository<RecordLike>(record_likesSeed);
 
 // ============================================================
 // 种子数据：record_comments（记录评论）
 // ============================================================
-export const record_comments: RecordComment[] = [
+const record_commentsSeed: RecordComment[] = [
   {
     id: 'rc-0001',
     recordId: 'rec-0001',
@@ -789,26 +839,38 @@ export const record_comments: RecordComment[] = [
     createdAt: daysAgoIso(1),
   },
 ];
+export const record_comments = new InMemoryRepository<RecordComment>(record_commentsSeed);
 
 // ============================================================
-// 启动时打印种子数据统计（验证可见）
+// 启动时打印存储统计（验证可见）
+// - memory 模式：打印各仓库种子数据条数（Repository.count 已为 async，db.ts 顶层不能 await，
+//   故直接用种子数组的 .length，与内存种子条数等价）
+// - mysql 模式：12 个实体走 MysqlRepository，跳过内存统计，仅打印驱动信息
 // ============================================================
-console.log('[store] 种子数据加载完成:');
-console.log(`  - users count: ${users.length}`);
-console.log(`  - families count: ${families.length}`);
-console.log(`  - family_members count: ${family_members.length}`);
-console.log(`  - family_recipes count: ${family_recipes.length}`);
-console.log(`  - invitations count: ${invitations.length}`);
-console.log(`  - records count: ${records.length}`);
-console.log(`  - weekly_menu count: ${weekly_menu.length}`);
-console.log(`  - shopping_items count: ${shopping_items.length}`);
-console.log(`  - achievements count: ${achievements.length}`);
-console.log(`  - user_achievements count: ${user_achievements.length}`);
-console.log(`  - check_ins count: ${check_ins.length}`);
-console.log(`  - challenges count: ${challenges.length}`);
-console.log(`  - pokedexCatalog count: ${pokedexCatalog.length}`);
-console.log(`  - personalityTypes count: ${personalityTypes.length}`);
-console.log(`  - blindGuessRounds count: ${blindGuessRounds.length}`);
-console.log(`  - record_likes count: ${record_likes.length}`);
-console.log(`  - record_comments count: ${record_comments.length}`);
-console.log(`[store] 演示账号：demo / 123456`);
+if (!isMysql) {
+  console.log('[store] 种子数据加载完成:');
+  console.log(`  - users count: ${usersSeed.length}`);
+  console.log(`  - families count: ${familiesSeed.length}`);
+  console.log(`  - family_members count: ${family_membersSeed.length}`);
+  console.log(`  - family_recipes count: ${family_recipesSeed.length}`);
+  console.log(`  - invitations count: ${invitationsSeed.length}`);
+  console.log(`  - records count: ${recordsSeed.length}`);
+  console.log(`  - weekly_menu count: ${weekly_menuSeed.length}`);
+  console.log(`  - shopping_items count: ${shopping_itemsSeed.length}`);
+  console.log(`  - achievements count: ${achievementsSeed.length}`);
+  console.log(`  - user_achievements count: ${user_achievementsSeed.length}`);
+  console.log(`  - check_ins count: ${check_insSeed.length}`);
+  console.log(`  - challenges count: ${challengesSeed.length}`);
+  console.log(`  - pokedexCatalog count: ${pokedexCatalog.length}`);
+  console.log(`  - personalityTypes count: ${personalityTypes.length}`);
+  console.log(`  - blindGuessRounds count: 0`);
+  console.log(`  - record_likes count: ${record_likesSeed.length}`);
+  console.log(`  - record_comments count: ${record_commentsSeed.length}`);
+  console.log(`[store] 演示账号：demo / 123456`);
+} else {
+  const m = appConfig.storage.mysql;
+  console.log(
+    `[store] 存储驱动：mysql（${m.host}:${m.port}/${m.database}），12 个实体走 MysqlRepository，数据由 db/init.sql 提供`,
+  );
+  console.log(`[store] pokedexCatalog / personalityTypes / blindGuessRounds / record_likes / record_comments 保持内存实现`);
+}

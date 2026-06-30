@@ -10,7 +10,7 @@ import asyncio
 import os
 import uuid
 
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -37,7 +37,7 @@ app = FastAPI(title="味记 AI 服务", version="0.1.0")
 # ============================================================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -48,6 +48,24 @@ log_config_status()
 
 # 确保静态文件目录存在（beautify 端点降级时落盘原图使用）
 os.makedirs('static', exist_ok=True)
+
+# /static 路径访问限制：仅允许白名单 Referer 的请求，阻止匿名外部枚举
+STATIC_ALLOWED_REFERERS = (
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://localhost:8001',
+)
+
+
+@app.middleware('http')
+async def restrict_static(request: Request, call_next):
+    if request.url.path.startswith('/static'):
+        referer = request.headers.get('referer', '')
+        if not any(referer.startswith(allowed) for allowed in STATIC_ALLOWED_REFERERS):
+            return JSONResponse(status_code=403, content={'code': 403, 'message': 'Forbidden'})
+    return await call_next(request)
+
+
 app.mount('/static', StaticFiles(directory='static'), name='static')
 
 

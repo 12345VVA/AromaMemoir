@@ -78,3 +78,38 @@ def test_sticker_returns_mock(client: TestClient):
     assert data['code'] == 0
     # sticker 始终返回 mock，message 在 data 内
     assert '开发中' in data['data']['message']
+
+
+# ============================================================
+# Task 2: CORS 白名单
+# ============================================================
+def test_cors_whitelisted_origin_echoed(client: TestClient):
+    # 白名单 Origin 应在响应头回显 access-control-allow-origin
+    res = client.get('/health', headers={'Origin': 'http://localhost:5173'})
+    assert res.status_code == 200
+    assert res.headers.get('access-control-allow-origin') == 'http://localhost:5173'
+
+
+def test_cors_non_whitelisted_origin_not_echoed(client: TestClient):
+    # 非白名单 Origin 不应回显
+    res = client.get('/health', headers={'Origin': 'https://evil.example.com'})
+    assert res.status_code == 200
+    assert res.headers.get('access-control-allow-origin') != 'https://evil.example.com'
+
+
+# ============================================================
+# Task 13: /static 访问限制
+# ============================================================
+def test_static_no_referer_returns_403(client: TestClient):
+    # 无 Referer 访问 /static 应被中间件拦截为 403
+    res = client.get('/static/nonexistent.jpg')
+    assert res.status_code == 403
+
+
+def test_static_whitelisted_referer_passes_middleware(client: TestClient):
+    # 白名单 Referer 不被中间件拦截（文件不存在返回 404，关键是未被 403 拦截）
+    res = client.get(
+        '/static/nonexistent.jpg',
+        headers={'Referer': 'http://localhost:5173/'},
+    )
+    assert res.status_code != 403

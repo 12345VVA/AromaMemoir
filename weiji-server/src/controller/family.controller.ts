@@ -5,7 +5,7 @@
 
 import type { Context } from 'koa';
 import { Controller, Get, Post, Patch, Delete } from '../common/decorators';
-import { ok, fail, forbidden, type ApiResponse } from '../common/response';
+import { ok, fail, forbidden, escapeHtml, type ApiResponse } from '../common/response';
 import {
   families,
   family_members,
@@ -126,9 +126,11 @@ export class FamilyController {
     if (!membership) return ok([]);
 
     const members = await family_members.findAll((m) => m.familyId === membership.familyId);
+    const allUsers = await users.toArray();
+    const userMap = new Map(allUsers.map(u => [u.id, u]));
     const list = [];
     for (const m of members) {
-      const user = await users.findById(m.userId);
+      const user = userMap.get(m.userId);
       list.push({
         id: m.id,
         userId: m.userId,
@@ -776,12 +778,30 @@ export class FamilyController {
     const start = (page - 1) * pageSize;
     const pagedList = list.slice(start, start + pageSize);
 
+    // 批量预加载，避免 N+1 查询
+    const allUsers = await users.toArray();
+    const userMap = new Map(allUsers.map(u => [u.id, u]));
+    const allLikes = await record_likes.toArray();
+    const likesByRecord = new Map<string, typeof allLikes>();
+    for (const l of allLikes) {
+      const arr = likesByRecord.get(l.recordId) ?? [];
+      arr.push(l);
+      likesByRecord.set(l.recordId, arr);
+    }
+    const allComments = await record_comments.toArray();
+    const commentsByRecord = new Map<string, typeof allComments>();
+    for (const c of allComments) {
+      const arr = commentsByRecord.get(c.recordId) ?? [];
+      arr.push(c);
+      commentsByRecord.set(c.recordId, arr);
+    }
+
     // 构造 FamilyRecordItem
     const items: FamilyRecordItem[] = [];
     for (const record of pagedList) {
-      const user = await users.findById(record.userId);
-      const likes = await record_likes.findAll((l) => l.recordId === record.id);
-      const comments = await record_comments.findAll((c) => c.recordId === record.id);
+      const user = userMap.get(record.userId);
+      const likes = likesByRecord.get(record.id) ?? [];
+      const comments = commentsByRecord.get(record.id) ?? [];
       const likedByMe = likes.some((l) => l.userId === userId);
 
       items.push({
@@ -799,7 +819,7 @@ export class FamilyController {
         likeCount: likes.length,
         commentCount: comments.length,
         likedByMe,
-        comments: comments.sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1)),
+        comments: [...comments].sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1)),
       });
     }
 
@@ -870,7 +890,7 @@ export class FamilyController {
       recordId,
       userId,
       userNickname,
-      content: content.trim(),
+      content: escapeHtml(content.trim()),
       createdAt: new Date().toISOString(),
     });
 

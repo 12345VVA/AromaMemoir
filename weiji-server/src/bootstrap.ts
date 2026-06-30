@@ -12,6 +12,8 @@ import Koa from 'koa';
 import Router from '@koa/router';
 import cors from '@koa/cors';
 import bodyParser from 'koa-bodyparser';
+import helmet from 'koa-helmet';
+import rateLimit from 'koa-ratelimit';
 import { appConfig, Configuration } from './configuration';
 import { HealthController } from './controller/health.controller';
 import { AuthController } from './controller/auth.controller';
@@ -43,6 +45,9 @@ const controllers: Array<{ new (...args: unknown[]): unknown }> = [
   AiController,
   GamificationController,
 ];
+
+// 速率限制覆盖的敏感路径（登录 / 注册 / 邀请码加入）：5 次/分钟/IP 防暴力破解
+const RATE_LIMITED_PATHS = new Set(['/api/auth/login', '/api/auth/register', '/api/family/join']);
 
 // 将控制器内的路由元数据注册到 koa-router
 function registerController(router: Router, ControllerClass: { new (...args: unknown[]): unknown }): void {
@@ -82,6 +87,10 @@ export async function createApp(): Promise<Koa> {
   const app = new Koa();
   const router = new Router();
 
+  // 0. 安全响应头（X-Content-Type-Options / X-Frame-Options / HSTS 等）
+  // 关闭 CSP 以避免破坏现有内联脚本，其余默认头全部启用
+  app.use(helmet({ contentSecurityPolicy: false }));
+
   // 1. CORS 中间件（允许前端 5173 跨域 + 携带 Authorization）
   // @koa/cors 的 origin 只接受 string 或 function，需将数组转换为回调
   const allowedOrigins = appConfig.cors.origin;
@@ -105,25 +114,44 @@ export async function createApp(): Promise<Koa> {
   // 2. body parser（解析 JSON / form / multipart 文本部分）
   app.use(bodyParser({ jsonLimit: '20mb', formLimit: '10mb' }));
 
-  // 3. JWT 认证中间件（白名单：/health、/api/auth/login、/api/auth/register、OPTIONS 预检）
-  // 顺序：cors → bodyParser → jwtMiddleware → router.routes()
+  // 3. 速率限制：对登录/注册/邀请码加入端点限流 5 次/分钟/IP（防暴力破解）
+  // 在 jwtMiddleware 之前执行，使限流计数优先于鉴权处理
+  // db 在 createApp 内部 new，保证每个应用实例（含测试）拥有独立计数 Map
+  const authRateLimit = rateLimit({
+    driver: 'memory',
+    db: new Map(),
+    duration: 60_000,
+    max: 5,
+    id: (ctx) => ctx.ip,
+    errorMessage: '请求过于频繁，请稍后再试',
+    disableHeader: false,
+  });
+  app.use(async (ctx, next) => {
+    if (RATE_LIMITED_PATHS.has(ctx.path)) {
+      return authRateLimit(ctx, next);
+    }
+    await next();
+  });
+
+  // 4. JWT 认证中间件（白名单：/health、/api/auth/login、/api/auth/register、OPTIONS 预检）
+  // 顺序：helmet → cors → bodyParser → ratelimit → jwtMiddleware → router.routes()
   app.use(jwtMiddleware);
 
-  // 4. 全局错误兜底
+  // 5. 全局错误兜底
   app.on('error', (err, ctx) => {
     console.error('[koa error]', err.message, ctx?.request?.url);
   });
 
-  // 5. 注册所有控制器
+  // 6. 注册所有控制器
   for (const ControllerClass of controllers) {
     registerController(router, ControllerClass);
   }
 
-  // 6. 挂载路由
+  // 7. 挂载路由
   app.use(router.routes());
   app.use(router.allowedMethods());
 
-  // 7. 触发 Configuration onReady 钩子
+  // 8. 触发 Configuration onReady 钩子
   const configuration = new Configuration();
   await configuration.onReady();
 

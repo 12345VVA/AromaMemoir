@@ -26,3 +26,17 @@ export function unauthorized(message: string = '未登录或登录已过期'): A
 export function forbidden(message: string = '无权限访问'): ApiResponse<null> {
   return { code: 403, data: null, message };
 }
+
+// HTML 字符转义（防 XSS）：转义 & < > " '
+export function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => {
+    switch (c) {
+      case '&': return '&amp;';
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '"': return '&quot;';
+      case "'": return '&#39;';
+      default: return c;
+    }
+  });
+}

@@ -18,12 +18,15 @@
     "@midwayjs/decorator": "^3.20.0",
     "@midwayjs/koa": "^3.20.0",
     "@midwayjs/validate": "^3.20.0",
+    "@types/koa-helmet": "^6.0.8",
     "axios": "^1.7.0",
     "bcryptjs": "^2.4.3",
     "dotenv": "^17.4.2",
     "jsonwebtoken": "^9.0.0",
     "koa": "^2.15.0",
     "koa-bodyparser": "^4.4.0",
+    "koa-helmet": "^9.0.0",
+    "koa-ratelimit": "^6.0.0",
     "mysql2": "^3.22.5"
   },
   "devDependencies": {

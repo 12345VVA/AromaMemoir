@@ -98,4 +98,43 @@ describe('Record 控制器', () => {
     assert.strictEqual(res.body.code, 404);
     assert.ok(res.body.message);
   });
+
+  // IDOR 越权防护：用户 B 携带自己 token 访问 demo 用户的记录应返回 403
+  it('IDOR 防护：其他用户访问 demo 用户的 record-0001 返回 403', async () => {
+    // 注册一个全新用户 B
+    const username = `idor_user_${Date.now()}`;
+    const regRes = await request.post('/api/auth/register').send({
+      username,
+      password: 'test1234',
+      nickname: 'idor',
+    });
+    assert.strictEqual(regRes.body.code, 0, '注册用户 B 应成功');
+    const userBToken = regRes.body.data.token as string;
+    assert.ok(userBToken, '应返回 token');
+
+    // 用户 B 尝试访问 demo 用户拥有的 record-0001
+    const res = await request
+      .get('/api/record/record-0001')
+      .set('Authorization', `Bearer ${userBToken}`);
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.code, 403);
+    assert.ok(
+      typeof res.body.message === 'string' && res.body.message.includes('无权'),
+      `message 应包含 "无权"，实际为：${res.body.message}`,
+    );
+    assert.strictEqual(res.body.data, null);
+  });
+
+  // IDOR 防护回归：demo 用户访问自己的 record-0001 仍应成功（确保 403 逻辑不误伤）
+  it('IDOR 防护：demo 用户访问自己的 record-0001 仍返回 200/code:0', async () => {
+    const res = await request
+      .get('/api/record/record-0001')
+      .set('Authorization', `Bearer ${token}`);
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.code, 0);
+    assert.strictEqual(res.body.data.id, 'record-0001');
+    assert.strictEqual(res.body.data.userId, 'user-demo-0001');
+  });
 });

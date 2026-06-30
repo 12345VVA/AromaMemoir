@@ -166,4 +166,41 @@ describe('Family 控制器', () => {
     assert.ok(first.category);
     assert.strictEqual(typeof first.checked, 'boolean');
   });
+
+  // 8. 评论 XSS 过滤（Task 12）
+  it('POST /api/family/records/:id/comments 对评论内容做 HTML 转义（防 XSS）', async () => {
+    // 先获取一条家庭动态记录
+    const listRes = await request
+      .get('/api/family/records')
+      .set('Authorization', `Bearer ${token}`);
+    assert.strictEqual(listRes.status, 200);
+    assert.ok(listRes.body.data.list.length > 0, '应至少有一条家庭动态');
+    const recordId = listRes.body.data.list[0].id;
+
+    // 提交含 <script> 的 XSS 评论
+    const xssPayload = '<script>alert(1)</script>';
+    const postRes = await request
+      .post(`/api/family/records/${recordId}/comments`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ content: xssPayload });
+    assert.strictEqual(postRes.status, 200);
+    assert.strictEqual(postRes.body.code, 0);
+    // 返回的评论内容应被转义
+    assert.strictEqual(
+      postRes.body.data.content,
+      '&lt;script&gt;alert(1)&lt;/script&gt;'
+    );
+
+    // 重新 GET 家庭动态，校验存储的内容已转义
+    const verifyRes = await request
+      .get('/api/family/records')
+      .set('Authorization', `Bearer ${token}`);
+    assert.strictEqual(verifyRes.status, 200);
+    const record = verifyRes.body.data.list.find((r: any) => r.id === recordId);
+    assert.ok(record, '应能找到刚评论的记录');
+    const xssComment = record.comments.find(
+      (c: any) => c.content === '&lt;script&gt;alert(1)&lt;/script&gt;'
+    );
+    assert.ok(xssComment, '存储的评论内容应已被 HTML 转义');
+  });
 });

@@ -2354,27 +2354,27 @@ body {
                 味记
             </div>
             <nav class="sidebar-nav">
-                <button class="sidebar-nav-item active" data-page="home" onclick="navigateTo('home')">
+                <button class="sidebar-nav-item active" data-page="home">
                     <i data-lucide="home"></i>
                     <span>首页</span>
                 </button>
-                <button class="sidebar-nav-item" data-page="records" onclick="navigateTo('records')">
+                <button class="sidebar-nav-item" data-page="records">
                     <i data-lucide="book-open"></i>
                     <span>记录</span>
                 </button>
-                <button class="sidebar-nav-item" data-page="family" onclick="navigateTo('family')">
+                <button class="sidebar-nav-item" data-page="family">
                     <i data-lucide="users"></i>
                     <span>家庭菜谱</span>
                 </button>
-                <button class="sidebar-nav-item" data-page="achievements" onclick="navigateTo('achievements')">
+                <button class="sidebar-nav-item" data-page="achievements">
                     <i data-lucide="trophy"></i>
                     <span>成就徽章</span>
                 </button>
-                <button class="sidebar-nav-item" data-page="gameplay" onclick="navigateTo('gameplay')">
+                <button class="sidebar-nav-item" data-page="gameplay">
                     <i data-lucide="gamepad-2"></i>
                     <span>趣味玩法</span>
                 </button>
-                <button class="sidebar-nav-item" data-page="profile" onclick="navigateTo('profile')">
+                <button class="sidebar-nav-item" data-page="profile">
                     <i data-lucide="user"></i>
                     <span>我的</span>
                 </button>
@@ -2412,7 +2412,7 @@ body {
                     <div class="input-search">
                         <span class="ico"><i data-lucide="search" style="width: 20px; height: 20px;"></i></span>
                         <input type="text" placeholder="搜索菜谱或食材" id="home-search" />
-                        <span class="ico" style="cursor: pointer;" onclick="showToast('语音搜索功能')">
+                        <span class="ico" id="voice-record-btn" style="cursor: pointer;" onclick="startVoiceRecording()">
                             <i data-lucide="mic" style="width: 20px; height: 20px;"></i>
                         </span>
                     </div>
@@ -2435,10 +2435,16 @@ body {
                         </div>
                         <button class="btn btn-primary btn-sm" id="checkin-btn" onclick="doCheckin()">今日打卡</button>
                     </div>
+                    <button id="replenish-btn" onclick="handleReplenish()" style="display:none;margin-top:8px;padding:6px 16px;border:1px solid var(--color-primary);background:transparent;color:var(--color-primary);border-radius:20px;font-size:var(--font-size-caption);cursor:pointer;">补签昨日</button>
                     <div class="checkin-days" id="checkin-days"></div>
                 </div>
 
                 <div class="section-title">美食日记</div>
+                <div style="display:flex;gap:8px;margin-bottom:12px;">
+                  <button id="btn-list-view" onclick="switchDiaryView('list')" style="padding:6px 16px;border:none;border-radius:20px;font-size:13px;cursor:pointer;background:var(--color-primary);color:#fff;">列表</button>
+                  <button id="btn-calendar-view" onclick="switchDiaryView('calendar')" style="padding:6px 16px;border:none;border-radius:20px;font-size:13px;cursor:pointer;background:transparent;color:var(--color-on-surface-variant);">日历</button>
+                </div>
+                <div id="calendar-view" style="display:none;"></div>
                 <div class="food-list" id="food-diary-list"></div>
 
                 <div class="recommend-section" id="recommend-section" style="display:none;">
@@ -2469,9 +2475,16 @@ body {
                 <div class="tabs-bar" id="family-view-tabs">
                     <button class="tab-item active" data-view="recipes">菜谱</button>
                     <button class="tab-item" data-view="weekly">本周菜单</button>
+                    <button class="family-tab-btn" onclick="switchFamilyTab('records')" data-tab="records">家庭动态</button>
+                    <button class="family-tab-btn" onclick="switchFamilyTab('report')" data-tab="report">饮食报告</button>
                 </div>
 
                 <div id="recipe-view">
+                    <div id="create-family-entry" style="display:none;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;text-align:center;">
+                        <div style="font-size:48px;margin-bottom:16px;">👨‍👩‍👧</div>
+                        <p style="font-size:var(--font-size-body);color:var(--color-on-surface-variant);margin-bottom:24px;">您还未加入任何家庭组</p>
+                        <button onclick="showCreateFamilyDialog()" style="padding:12px 32px;border:none;background:var(--color-primary);color:#fff;border-radius:24px;font-size:var(--font-size-body);cursor:pointer;">创建家庭组</button>
+                    </div>
                     <div class="tabs-bar" id="recipe-tabs">
                         <button class="tab-item active" data-tab="all">全部</button>
                         <button class="tab-item" data-tab="home">家常菜</button>
@@ -2487,6 +2500,9 @@ body {
                             <button class="btn btn-ghost" onclick="showInvitationDialog()">
                                 <i data-lucide="user-plus" style="width: 16px; height: 16px; margin-right: 4px;"></i>
                                 邀请家人
+                            </button>
+                            <button onclick="showUploadRecipeDialog()" style="padding:8px 16px;border:none;background:var(--color-primary);color:#fff;border-radius:20px;font-size:var(--font-size-caption);cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+                                <i data-lucide="plus" style="width:16px;height:16px;"></i> 上传菜谱
                             </button>
                         </div>
                         <div class="family-members no-scrollbar" id="family-members"></div>
@@ -2504,12 +2520,28 @@ body {
                             <div class="shopping-title">购物清单</div>
                             <div class="shopping-subtitle">根据本周菜单自动生成</div>
                         </div>
+                        <button class="btn btn-outline btn-sm" onclick="handleGenerateShopping()" style="margin-left:auto;">
+                            <i data-lucide="sparkles" style="width:14px;height:14px;"></i>
+                            <span>根据菜单生成</span>
+                        </button>
                         <button class="btn btn-primary btn-sm" onclick="handleAddShoppingItem()">
                             <i data-lucide="plus" style="width: 16px; height: 16px; margin-right: 4px;"></i>
                             添加物品
                         </button>
                     </div>
                     <div id="shopping-list" class="shopping-list"></div>
+                </div>
+
+                <div id="family-records-view" style="display:none;padding:0 16px;">
+                  <div id="family-records-list"></div>
+                </div>
+
+                <div id="family-report-view" class="family-tab-content" style="display:none;">
+                  <div class="report-toolbar" style="display:flex;align-items:center;gap:12px;padding:12px 0;">
+                    <label style="font-size:14px;color:var(--color-on-surface-variant);">选择月份：</label>
+                    <input type="month" id="report-month-input" onchange="changeReportMonth()" style="padding:6px 10px;border:1px solid var(--color-outline);border-radius:8px;" />
+                  </div>
+                  <div id="family-report-content"></div>
                 </div>
             </div>
 
@@ -2552,6 +2584,7 @@ body {
 
                 <div class="padding-x padding-bottom">
                     <div id="nutrition-cards" style="display: none; gap: var(--space-2); margin-bottom: var(--space-3);"></div>
+                    <div id="confidence-warn" style="display:none;padding:8px 12px;background:#FFF3CD;color:#856404;border-radius:8px;font-size:13px;margin-bottom:8px;"></div>
                     <div class="food-card food-card--h" style="width: 100%; box-shadow: var(--shadow-1);">
                         <div class="card-img" style="width: 96px; height: 96px; flex-shrink: 0; border-radius: var(--radius-lg); overflow: hidden;">
                             <img src="assets/food-camera-preview.jpg" alt="Food thumbnail" id="dish-thumbnail" style="width: 100%; height: 100%; object-fit: cover;">
@@ -2595,6 +2628,10 @@ body {
                         <span class="chip outline" onclick="toggleRecordTag(this)">值得复刻</span>
                         <span class="chip outline" onclick="toggleRecordTag(this)">健康轻食</span>
                         <span class="chip outline" onclick="toggleRecordTag(this)">节日美食</span>
+                        <button class="chip outline" onclick="showCustomTagInput()" id="add-tag-btn" style="cursor:pointer;border-style:dashed;">
+                            <i data-lucide="plus" style="width:14px;height:14px;"></i> 添加标签
+                        </button>
+                        <input type="text" id="custom-tag-input" placeholder="输入标签（≤10字）" style="display:none;width:120px;padding:4px 8px;border:1px solid var(--color-outline);border-radius:16px;font-size:var(--font-size-caption);outline:none;" onkeydown="if(event.key==='Enter')addCustomTag();if(event.key==='Escape')hideCustomTagInput()" />
                     </div>
                 </div>
 
@@ -2889,6 +2926,63 @@ body {
         </div>
     </div>
 
+<!-- 创建家庭组弹窗 -->
+<div class="modal-overlay" id="create-family-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:var(--color-surface);border-radius:16px;padding:24px;max-width:360px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+    <h3 style="margin:0 0 16px;font-size:var(--font-size-title);">创建家庭组</h3>
+    <input type="text" id="create-family-name" placeholder="输入家庭组名称" style="width:100%;padding:12px;border:1px solid var(--color-outline);border-radius:8px;font-size:var(--font-size-body);margin-bottom:16px;box-sizing:border-box;" />
+    <div style="display:flex;gap:12px;justify-content:flex-end;">
+      <button onclick="closeCreateFamilyModal()" style="padding:8px 20px;border:none;background:transparent;color:var(--color-primary);border-radius:8px;font-size:var(--font-size-body);cursor:pointer;">取消</button>
+      <button onclick="handleCreateFamily()" style="padding:8px 20px;border:none;background:var(--color-primary);color:#fff;border-radius:8px;font-size:var(--font-size-body);cursor:pointer;">创建</button>
+    </div>
+  </div>
+</div>
+
+<!-- 上传菜谱弹窗 -->
+<div class="modal-overlay" id="upload-recipe-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;overflow-y:auto;">
+  <div style="background:var(--color-surface);border-radius:16px;padding:24px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);margin:auto;">
+    <h3 style="margin:0 0 16px;font-size:var(--font-size-title);">上传菜谱</h3>
+    <div style="margin-bottom:12px;">
+      <label style="display:block;margin-bottom:4px;font-size:var(--font-size-caption);color:var(--color-on-surface-variant);">菜谱名称 *</label>
+      <input type="text" id="recipe-name" placeholder="如：红烧肉" style="width:100%;padding:10px;border:1px solid var(--color-outline);border-radius:8px;font-size:var(--font-size-body);box-sizing:border-box;" />
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="display:block;margin-bottom:4px;font-size:var(--font-size-caption);color:var(--color-on-surface-variant);">分类</label>
+      <select id="recipe-category" style="width:100%;padding:10px;border:1px solid var(--color-outline);border-radius:8px;font-size:var(--font-size-body);box-sizing:border-box;">
+        <option value="家常菜">家常菜</option>
+        <option value="汤品">汤品</option>
+        <option value="甜品">甜品</option>
+        <option value="主食">主食</option>
+        <option value="凉菜">凉菜</option>
+      </select>
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="display:block;margin-bottom:4px;font-size:var(--font-size-caption);color:var(--color-on-surface-variant);">难度</label>
+      <select id="recipe-difficulty" style="width:100%;padding:10px;border:1px solid var(--color-outline);border-radius:8px;font-size:var(--font-size-body);box-sizing:border-box;">
+        <option value="简单">简单</option>
+        <option value="中等">中等</option>
+        <option value="困难">困难</option>
+      </select>
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="display:block;margin-bottom:4px;font-size:var(--font-size-caption);color:var(--color-on-surface-variant);">烹饪时间（分钟）</label>
+      <input type="number" id="recipe-cooktime" value="30" min="1" style="width:100%;padding:10px;border:1px solid var(--color-outline);border-radius:8px;font-size:var(--font-size-body);box-sizing:border-box;" />
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="display:block;margin-bottom:4px;font-size:var(--font-size-caption);color:var(--color-on-surface-variant);">食材清单 *（每行一项：名称,用量,单位）</label>
+      <textarea id="recipe-ingredients" rows="4" placeholder="五花肉,500,g&#10;生抽,2,勺&#10;冰糖,30,g" style="width:100%;padding:10px;border:1px solid var(--color-outline);border-radius:8px;font-size:var(--font-size-body);box-sizing:border-box;resize:vertical;"></textarea>
+    </div>
+    <div style="margin-bottom:16px;">
+      <label style="display:block;margin-bottom:4px;font-size:var(--font-size-caption);color:var(--color-on-surface-variant);">烹饪步骤（每行一步）</label>
+      <textarea id="recipe-steps" rows="4" placeholder="1. 五花肉切块焯水&#10;2. 锅中放油加冰糖炒色&#10;3. 放入五花肉翻炒上色" style="width:100%;padding:10px;border:1px solid var(--color-outline);border-radius:8px;font-size:var(--font-size-body);box-sizing:border-box;resize:vertical;"></textarea>
+    </div>
+    <div style="display:flex;gap:12px;justify-content:flex-end;">
+      <button onclick="closeUploadRecipeModal()" style="padding:8px 20px;border:none;background:transparent;color:var(--color-primary);border-radius:8px;font-size:var(--font-size-body);cursor:pointer;">取消</button>
+      <button onclick="handleUploadRecipe()" style="padding:8px 20px;border:none;background:var(--color-primary);color:#fff;border-radius:8px;font-size:var(--font-size-body);cursor:pointer;">上传</button>
+    </div>
+  </div>
+</div>
+
     <div class="recommend-modal" id="recommend-modal">
         <div class="recommend-modal-backdrop" onclick="closeRecommendModal()"></div>
         <div class="recommend-modal-content">
@@ -2944,6 +3038,18 @@ body {
     </div>
 
     <div class="toast" id="toast"></div>
+
+    <div id="voice-recording-indicator" onclick="stopVoiceRecording()" style="display:none;position:fixed;top:20px;left:50%;transform:translateX(-50%);background:rgba(255,94,26,0.95);color:white;padding:8px 16px;border-radius:20px;z-index:9999;align-items:center;gap:8px;font-size:14px;cursor:pointer;">
+      <span class="voice-pulse-dot" style="width:10px;height:10px;background:white;border-radius:50%;animation:voicePulse 1.2s infinite;"></span>
+      <span id="voice-record-text">录音中... 点击停止</span>
+    </div>
+    <style>
+    @keyframes voicePulse {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.5); opacity: 0.6; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    </style>
 
     <script src="api.js"></script>
     <script src="app.js"></script>

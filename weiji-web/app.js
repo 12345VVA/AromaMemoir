@@ -9,6 +9,37 @@ let selectedImageVersion = 'original';
 let currentRecommendations = [];
 let currentRecipeVisibility = null;
 
+/* ===== 图片压缩工具（F1增强） ===== */
+function compressImage(file, maxSize) {
+  maxSize = maxSize || 2 * 1024 * 1024; // 默认2MB
+  return new Promise(function(resolve) {
+    if (file.size <= maxSize) {
+      resolve(file);
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var img = new Image();
+      img.onload = function() {
+        var canvas = document.createElement('canvas');
+        var ctx = canvas.getContext('2d');
+        var width = img.width;
+        var height = img.height;
+        var ratio = Math.sqrt(maxSize / file.size);
+        canvas.width = Math.floor(width * ratio);
+        canvas.height = Math.floor(height * ratio);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(function(blob) {
+          var compressed = new File([blob], file.name, { type: file.type || 'image/jpeg' });
+          resolve(compressed);
+        }, file.type || 'image/jpeg', 0.8);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 /* ===== 静态挑战数据（无对应后端接口，作为前端兜底） ===== */
 const CHALLENGES = [
   {
@@ -153,13 +184,18 @@ async function loadHomeData() {
   const listEl = document.getElementById('food-diary-list');
   showLoading(listEl);
   try {
-    const [recordsRes, checkin, recommendations] = await Promise.all([
+    const [recordsRes, checkin] = await Promise.all([
       api.getRecords(),
-      api.getCheckinStatus(),
-      api.getRecommendations().catch(() => null)
+      api.getCheckinStatus()
     ]);
     renderRecords((recordsRes && recordsRes.list) || []);
     renderCheckin(checkin);
+    // 获取最近记录用于推荐
+    var recentDishNames = [];
+    if (recordsRes && recordsRes.list) {
+      recentDishNames = recordsRes.list.slice(0, 5).map(function(r) { return r.dishName; });
+    }
+    var recommendations = await api.getRecommendations(recentDishNames).catch(function() { return null; });
     if (recommendations && recommendations.length) {
       renderRecommendations(recommendations);
     } else {
@@ -178,6 +214,16 @@ async function loadFamilyData() {
   showLoading(gridEl);
   showLoading(membersEl);
   try {
+    const familyInfo = await api.getFamilyInfo();
+    // 如果未加入家庭组，显示创建入口
+    const createFamilyBtn = document.getElementById('create-family-entry');
+    if (createFamilyBtn) {
+      if (!familyInfo) {
+        createFamilyBtn.style.display = 'flex';
+      } else {
+        createFamilyBtn.style.display = 'none';
+      }
+    }
     const [recipes, members] = await Promise.all([
       api.getFamilyRecipes(),
       api.getFamilyMembers()
@@ -201,7 +247,14 @@ async function loadAchievementsData() {
     ]);
     renderAchievements(achievements || []);
     renderLevel(level);
-    renderChallenges(CHALLENGES);
+    // 加载挑战赛数据（从后端获取，失败时降级为空）
+    let challenges = [];
+    try {
+      challenges = await api.getChallenges();
+    } catch (e) {
+      challenges = [];
+    }
+    renderChallenges(challenges);
   } catch (err) {
     hideLoading(badgeEl);
     showToast(err.message);
@@ -242,6 +295,7 @@ function renderRecords(list) {
       '</div>' +
     '</div>';
   }).join('');
+  window._allRecords = list;
   lucide.createIcons();
 }
 
@@ -349,11 +403,12 @@ function closeRecommendModal() {
 function renderCheckin(data) {
   if (!data) return;
   const text = document.getElementById('checkin-text');
-  if (text) text.textContent = '已坚持 ' + data.streakDays + ' 天';
+  if (text) text.textContent = '已坚持 ' + (data.streak != null ? data.streak : data.streakDays) + ' 天';
 
   const btn = document.getElementById('checkin-btn');
   if (btn) {
-    if (data.checkedInToday) {
+    const checked = data.todayChecked != null ? data.todayChecked : data.checkedInToday;
+    if (checked) {
       btn.textContent = '已打卡';
       btn.disabled = true;
       btn.style.opacity = '0.6';
@@ -369,6 +424,21 @@ function renderCheckin(data) {
     days.innerHTML = data.calendar.map(d =>
       '<div class="checkin-day ' + escapeAttr(d.status) + '" data-day="' + escapeAttr(d.day) + '">' + escapeHTML(d.label) + '</div>'
     ).join('');
+  }
+
+  // 补签按钮：今日已打卡但昨日未打卡时显示
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
+  const replenishBtn = document.getElementById('replenish-btn');
+  if (replenishBtn) {
+    const checked = data.todayChecked != null ? data.todayChecked : data.checkedInToday;
+    const lastDate = data.lastCheckDate;
+    if (checked && lastDate !== yesterdayStr) {
+      replenishBtn.style.display = 'block';
+    } else {
+      replenishBtn.style.display = 'none';
+    }
   }
 }
 
@@ -566,8 +636,16 @@ async function doCheckin() {
   const btn = document.getElementById('checkin-btn');
   if (btn) { btn.disabled = true; }
   try {
-    await api.doCheckin();
+    const result = await api.doCheckin();
     showToast('打卡成功！🔥');
+    // 成就解锁提示
+    if (result && result.newAchievements && result.newAchievements.length > 0) {
+      setTimeout(() => {
+        result.newAchievements.forEach(ach => {
+          showToast('🎉 解锁成就：' + ach.name + '！');
+        });
+      }, 1000);
+    }
     const status = await api.getCheckinStatus();
     renderCheckin(status);
   } catch (err) {
@@ -576,13 +654,26 @@ async function doCheckin() {
   }
 }
 
+async function handleReplenish() {
+  try {
+    const data = await api.replenishCheckin();
+    showToast('补签成功！连续' + data.streak + '天');
+    const status = await api.getCheckinStatus();
+    renderCheckin(status);
+  } catch (e) {
+    showToast(e.message || '补签失败');
+  }
+}
+
 async function startRecognize() {
   const fileInput = document.getElementById('file-input');
-  const file = fileInput && fileInput.files && fileInput.files[0];
-  if (!file) {
+  var rawFile = fileInput && fileInput.files && fileInput.files[0];
+  if (!rawFile) {
     showToast('请先选择照片');
     return;
   }
+  // 压缩图片
+  var file = await compressImage(rawFile);
   // Reset beautify & nutrition state
   currentBeautifiedUrl = null;
   selectedImageVersion = 'original';
@@ -596,6 +687,17 @@ async function startRecognize() {
   try {
     const result = await api.recognizeFood(file);
     currentRecognizeData = result;
+
+    // 低置信度提示
+    var confidenceWarn = document.getElementById('confidence-warn');
+    if (confidenceWarn) {
+      if (result.confidence != null && result.confidence < 0.5) {
+        confidenceWarn.style.display = 'block';
+        confidenceWarn.textContent = '⚠️ 这可能不是食物，请确认或手动输入菜名';
+      } else {
+        confidenceWarn.style.display = 'none';
+      }
+    }
 
     const dishInput = document.getElementById('dish-name');
     if (dishInput) dishInput.value = result.dishName || '';
@@ -732,8 +834,16 @@ async function saveRecord() {
     aiConfidence: currentRecognizeData ? (currentRecognizeData.confidence != null ? currentRecognizeData.confidence : null) : null
   };
   try {
-    await api.saveRecord(data);
+    const result = await api.saveRecord(data);
     showToast('"' + dishName + '" 保存成功！');
+    // 成就解锁提示
+    if (result && result.newAchievements && result.newAchievements.length > 0) {
+      setTimeout(() => {
+        result.newAchievements.forEach(ach => {
+          showToast('🎉 解锁成就：' + ach.name + '！');
+        });
+      }, 1000);
+    }
     currentRecognizeData = null;
     setTimeout(() => {
       navigateTo('home');
@@ -834,10 +944,38 @@ function switchFamilyTab(view) {
     if (shoppingSection) shoppingSection.style.display = '';
     loadWeeklyMenu();
     loadShoppingList();
+  } else if (view === 'records') {
+    if (recipeView) recipeView.style.display = 'none';
+    if (weeklyView) weeklyView.style.display = 'none';
+    if (shoppingSection) shoppingSection.style.display = 'none';
   } else {
     if (recipeView) recipeView.style.display = '';
     if (weeklyView) weeklyView.style.display = 'none';
     if (shoppingSection) shoppingSection.style.display = 'none';
+  }
+  // 在 switchFamilyTab 函数中添加对 records 的处理
+  if (view === 'records') {
+    document.getElementById('family-records-view').style.display = 'block';
+    loadFamilyRecords();
+  } else {
+    document.getElementById('family-records-view').style.display = 'none';
+  }
+  // 处理饮食报告 view 的显示与加载
+  const reportView = document.getElementById('family-report-view');
+  if (view === 'report') {
+    if (recipeView) recipeView.style.display = 'none';
+    if (weeklyView) weeklyView.style.display = 'none';
+    if (shoppingSection) shoppingSection.style.display = 'none';
+    if (reportView) reportView.style.display = 'block';
+    // 设置月份输入默认为当月
+    const monthInput = document.getElementById('report-month-input');
+    if (monthInput && !monthInput.value) {
+      const now = new Date();
+      monthInput.value = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    }
+    loadFamilyReport(monthInput ? monthInput.value : undefined);
+  } else {
+    if (reportView) reportView.style.display = 'none';
   }
 }
 
@@ -1123,6 +1261,303 @@ function showAddToMenuDialog(recipeId) {
   });
 }
 
+function showCreateFamilyDialog() {
+  document.getElementById('create-family-modal').style.display = 'flex';
+  document.getElementById('create-family-name').value = '';
+}
+
+function closeCreateFamilyModal() {
+  document.getElementById('create-family-modal').style.display = 'none';
+}
+
+async function handleCreateFamily() {
+  const name = document.getElementById('create-family-name').value.trim();
+  if (!name) {
+    showToast('请输入家庭组名称');
+    return;
+  }
+  try {
+    await api.createFamily(name);
+    closeCreateFamilyModal();
+    showToast('创建成功');
+    loadFamilyData();
+  } catch (e) {
+    showToast(e.message || '创建失败');
+  }
+}
+
+function showUploadRecipeDialog() {
+  document.getElementById('upload-recipe-modal').style.display = 'flex';
+}
+
+function closeUploadRecipeModal() {
+  document.getElementById('upload-recipe-modal').style.display = 'none';
+}
+
+async function handleUploadRecipe() {
+  const name = document.getElementById('recipe-name').value.trim();
+  const category = document.getElementById('recipe-category').value;
+  const difficulty = document.getElementById('recipe-difficulty').value;
+  const cookTime = parseInt(document.getElementById('recipe-cooktime').value, 10) || 30;
+  const ingredientsText = document.getElementById('recipe-ingredients').value.trim();
+  const stepsText = document.getElementById('recipe-steps').value.trim();
+
+  if (!name) {
+    showToast('请填写菜谱名称');
+    return;
+  }
+  if (!ingredientsText) {
+    showToast('请填写食材清单');
+    return;
+  }
+
+  // 解析食材：每行一项，格式 名称,用量,单位
+  const ingredients = ingredientsText.split('\n').filter(l => l.trim()).map(line => {
+    const parts = line.split(',').map(p => p.trim());
+    return { name: parts[0] || '', amount: parts[1] || '', unit: parts[2] || '' };
+  }).filter(i => i.name);
+
+  // 解析步骤：每行一步
+  const steps = stepsText ? stepsText.split('\n').filter(l => l.trim()).map((line, i) => ({
+    stepNum: i + 1,
+    text: line.replace(/^\d+\.\s*/, '').trim()
+  })) : [];
+
+  try {
+    await api.uploadRecipe({ name, category, difficulty, cookTime, ingredients, steps, visibility: 'family' });
+    closeUploadRecipeModal();
+    showToast('上传成功');
+    loadFamilyData();
+  } catch (e) {
+    showToast(e.message || '上传失败');
+  }
+}
+
+/* ===== 家庭动态（F16） ===== */
+async function loadFamilyRecords() {
+  var container = document.getElementById('family-records-list');
+  if (!container) return;
+  container.innerHTML = '<div style="padding:var(--space-6);text-align:center;color:var(--color-on-surface-variant);">加载中...</div>';
+  try {
+    var data = await api.getFamilyRecords(1);
+    renderFamilyRecords((data && data.list) || []);
+  } catch (e) {
+    container.innerHTML = '<div style="padding:var(--space-6);text-align:center;color:var(--color-on-surface-variant);">暂无动态</div>';
+  }
+}
+
+function renderFamilyRecords(list) {
+  var container = document.getElementById('family-records-list');
+  if (!container) return;
+  if (!list || list.length === 0) {
+    container.innerHTML = '<div style="padding:var(--space-6);text-align:center;color:var(--color-on-surface-variant);">还没有家庭动态，快去记录美食吧！</div>';
+    return;
+  }
+  container.innerHTML = list.map(function(item) {
+    var imgUrl = item.beautifiedUrl || item.imageUrl || '';
+    var imgHtml = imgUrl ? '<img src="' + escapeAttr(imgUrl) + '" style="width:100%;height:200px;object-fit:cover;border-radius:8px;margin-bottom:12px;" />' : '';
+    var stars = '';
+    for (var i = 1; i <= 5; i++) {
+      stars += '<span style="color:' + (i <= item.rating ? '#FFB800' : '#ddd') + ';">★</span>';
+    }
+    var tagsHtml = (item.tags || []).map(function(t) {
+      return '<span class="chip filled" style="font-size:11px;">' + escapeHTML(t) + '</span>';
+    }).join('');
+    var commentsHtml = (item.comments || []).map(function(c) {
+      return '<div style="padding:4px 0;font-size:13px;"><strong>' + escapeHTML(c.userNickname) + '</strong>: ' + escapeHTML(c.content) + '</div>';
+    }).join('');
+    return '<div style="background:var(--color-surface);border-radius:12px;padding:16px;margin-bottom:12px;">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
+        '<div style="width:32px;height:32px;border-radius:50%;background:var(--color-primary);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;">' + escapeHTML((item.userNickname || '?').charAt(0)) + '</div>' +
+        '<div><div style="font-weight:600;font-size:14px;">' + escapeHTML(item.userNickname) + '</div>' +
+        '<div style="font-size:12px;color:var(--color-on-surface-variant);">' + escapeHTML(item.recordDate) + '</div></div>' +
+      '</div>' +
+      imgHtml +
+      '<div style="font-size:16px;font-weight:600;margin-bottom:4px;">' + escapeHTML(item.dishName) + '</div>' +
+      '<div style="margin-bottom:8px;">' + stars + '</div>' +
+      (tagsHtml ? '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;">' + tagsHtml + '</div>' : '') +
+      '<div style="display:flex;gap:16px;padding-top:8px;border-top:1px solid var(--color-outline);">' +
+        '<button onclick="handleToggleLike(\'' + escapeAttr(item.id) + '\')" style="border:none;background:transparent;color:' + (item.likedByMe ? 'var(--color-primary)' : 'var(--color-on-surface-variant)') + ';cursor:pointer;font-size:14px;display:flex;align-items:center;gap:4px;">' +
+          '<svg width="18" height="18" viewBox="0 0 24 24" fill="' + (item.likedByMe ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>' +
+          '<span>' + item.likeCount + '</span>' +
+        '</button>' +
+        '<button onclick="toggleCommentBox(\'' + escapeAttr(item.id) + '\')" style="border:none;background:transparent;color:var(--color-on-surface-variant);cursor:pointer;font-size:14px;display:flex;align-items:center;gap:4px;">' +
+          '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>' +
+          '<span>' + item.commentCount + '</span>' +
+        '</button>' +
+      '</div>' +
+      (commentsHtml ? '<div style="padding-top:8px;margin-top:4px;border-top:1px solid var(--color-outline);">' + commentsHtml + '</div>' : '') +
+      '<div id="comment-box-' + escapeAttr(item.id) + '" style="display:none;padding-top:8px;">' +
+        '<div style="display:flex;gap:8px;">' +
+          '<input type="text" id="comment-input-' + escapeAttr(item.id) + '" placeholder="写评论..." style="flex:1;padding:8px 12px;border:1px solid var(--color-outline);border-radius:20px;font-size:13px;outline:none;" />' +
+          '<button onclick="handleSubmitComment(\'' + escapeAttr(item.id) + '\')" style="padding:8px 16px;border:none;background:var(--color-primary);color:#fff;border-radius:20px;font-size:13px;cursor:pointer;">发送</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+async function handleToggleLike(recordId) {
+  try {
+    await api.toggleRecordLike(recordId);
+    loadFamilyRecords();
+  } catch (e) {
+    showToast(e.message || '操作失败');
+  }
+}
+
+function toggleCommentBox(recordId) {
+  var box = document.getElementById('comment-box-' + recordId);
+  if (box) {
+    box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    if (box.style.display === 'block') {
+      var input = document.getElementById('comment-input-' + recordId);
+      if (input) input.focus();
+    }
+  }
+}
+
+async function handleSubmitComment(recordId) {
+  var input = document.getElementById('comment-input-' + recordId);
+  if (!input) return;
+  var content = input.value.trim();
+  if (!content) {
+    showToast('请输入评论内容');
+    return;
+  }
+  try {
+    await api.addRecordComment(recordId, content);
+    showToast('评论成功');
+    loadFamilyRecords();
+  } catch (e) {
+    showToast(e.message || '评论失败');
+  }
+}
+
+/* ===== 日历视图（F3增强） ===== */
+var calendarCurrentMonth = new Date();
+
+function renderCalendarView(recordsList) {
+  var container = document.getElementById('calendar-view');
+  if (!container) return;
+
+  var year = calendarCurrentMonth.getFullYear();
+  var month = calendarCurrentMonth.getMonth();
+
+  // 构建有记录的日期集合
+  var recordDates = {};
+  (recordsList || []).forEach(function(r) {
+    if (r.recordDate) {
+      if (!recordDates[r.recordDate]) recordDates[r.recordDate] = [];
+      recordDates[r.recordDate].push(r);
+    }
+  });
+
+  // 计算日历网格
+  var firstDay = new Date(year, month, 1);
+  var lastDay = new Date(year, month + 1, 0);
+  var startWeekday = firstDay.getDay() || 7; // 周日=0转为7
+  var daysInMonth = lastDay.getDate();
+
+  var monthNames = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+  var today = new Date().toISOString().split('T')[0];
+  var todayDate = new Date();
+  var isCurrentMonth = (year === todayDate.getFullYear() && month === todayDate.getMonth());
+
+  var html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">' +
+    '<button onclick="changeMonth(-1)" style="border:none;background:transparent;color:var(--color-primary);font-size:18px;cursor:pointer;padding:8px;">‹</button>' +
+    '<span style="font-size:16px;font-weight:600;">' + year + '年' + monthNames[month] + '</span>' +
+    '<button onclick="changeMonth(1)" style="border:none;background:transparent;color:var(--color-primary);font-size:18px;cursor:pointer;padding:8px;">›</button>' +
+  '</div>';
+
+  html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:8px;">';
+  ['一','二','三','四','五','六','日'].forEach(function(d) {
+    html += '<div style="text-align:center;font-size:12px;color:var(--color-on-surface-variant);padding:4px;">' + d + '</div>';
+  });
+  html += '</div>';
+
+  html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;">';
+  // 空白格
+  for (var i = 1; i < startWeekday; i++) {
+    html += '<div></div>';
+  }
+  // 日期格
+  for (var d = 1; d <= daysInMonth; d++) {
+    var dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    var hasRecord = !!recordDates[dateStr];
+    var isToday = isCurrentMonth && d === todayDate.getDate();
+    var bg = hasRecord ? 'background:var(--color-primary);color:#fff;' : 'background:var(--color-surface-variant);';
+    if (isToday) bg += 'border:2px solid var(--color-primary);';
+    html += '<div onclick="' + (hasRecord ? 'showDayRecords(\'' + dateStr + '\')' : '') + '" ' +
+      'style="aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:8px;cursor:' + (hasRecord ? 'pointer' : 'default') + ';' + bg + 'padding:4px;">' +
+      '<span style="font-size:14px;">' + d + '</span>' +
+      (hasRecord ? '<span style="width:4px;height:4px;border-radius:50%;background:#fff;margin-top:2px;"></span>' : '') +
+    '</div>';
+  }
+  html += '</div>';
+
+  html += '<div id="day-records-container" style="margin-top:16px;"></div>';
+
+  // 存储记录数据供点击使用
+  window._calendarRecordDates = recordDates;
+
+  container.innerHTML = html;
+}
+
+function changeMonth(delta) {
+  calendarCurrentMonth.setMonth(calendarCurrentMonth.getMonth() + delta);
+  // 重新加载日历
+  var list = window._allRecords || [];
+  renderCalendarView(list);
+}
+
+function showDayRecords(dateStr) {
+  var container = document.getElementById('day-records-container');
+  if (!container) return;
+  var records = (window._calendarRecordDates || {})[dateStr] || [];
+  if (records.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+  container.innerHTML = '<div style="font-size:14px;font-weight:600;margin-bottom:8px;">' + dateStr + ' 的记录</div>' +
+    records.map(function(r) {
+      var imgUrl = r.beautifiedUrl || r.imageUrl || '';
+      var imgHtml = imgUrl ? '<img src="' + escapeAttr(imgUrl) + '" style="width:60px;height:60px;object-fit:cover;border-radius:8px;" />' : '';
+      var stars = '';
+      for (var i = 1; i <= 5; i++) {
+        stars += '<span style="color:' + (i <= r.rating ? '#FFB800' : '#ddd') + ';font-size:12px;">★</span>';
+      }
+      return '<div style="display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--color-outline);">' +
+        imgHtml +
+        '<div><div style="font-weight:600;font-size:14px;">' + escapeHTML(r.dishName) + '</div>' +
+        '<div>' + stars + '</div></div>' +
+      '</div>';
+    }).join('');
+}
+
+function switchDiaryView(view) {
+  var listView = document.getElementById('food-diary-list');
+  var calView = document.getElementById('calendar-view');
+  var btnList = document.getElementById('btn-list-view');
+  var btnCal = document.getElementById('btn-calendar-view');
+  if (view === 'calendar') {
+    if (listView) listView.style.display = 'none';
+    if (calView) calView.style.display = 'block';
+    if (btnList) btnList.style.background = 'transparent';
+    if (btnList) btnList.style.color = 'var(--color-on-surface-variant)';
+    if (btnCal) btnCal.style.background = 'var(--color-primary)';
+    if (btnCal) btnCal.style.color = '#fff';
+    renderCalendarView(window._allRecords || []);
+  } else {
+    if (listView) listView.style.display = 'block';
+    if (calView) calView.style.display = 'none';
+    if (btnList) btnList.style.background = 'var(--color-primary)';
+    if (btnList) btnList.style.color = '#fff';
+    if (btnCal) btnCal.style.background = 'transparent';
+    if (btnCal) btnCal.style.color = 'var(--color-on-surface-variant)';
+  }
+}
+
 async function showInvitationDialog() {
   const existing = document.getElementById('invitation-dialog');
   if (existing) existing.remove();
@@ -1262,6 +1697,70 @@ function toggleRecordTag(el) {
   document.querySelectorAll('#record-tags .chip.selected').forEach(c => {
     selectedTags.push(c.textContent.trim());
   });
+}
+
+function showCustomTagInput() {
+  // 检查标签数量
+  const tags = document.querySelectorAll('#record-tags .chip:not(#add-tag-btn)');
+  if (tags.length >= 5) {
+    showToast('最多5个标签');
+    return;
+  }
+  document.getElementById('add-tag-btn').style.display = 'none';
+  const input = document.getElementById('custom-tag-input');
+  input.style.display = 'inline-block';
+  input.value = '';
+  input.focus();
+}
+
+function hideCustomTagInput() {
+  document.getElementById('custom-tag-input').style.display = 'none';
+  document.getElementById('add-tag-btn').style.display = 'inline-flex';
+}
+
+function addCustomTag() {
+  const input = document.getElementById('custom-tag-input');
+  const value = input.value.trim();
+  if (!value) {
+    hideCustomTagInput();
+    return;
+  }
+  if (value.length > 10) {
+    showToast('标签最多10个字');
+    return;
+  }
+  // 检查是否已存在
+  const existing = Array.from(document.querySelectorAll('#record-tags .chip')).map(c => c.textContent.trim());
+  if (existing.includes(value)) {
+    showToast('标签已存在');
+    return;
+  }
+  // 检查数量
+  const tags = document.querySelectorAll('#record-tags .chip:not(#add-tag-btn)');
+  if (tags.length >= 5) {
+    showToast('最多5个标签');
+    hideCustomTagInput();
+    return;
+  }
+  // 添加到选中标签
+  if (!selectedTags.includes(value)) {
+    selectedTags.push(value);
+  }
+  // 创建chip元素
+  const container = document.getElementById('record-tags');
+  const chip = document.createElement('button');
+  chip.className = 'chip selected';
+  chip.textContent = value;
+  chip.onclick = function() {
+    const idx = selectedTags.indexOf(value);
+    if (idx > -1) selectedTags.splice(idx, 1);
+    chip.remove();
+    if (selectedTags.length < 5) {
+      document.getElementById('add-tag-btn').style.display = 'inline-flex';
+    }
+  };
+  container.insertBefore(chip, document.getElementById('add-tag-btn'));
+  hideCustomTagInput();
 }
 
 /* ===== 文件选择 ===== */
@@ -1818,4 +2317,250 @@ async function revealBlindGuess(roundId) {
   } catch (err) {
     showToast(err.message);
   }
+}
+
+/* ===== F11 语音交互 ===== */
+let mediaRecorder = null;
+let voiceChunks = [];
+let voiceStream = null;
+let voiceTimer = null;
+let voiceStartTime = 0;
+
+async function startVoiceRecording() {
+  // 检查浏览器支持
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined') {
+    showToast('当前浏览器不支持语音录制，请使用文字输入');
+    return;
+  }
+  try {
+    voiceStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (err) {
+    if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
+      showToast('麦克风权限被拒绝，请使用文字输入');
+    } else {
+      showToast('无法访问麦克风：' + (err.message || '未知错误'));
+    }
+    return;
+  }
+  voiceChunks = [];
+  // 优先使用 audio/webm，回退到默认
+  let mimeType = 'audio/webm';
+  if (!MediaRecorder.isTypeSupported(mimeType)) {
+    mimeType = '';
+  }
+  mediaRecorder = mimeType ? new MediaRecorder(voiceStream, { mimeType }) : new MediaRecorder(voiceStream);
+  mediaRecorder.ondataavailable = function(e) {
+    if (e.data && e.data.size > 0) voiceChunks.push(e.data);
+  };
+  mediaRecorder.onstop = function() {
+    handleVoiceStop();
+  };
+  mediaRecorder.start();
+  voiceStartTime = Date.now();
+  // 显示录音指示器
+  const indicator = document.getElementById('voice-recording-indicator');
+  if (indicator) indicator.style.display = 'flex';
+  // 30秒自动停止
+  voiceTimer = setTimeout(function() {
+    stopVoiceRecording();
+  }, 30000);
+}
+
+function stopVoiceRecording() {
+  if (voiceTimer) { clearTimeout(voiceTimer); voiceTimer = null; }
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop();
+  }
+  if (voiceStream) {
+    voiceStream.getTracks().forEach(function(t) { t.stop(); });
+    voiceStream = null;
+  }
+  const indicator = document.getElementById('voice-recording-indicator');
+  if (indicator) indicator.style.display = 'none';
+}
+
+async function handleVoiceStop() {
+  if (!voiceChunks || voiceChunks.length === 0) {
+    showToast('未录制到音频，请重试');
+    return;
+  }
+  const blob = new Blob(voiceChunks, { type: 'audio/webm' });
+  const file = new File([blob], 'voice.webm', { type: 'audio/webm' });
+  showToast('正在识别...');
+  try {
+    const result = await api.recognizeVoice(file);
+    const text = (result && result.text) || '';
+    const intent = (result && result.intent) || 'unknown';
+    if (!text) {
+      showToast('未能识别您的语音，请尝试文字输入');
+      return;
+    }
+    handleVoiceResult(text, intent);
+  } catch (err) {
+    showToast('语音识别失败：' + (err.message || '请重试'));
+  }
+}
+
+function handleVoiceResult(text, intent) {
+  // 显示识别文本（Toast）
+  showToast('识别到：' + text);
+  // 按意图分流
+  if (intent === 'what_to_cook') {
+    // 跳转到首页并触发推荐
+    navigateTo('home');
+    setTimeout(function() {
+      // 触发推荐刷新
+      loadHomeData();
+      showToast('为你推荐今天可以做的菜');
+    }, 200);
+  } else if (intent === 'search_recipe') {
+    // 弹出搜索结果（简单实现：弹出 alert 或在家庭菜谱页过滤）
+    // 找到家庭菜谱并按菜名过滤
+    navigateTo('family');
+    setTimeout(function() {
+      try {
+        const grid = document.getElementById('recipe-grid');
+        if (grid) {
+          const cards = grid.querySelectorAll('.food-card, .recipe-card');
+          let matched = 0;
+          cards.forEach(function(card) {
+            const title = card.querySelector('.card-title');
+            if (title && title.textContent.indexOf(text) >= 0) {
+              card.style.display = '';
+              matched++;
+            } else if (title) {
+              card.style.display = 'none';
+            }
+          });
+          showToast('找到 ' + matched + ' 道相关菜谱');
+        }
+      } catch (e) {}
+    }, 500);
+  } else if (intent === 'cooking_step') {
+    showToast('"' + text + '"的步骤功能开发中，请查看菜谱详情');
+  } else {
+    // unknown，仅显示文本
+  }
+}
+
+/* ===== F15 购物清单自动生成 ===== */
+async function handleGenerateShopping() {
+  // 二次确认
+  const confirmed = confirm('将根据本周菜单自动生成购物清单，已存在条目会跳过，是否继续？');
+  if (!confirmed) return;
+  try {
+    showToast('正在生成...');
+    const result = await api.generateShoppingFromMenu();
+    const added = (result && result.added) || 0;
+    const skipped = (result && result.skipped) || 0;
+    const message = result && result.message;
+    if (message) {
+      showToast(message);
+    } else {
+      showToast('已生成 ' + added + ' 条，跳过 ' + skipped + ' 条已存在');
+    }
+    // 刷新购物清单
+    loadShoppingList();
+  } catch (err) {
+    showToast('生成失败：' + (err.message || '请重试'));
+  }
+}
+
+/* ===== F17 家庭饮食报告 ===== */
+async function loadFamilyReport(month) {
+  const container = document.getElementById('family-report-content');
+  if (!container) return;
+  container.innerHTML = '<div style="padding:var(--space-6);text-align:center;color:var(--color-on-surface-variant);">加载中...</div>';
+  try {
+    const report = await api.getFamilyReport(month);
+    renderFamilyReport(report || {});
+  } catch (err) {
+    container.innerHTML = '<div style="padding:var(--space-6);text-align:center;color:var(--color-error);">' + escapeHTML(err.message || '加载失败') + '</div>';
+  }
+}
+
+function renderFamilyReport(report) {
+  const container = document.getElementById('family-report-content');
+  if (!container) return;
+  const total = report.totalRecords || 0;
+  if (total === 0) {
+    container.innerHTML =
+      '<div style="padding:var(--space-8);text-align:center;">' +
+        '<div style="font-size:14px;color:var(--color-on-surface-variant);margin-bottom:12px;">本月暂无记录，去记录第一餐吧</div>' +
+        '<button class="btn btn-primary btn-sm" onclick="navigateTo(\'home\')">去记录</button>' +
+      '</div>';
+    return;
+  }
+  const prev = report.prevMonthRecords || 0;
+  const diff = total - prev;
+  const diffText = diff > 0 ? ('↑' + diff) : (diff < 0 ? ('↓' + Math.abs(diff)) : '持平');
+  const diffColor = diff > 0 ? 'var(--success-600)' : (diff < 0 ? 'var(--error)' : 'var(--color-on-surface-variant)');
+
+  // 贡献榜
+  const contribs = report.memberContributions || [];
+  const contribHTML = contribs.slice(0, 5).map(function(c, idx) {
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;">' +
+      '<span style="width:24px;height:24px;border-radius:50%;background:var(--primary-100);color:var(--primary-700);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;">' + (idx + 1) + '</span>' +
+      '<img src="' + escapeAttr(c.userAvatar || '') + '" style="width:32px;height:32px;border-radius:50%;" />' +
+      '<span style="flex:1;font-size:14px;">' + escapeHTML(c.userNickname || '匿名') + '</span>' +
+      '<span style="font-size:14px;color:var(--color-on-surface-variant);">' + (c.recordCount || 0) + ' 条</span>' +
+    '</div>';
+  }).join('');
+
+  // Top5 菜品
+  const topDishes = report.topDishes || [];
+  const topHTML = topDishes.map(function(d, idx) {
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--color-outline);">' +
+      '<span style="width:24px;height:24px;border-radius:50%;background:var(--accent-50);color:var(--accent-700);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;">' + (idx + 1) + '</span>' +
+      '<span style="flex:1;font-size:14px;">' + escapeHTML(d.dishName || '') + '</span>' +
+      '<span style="font-size:12px;color:var(--color-on-surface-variant);">' + (d.count || 0) + ' 次</span>' +
+      '<span style="font-size:12px;color:var(--accent);">★ ' + (d.avgRating || 0).toFixed(1) + '</span>' +
+    '</div>';
+  }).join('');
+
+  // 标签云
+  const tags = report.tagDistribution || [];
+  const tagHTML = tags.map(function(t) {
+    const fontSize = Math.min(20, Math.max(12, 12 + (t.count || 0) * 2));
+    return '<span style="display:inline-block;padding:4px 10px;margin:4px;background:var(--primary-50);color:var(--primary-700);border-radius:12px;font-size:' + fontSize + 'px;">' + escapeHTML(t.tag || '') + ' (' + (t.count || 0) + ')</span>';
+  }).join('');
+
+  container.innerHTML =
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px;">' +
+      '<div class="report-card" style="background:var(--color-surface);border:1px solid var(--color-outline);border-radius:12px;padding:16px;">' +
+        '<div style="font-size:12px;color:var(--color-on-surface-variant);margin-bottom:6px;">本月记录</div>' +
+        '<div style="font-size:28px;font-weight:600;color:var(--primary-700);">' + total + '</div>' +
+        '<div style="font-size:12px;color:' + diffColor + ';margin-top:4px;">环比 ' + diffText + '</div>' +
+      '</div>' +
+      '<div class="report-card" style="background:var(--color-surface);border:1px solid var(--color-outline);border-radius:12px;padding:16px;">' +
+        '<div style="font-size:12px;color:var(--color-on-surface-variant);margin-bottom:6px;">平均评分</div>' +
+        '<div style="font-size:28px;font-weight:600;color:var(--accent);">★ ' + (report.avgRating || 0).toFixed(1) + '</div>' +
+        '<div style="font-size:12px;color:var(--color-on-surface-variant);margin-top:4px;">满分 5.0</div>' +
+      '</div>' +
+      '<div class="report-card" style="background:var(--color-surface);border:1px solid var(--color-outline);border-radius:12px;padding:16px;">' +
+        '<div style="font-size:12px;color:var(--color-on-surface-variant);margin-bottom:6px;">活跃成员</div>' +
+        '<div style="font-size:28px;font-weight:600;color:var(--success-600);">' + contribs.length + '</div>' +
+        '<div style="font-size:12px;color:var(--color-on-surface-variant);margin-top:4px;">参与记录</div>' +
+      '</div>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">' +
+      '<div style="background:var(--color-surface);border:1px solid var(--color-outline);border-radius:12px;padding:16px;">' +
+        '<div style="font-size:14px;font-weight:600;margin-bottom:8px;">🏆 贡献榜</div>' +
+        (contribHTML || '<div style="padding:12px;color:var(--color-on-surface-variant);text-align:center;font-size:13px;">暂无数据</div>') +
+      '</div>' +
+      '<div style="background:var(--color-surface);border:1px solid var(--color-outline);border-radius:12px;padding:16px;">' +
+        '<div style="font-size:14px;font-weight:600;margin-bottom:8px;">🍽️ 高频菜品 Top 5</div>' +
+        (topHTML || '<div style="padding:12px;color:var(--color-on-surface-variant);text-align:center;font-size:13px;">暂无数据</div>') +
+      '</div>' +
+    '</div>' +
+    '<div style="background:var(--color-surface);border:1px solid var(--color-outline);border-radius:12px;padding:16px;">' +
+      '<div style="font-size:14px;font-weight:600;margin-bottom:8px;">🏷️ 标签云</div>' +
+      (tagHTML || '<div style="padding:12px;color:var(--color-on-surface-variant);text-align:center;font-size:13px;">暂无标签</div>') +
+    '</div>';
+}
+
+function changeReportMonth() {
+  const input = document.getElementById('report-month-input');
+  if (!input || !input.value) return;
+  loadFamilyReport(input.value);
 }

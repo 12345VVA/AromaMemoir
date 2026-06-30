@@ -188,6 +188,13 @@ export interface ShoppingItem {
   updatedAt: string;
 }
 
+// 购物清单根据菜单自动生成结果
+export interface ShoppingGenerateResult {
+  added: number;
+  skipped: number;
+  message?: string;
+}
+
 // ============================================================
 // 成就、打卡、挑战
 // ============================================================
@@ -378,4 +385,81 @@ export interface PokedexCatalogEntry {
   dishName: string;
   category: string;
   rarity: PokedexRarity;
+}
+
+// ============================================================
+// 家庭动态（F16）
+// ============================================================
+
+// 记录点赞
+export interface RecordLike {
+  id: string;
+  recordId: string;
+  userId: string;
+  createdAt: string;
+}
+
+// 记录评论
+export interface RecordComment {
+  id: string;
+  recordId: string;
+  userId: string;
+  userNickname: string;
+  content: string;
+  createdAt: string;
+}
+
+// 家庭动态条目（记录 + 作者信息 + 互动数据）
+export interface FamilyRecordItem {
+  id: string;
+  userId: string;
+  userNickname: string;
+  userAvatar: string;
+  dishName: string;
+  imageUrl?: string;
+  beautifiedUrl?: string;
+  rating: number;
+  tags: string[];
+  recordDate: string;
+  cookingMethod?: string;
+  likeCount: number;
+  commentCount: number;
+  likedByMe: boolean;
+  comments: RecordComment[];
+}
+
+// 家庭饮食月度报告（F17）
+export interface FamilyDietReport {
+  month: string;                          // YYYY-MM
+  totalRecords: number;
+  prevMonthRecords: number;               // 上月记录数，用于环比
+  memberContributions: Array<{
+    userId: string;
+    userNickname: string;
+    userAvatar: string;
+    recordCount: number;
+  }>;
+  topDishes: Array<{
+    dishName: string;
+    count: number;
+    avgRating: number;
+  }>;
+  avgRating: number;                     // 0-5
+  tagDistribution: Array<{
+    tag: string;
+    count: number;
+  }>;
+}
+
+// ============================================================
+// 语音交互（F11）
+// ============================================================
+
+// 语音识别意图，供前端分流处理
+export type VoiceIntent = 'search_recipe' | 'cooking_step' | 'what_to_cook' | 'unknown';
+
+// 语音识别响应（在原有 text 基础上新增 intent 字段）
+export interface VoiceRecognizeResponse {
+  text: string;
+  intent: VoiceIntent;
 }

@@ -15,6 +15,26 @@ import type { Context } from 'koa';
 import { Controller, Post } from '../common/decorators';
 import { fail, type ApiResponse } from '../common/response';
 import { AiProxyService } from '../service/ai-proxy.service';
+import type { VoiceIntent } from '../store/types';
+
+// 语音意图识别
+// 根据关键词推断用户意图，供前端分流处理：
+//   - text 为空 → unknown
+//   - 包含"今天吃什么"类关键词 → what_to_cook
+//   - 包含"怎么做"类关键词 → cooking_step
+//   - 其他默认按菜谱搜索处理 → search_recipe
+function detectVoiceIntent(text: string): VoiceIntent {
+  if (!text || !text.trim()) {
+    return 'unknown';
+  }
+  if (/今天|做什么|吃啥|吃啥呢|今晚/.test(text)) {
+    return 'what_to_cook';
+  }
+  if (/怎么做|步骤|教我|做法/.test(text)) {
+    return 'cooking_step';
+  }
+  return 'search_recipe';
+}
 
 @Controller('/api/ai')
 export class AiController {
@@ -59,10 +79,18 @@ export class AiController {
 
   // POST /api/ai/voice/recognize
   // multipart form-data, audio 字段 → 转发到 weiji-ai /ai/voice/recognize
+  // 在原有 { text } 基础上注入 intent 字段，供前端分流处理
   @Post('/voice/recognize')
   async voiceRecognize(ctx: Context): Promise<ApiResponse> {
     try {
-      return await AiProxyService.forwardMultipart(ctx, '/ai/voice/recognize');
+      const result = await AiProxyService.forwardMultipart(ctx, '/ai/voice/recognize');
+      const text = (result.data as { text?: string } | null)?.text ?? '';
+      const intent = detectVoiceIntent(text);
+      return {
+        code: result.code,
+        message: result.message,
+        data: { text, intent },
+      };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('[ai-proxy]', '/ai/voice/recognize', message);

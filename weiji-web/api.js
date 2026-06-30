@@ -148,8 +148,20 @@ const api = {
     fd.append('image', file);
     return request('POST', '/api/ai/beautify', fd, true);
   },
-  getRecommendations(dishName) {
-    return request('POST', '/api/ai/recommend', { dishName: dishName || '' }).then(data => data.recipes || data || []);
+  recognizeVoice(file) {
+    const fd = new FormData();
+    fd.append('audio', file);
+    return request('POST', '/api/ai/voice/recognize', fd, true);
+  },
+  getRecommendations(recentRecords) {
+    var body = { dishName: '' };
+    if (Array.isArray(recentRecords) && recentRecords.length > 0) {
+      body.recentRecords = recentRecords;
+      body.dishName = recentRecords[0] || '';
+    } else if (typeof recentRecords === 'string') {
+      body.dishName = recentRecords;
+    }
+    return request('POST', '/api/ai/recommend', body).then(function(data) { return data.recipes || data || []; });
   },
   getWeeklyMenu() {
     return request('GET', '/api/family/menu');
@@ -172,6 +184,13 @@ const api = {
   deleteShoppingItem(itemId) {
     return request('DELETE', '/api/family/shopping/' + itemId);
   },
+  generateShoppingFromMenu() {
+    return request('POST', '/api/family/shopping/generate', {});
+  },
+  getFamilyReport(month) {
+    const query = month ? ('?month=' + encodeURIComponent(month)) : '';
+    return request('GET', '/api/family/report' + query);
+  },
   getFamilyInfo() {
     return request('GET', '/api/family');
   },
@@ -192,6 +211,22 @@ const api = {
   },
   joinFamily(code) {
     return request('POST', '/api/family/join', { code });
+  },
+  uploadRecipe(data) {
+    return request('POST', '/api/family/recipes', data);
+  },
+  replenishCheckin() {
+    return request('POST', '/api/checkin/replenish');
+  },
+  getFamilyRecords(page) {
+    const query = page ? '?page=' + page + '&pageSize=20' : '';
+    return request('GET', '/api/family/records' + query);
+  },
+  toggleRecordLike(recordId) {
+    return request('POST', '/api/family/records/' + recordId + '/like');
+  },
+  addRecordComment(recordId, content) {
+    return request('POST', '/api/family/records/' + recordId + '/comments', { content });
   },
   getRecipesFiltered(params) {
     const query = new URLSearchParams();

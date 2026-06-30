@@ -74,6 +74,8 @@ import type {
   BlindGuessResult,
   BlindGuessRankEntry,
   Record,
+  AchievementDef,
+  FamilyDietReport,
 } from './types';
 
 // 肉类食材关键词（用于 meat_enthusiast 判定）
@@ -434,5 +436,195 @@ export function scoreBlindGuess(roundId: string): BlindGuessResult | null {
     items,
     ranking,
     chefWinner,
+  };
+}
+
+// ============================================================
+// 成就自动解锁检查
+// ============================================================
+
+import { achievements, user_achievements, check_ins, families, family_members, users } from './db';
+import { CheckinService } from '../service/checkin.service';
+
+// 检查并解锁满足条件的成就
+// 在用户创建记录或打卡后调用
+// 返回新解锁的成就列表
+export function checkAndUnlockAchievements(userId: string): AchievementDef[] {
+  const newlyUnlocked: AchievementDef[] = [];
+
+  // 获取用户已解锁的成就ID集合
+  const unlockedIds = new Set<string>();
+  for (const ua of user_achievements) {
+    if (ua.userId === userId) {
+      unlockedIds.add(ua.achievementId);
+    }
+  }
+
+  // 统计用户数据
+  // 记录数
+  const recordCount = records.filter((r) => r.userId === userId && !r.isDeleted).length;
+  // 连续打卡天数
+  const streak = CheckinService.calculateStreak(userId);
+  // 是否创建过家庭组
+  const familyCreated = families.some((f) => f.ownerId === userId && !f.isDeleted);
+
+  // 遍历成就定义，检查解锁条件
+  for (const ach of achievements) {
+    // 跳过已解锁的
+    if (unlockedIds.has(ach.id)) continue;
+
+    let shouldUnlock = false;
+    const cond = ach.condition;
+
+    switch (ach.code) {
+      case 'first_record':
+        shouldUnlock = recordCount >= 1;
+        break;
+      case 'streak_7':
+        shouldUnlock = streak >= 7;
+        break;
+      case 'streak_30':
+        shouldUnlock = streak >= 30;
+        break;
+      case 'record_100':
+        shouldUnlock = recordCount >= 100;
+        break;
+      case 'family_create':
+        shouldUnlock = familyCreated;
+        break;
+      // cuisine_10 暂不实现自动解锁（需要菜系统计）
+      default:
+        break;
+    }
+
+    if (shouldUnlock) {
+      // 创建用户成就记录
+      const now = new Date().toISOString();
+      user_achievements.push({
+        id: crypto.randomUUID(),
+        userId,
+        achievementId: ach.id,
+        earnedAt: now,
+      });
+      newlyUnlocked.push(ach);
+    }
+  }
+
+  return newlyUnlocked;
+}
+
+// ============================================================
+// 家庭饮食月度报告（F17）
+// ============================================================
+
+// 计算给定月份（YYYY-MM）的上一月 YYYY-MM
+// 1 月的上一月为上年 12 月
+function computePrevMonth(month: string): string {
+  const parts = month.split('-');
+  if (parts.length < 2) return month;
+  const year = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  if (Number.isNaN(year) || Number.isNaN(m)) return month;
+  let prevYear = year;
+  let prevMonthNum = m - 1;
+  if (prevMonthNum < 1) {
+    prevMonthNum = 12;
+    prevYear -= 1;
+  }
+  return `${prevYear}-${String(prevMonthNum).padStart(2, '0')}`;
+}
+
+// 生成家庭饮食月度报告
+// 流程：
+// 1. 通过 family_members 找出该家庭的所有 userIds
+// 2. 过滤 records：userId 在家庭组内 + isDeleted=false + recordDate 月份匹配
+// 3. 计算 prevMonthRecords：上一月同条件记录数
+// 4. memberContributions：按 userId 分组聚合，关联 users 表取昵称头像，按记录数倒序
+// 5. topDishes：按 dishName 分组，统计 count + 平均 rating，取 Top 5
+// 6. avgRating：所有记录的平均 rating（无记录时为 0）
+// 7. tagDistribution：展开所有 tags 数组，按频次排序，最多 10 个
+// 8. 无数据时返回 totalRecords=0 等空结构
+export function generateFamilyDietReport(familyId: string, month: string): FamilyDietReport {
+  // 通过 family_members 找出该家庭的所有 userIds
+  const memberUserIds = family_members
+    .filter((m) => m.familyId === familyId)
+    .map((m) => m.userId);
+  const userIdSet = new Set(memberUserIds);
+
+  const prevMonth = computePrevMonth(month);
+
+  // 过滤当月记录：userId 在家庭组内 + 未删除 + recordDate 月份匹配
+  const monthRecords = records.filter(
+    (r) => userIdSet.has(r.userId) && !r.isDeleted && r.recordDate.startsWith(month)
+  );
+
+  // 过滤上月记录（用于环比）
+  const prevMonthRecords = records.filter(
+    (r) => userIdSet.has(r.userId) && !r.isDeleted && r.recordDate.startsWith(prevMonth)
+  ).length;
+
+  // memberContributions：按 userId 分组聚合，关联 users 表取昵称头像，按记录数倒序
+  const memberMap = new Map<string, number>();
+  for (const r of monthRecords) {
+    memberMap.set(r.userId, (memberMap.get(r.userId) || 0) + 1);
+  }
+  const memberContributions = Array.from(memberMap.entries())
+    .map(([userId, recordCount]) => {
+      const user = users.find((u) => u.id === userId);
+      return {
+        userId,
+        userNickname: user?.nickname ?? '',
+        userAvatar: user?.avatar ?? '',
+        recordCount,
+      };
+    })
+    .sort((a, b) => b.recordCount - a.recordCount);
+
+  // topDishes：按 dishName 分组，统计 count + 平均 rating，取 Top 5
+  const dishMap = new Map<string, { dishName: string; count: number; ratingSum: number }>();
+  for (const r of monthRecords) {
+    const existing = dishMap.get(r.dishName);
+    if (existing) {
+      existing.count += 1;
+      existing.ratingSum += r.rating;
+    } else {
+      dishMap.set(r.dishName, { dishName: r.dishName, count: 1, ratingSum: r.rating });
+    }
+  }
+  const topDishes = Array.from(dishMap.values())
+    .map((d) => ({
+      dishName: d.dishName,
+      count: d.count,
+      avgRating: d.count > 0 ? d.ratingSum / d.count : 0,
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  // avgRating：所有记录的平均 rating（无记录时为 0）
+  const avgRating =
+    monthRecords.length > 0
+      ? monthRecords.reduce((sum, r) => sum + r.rating, 0) / monthRecords.length
+      : 0;
+
+  // tagDistribution：展开所有 tags 数组，按频次排序，最多 10 个
+  const tagMap = new Map<string, number>();
+  for (const r of monthRecords) {
+    for (const tag of r.tags || []) {
+      tagMap.set(tag, (tagMap.get(tag) || 0) + 1);
+    }
+  }
+  const tagDistribution = Array.from(tagMap.entries())
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+
+  return {
+    month,
+    totalRecords: monthRecords.length,
+    prevMonthRecords,
+    memberContributions,
+    topDishes,
+    avgRating,
+    tagDistribution,
   };
 }

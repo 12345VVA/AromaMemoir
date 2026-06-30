@@ -56,6 +56,22 @@ export class AuthService {
     return safe;
   }
 
+  // 密码强度校验：最少 8 字符 + 字母与数字 + 拒绝常见弱密码
+  private static validatePasswordStrength(password: string): void {
+    if (!password || password.length < 8) {
+      throw new Error('密码强度不足：至少 8 字符且需同时包含字母与数字');
+    }
+    const hasLetter = /[a-zA-Z]/.test(password);
+    const hasDigit = /\d/.test(password);
+    if (!hasLetter || !hasDigit) {
+      throw new Error('密码强度不足：至少 8 字符且需同时包含字母与数字');
+    }
+    const weakPasswords = ['12345678', 'password', 'qwerty', '11111111', 'abc12345', 'admin123', 'letmein1', '123456789', 'password1', 'iloveyou1'];
+    if (weakPasswords.includes(password.toLowerCase())) {
+      throw new Error('密码强度不足：至少 8 字符且需同时包含字母与数字');
+    }
+  }
+
   // 注册新用户
   // 校验用户名非空且不重复，密码 bcrypt 哈希后入库，注册成功自动签发 token
   static async register(username: string, password: string, nickname: string): Promise<RegisterResult> {
@@ -63,9 +79,7 @@ export class AuthService {
     if (!username || !username.trim()) {
       throw new Error('用户名不能为空');
     }
-    if (!password) {
-      throw new Error('密码不能为空');
-    }
+    AuthService.validatePasswordStrength(password);
     if (!nickname || !nickname.trim()) {
       throw new Error('昵称不能为空');
     }
@@ -73,7 +87,7 @@ export class AuthService {
     // 用户名查重
     const existed = await users.findByField('username', username);
     if (existed) {
-      throw new Error('用户名已存在');
+      throw new Error('注册失败，请检查输入或更换用户名');
     }
 
     // bcrypt 哈希密码

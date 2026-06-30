@@ -13,6 +13,18 @@ import type { Context } from 'koa';
 import axios, { AxiosResponse } from 'axios';
 import { appConfig } from '../configuration';
 
+// 从请求头中仅提取白名单字段，过滤 Host / X-Forwarded-* / Cookie 等内部头
+function pickHeaders(headers: Record<string, string | string[] | undefined>, allowlist: string[]): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const key of allowlist) {
+    const v = headers[key];
+    if (v !== undefined) {
+      result[key] = Array.isArray(v) ? v.join(',') : String(v);
+    }
+  }
+  return result;
+}
+
 // AI 服务连通性状态
 export type AiStatus = 'up' | 'down';
 
@@ -41,7 +53,7 @@ export class AiProxyService {
         `${appConfig.aiServiceUrl}${path}`,
         ctx.req,
         {
-          headers: ctx.headers,
+          headers: pickHeaders(ctx.headers, ['content-type', 'content-length', 'authorization']),
           timeout: AI_REQUEST_TIMEOUT,
           maxContentLength: Infinity,
           maxBodyLength: Infinity,

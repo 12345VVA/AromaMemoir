@@ -27,6 +27,7 @@
             show-password
             @keyup.enter="handleSubmit"
           />
+          <p v-if="isRegister" class="password-hint">至少 8 字符，需含字母与数字</p>
         </el-form-item>
         <el-button
           type="primary"
@@ -48,9 +49,9 @@
       </p>
 
       <!-- 演示账号提示 -->
-      <div class="demo-tip">
+      <div v-if="isDev" class="demo-tip">
         <p class="demo-label">演示账号</p>
-        <p class="demo-info">用户名：demo　密码：123456</p>
+        <p class="demo-info">{{ demoInfo }}</p>
       </div>
     </div>
   </div>
@@ -68,15 +69,20 @@ import { useAuthStore } from '../stores/auth';
 const router = useRouter();
 const auth = useAuthStore();
 
+const isDev = import.meta.env.DEV;
 const isRegister = ref(false);
 const loading = ref(false);
 const formRef = ref<FormInstance>();
 
 const form = reactive({
-  username: 'demo',
-  password: '123456',
+  username: isDev ? 'demo' : '',
+  password: isDev ? '123456' : '',
   nickname: '',
 });
+
+// 演示账号提示文案：dev 下展示明文，生产构建经 import.meta.env.DEV 静态替换 + 死代码消除，
+// 确保演示密码字符串不进入生产产物（避免在模板静态文本中保留字面量被 Vue hoistStatic 提升）
+const demoInfo = isDev ? '用户名：demo　密码：123456' : '';
 
 const rules: FormRules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
@@ -198,5 +204,11 @@ async function handleSubmit() {
 .demo-info {
   font-size: 12px;
   color: var(--foreground);
+}
+
+.password-hint {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  margin-top: 4px;
 }
 </style>

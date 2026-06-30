@@ -131,7 +131,7 @@ export class RecordController {
   }
 
   // GET /api/record/:id
-  // 返回单条记录；找不到或已软删除时返回 404
+  // 返回单条记录；找不到或已软删除时返回 404；非本人记录返回 403（防止 IDOR 越权）
   @Get('/:id')
   async getById(ctx: Context): Promise<ApiResponse> {
     const id = ctx.params.id;
@@ -139,6 +139,12 @@ export class RecordController {
 
     if (!record || record.isDeleted) {
       return fail('记录不存在', 404);
+    }
+
+    // 所有权校验：仅记录归属用户可访问，防止 IDOR 越权读取
+    const user = ctx.state.user as AuthUser;
+    if (record.userId !== user.userId) {
+      return fail('无权访问该记录', 403);
     }
 
     return ok(record);

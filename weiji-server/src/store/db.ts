@@ -866,7 +866,7 @@ if (!isMysql) {
   console.log(`  - blindGuessRounds count: 0`);
   console.log(`  - record_likes count: ${record_likesSeed.length}`);
   console.log(`  - record_comments count: ${record_commentsSeed.length}`);
-  console.log(`[store] 演示账号：demo / 123456`);
+  console.log(`[store] 演示账号详见 README.md（dev 模式默认 demo / 123456）`);
 } else {
   const m = appConfig.storage.mysql;
   console.log(

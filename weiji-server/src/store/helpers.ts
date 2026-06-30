@@ -4,22 +4,26 @@
 import crypto from 'crypto';
 
 // 按 id 查找单个元素
+/** @deprecated 请使用 InMemoryRepository 实例方法（如 users.findById(id)）替代 */
 export function findById<T extends { id: string }>(list: T[], id: string): T | undefined {
   return list.find((item) => item.id === id);
 }
 
 // 按字段查找单个元素
+/** @deprecated 请使用 InMemoryRepository 实例方法（如 users.findById(id)）替代 */
 export function findByField<T, K extends keyof T>(list: T[], field: K, value: T[K]): T | undefined {
   return list.find((item) => item[field] === value);
 }
 
 // 按条件过滤
+/** @deprecated 请使用 InMemoryRepository 实例方法（如 users.findById(id)）替代 */
 export function filterBy<T>(list: T[], predicate: (item: T) => boolean): T[] {
   return list.filter(predicate);
 }
 
 // 插入新元素并自动生成 UUID
 // 若 item 已含 id 则保留，否则使用 crypto.randomUUID() 生成
+/** @deprecated 请使用 InMemoryRepository 实例方法（如 users.findById(id)）替代 */
 export function insert<T extends { id: string }>(list: T[], item: Omit<T, 'id'> & Partial<Pick<T, 'id'>>): T {
   const newItem = { ...item, id: item.id || crypto.randomUUID() } as T;
   list.push(newItem);
@@ -28,6 +32,7 @@ export function insert<T extends { id: string }>(list: T[], item: Omit<T, 'id'> 
 
 // 按 id 更新元素（patch 合并），返回更新后的对象
 // 找不到时返回 undefined
+/** @deprecated 请使用 InMemoryRepository 实例方法（如 users.findById(id)）替代 */
 export function updateById<T extends { id: string }>(list: T[], id: string, patch: Partial<T>): T | undefined {
   const idx = list.findIndex((item) => item.id === id);
   if (idx === -1) return undefined;
@@ -41,6 +46,7 @@ export function updateById<T extends { id: string }>(list: T[], id: string, patc
 }
 
 // 软删除：设置 isDeleted = true
+/** @deprecated 请使用 InMemoryRepository 实例方法（如 users.findById(id)）替代 */
 export function softDelete<T extends { id: string; isDeleted: boolean }>(list: T[], id: string): T | undefined {
   const item = findById(list, id);
   if (item) {
@@ -443,74 +449,25 @@ export async function scoreBlindGuess(roundId: string): Promise<BlindGuessResult
 // 成就自动解锁检查
 // ============================================================
 
-import { achievements, user_achievements, check_ins, families, family_members, users } from './db';
+import { achievements, family_members, users } from './db';
 import { CheckinService } from '../service/checkin.service';
+import { AchievementService } from '../service/achievement.service';
 
 // 检查并解锁满足条件的成就
 // 在用户创建记录或打卡后调用
 // 返回新解锁的成就列表
 export async function checkAndUnlockAchievements(userId: string): Promise<AchievementDef[]> {
-  const newlyUnlocked: AchievementDef[] = [];
-
-  // 获取用户已解锁的成就ID集合
-  const unlockedIds = new Set<string>();
-  for (const ua of await user_achievements.toArray()) {
-    if (ua.userId === userId) {
-      unlockedIds.add(ua.achievementId);
-    }
-  }
-
-  // 统计用户数据
-  // 记录数
-  const recordCount = await records.count((r) => r.userId === userId && !r.isDeleted);
-  // 连续打卡天数
+  // 委托 AchievementService 统一实现（删除原 switch-case 重复逻辑）
   const streak = await CheckinService.calculateStreak(userId);
-  // 是否创建过家庭组
-  const familyCreated = (await families.count((f) => f.ownerId === userId && !f.isDeleted)) > 0;
-
-  // 遍历成就定义，检查解锁条件
-  for (const ach of await achievements.toArray()) {
-    // 跳过已解锁的
-    if (unlockedIds.has(ach.id)) continue;
-
-    let shouldUnlock = false;
-    const cond = ach.condition;
-
-    switch (ach.code) {
-      case 'first_record':
-        shouldUnlock = recordCount >= 1;
-        break;
-      case 'streak_7':
-        shouldUnlock = streak >= 7;
-        break;
-      case 'streak_30':
-        shouldUnlock = streak >= 30;
-        break;
-      case 'record_100':
-        shouldUnlock = recordCount >= 100;
-        break;
-      case 'family_create':
-        shouldUnlock = familyCreated;
-        break;
-      // cuisine_10 暂不实现自动解锁（需要菜系统计）
-      default:
-        break;
-    }
-
-    if (shouldUnlock) {
-      // 创建用户成就记录
-      const now = new Date().toISOString();
-      await user_achievements.insert({
-        id: crypto.randomUUID(),
-        userId,
-        achievementId: ach.id,
-        earnedAt: now,
-      });
-      newlyUnlocked.push(ach);
-    }
-  }
-
-  return newlyUnlocked;
+  const unlockedRecords = await AchievementService.checkAndUnlockRecordAchievements(userId);
+  const unlockedStreak = await AchievementService.checkAndUnlockStreakAchievements(userId, streak);
+  const unlockedFamily = await AchievementService.checkAndUnlockFamilyAchievements(userId);
+  const unlockedGameplay = await AchievementService.checkAndUnlockGameplayAchievements(userId);
+  const allUnlocked = [...unlockedRecords, ...unlockedStreak, ...unlockedFamily, ...unlockedGameplay];
+  // 反查 achievements 定义，返回 AchievementDef[]（保持原签名向后兼容）
+  const allAchievements = await achievements.toArray();
+  const achMap = new Map(allAchievements.map(a => [a.id, a]));
+  return allUnlocked.map(ua => achMap.get(ua.achievementId)).filter((a): a is AchievementDef => !!a);
 }
 
 // ============================================================

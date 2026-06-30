@@ -2,7 +2,8 @@
 
 > **用途：** 替代完整 API 设计 / 数据库设计 / 架构设计文档，供 MVP 阶段快速启动开发  
 > **日期：** 2026-06-24  
-> **框架：** cool-admin (Midway.js) + Python (FastAPI) AI 层
+> **框架：** weiji-server（Koa + @koa/router + 装饰器简化方案）+ weiji-ai（Python FastAPI）+ weiji-admin-web（Vue3）  
+> **说明：** 本手册最初基于 cool-admin (Midway.js) 方案草拟，**该方案未采用**。实际后端为 Koa + 装饰器简化方案（装饰器 API 兼容 Midway 风格，但不引入完整 DI 容器；`bootstrap.ts` 装配中间件并扫描 `@Controller` 路由）。文中保留的 cool-admin / Redis / BullMQ / WebSocket / 腾讯云 COS / 微信小程序 / Flutter 等内容为原目标设计，**均未实现**，仅作历史参考。
 
 ---
 
@@ -18,7 +19,7 @@
 
 # 一、接口约定卡片
 
-> **原则：** 标准 CRUD 接口由 cool-admin AI 编码 + Eps 自动生成，Swagger 自动文档化，此处不列。  
+> **原则：** 标准 CRUD 接口由 weiji-server 控制器（@Controller + @Get/@Post 装饰器）实现，统一走 `{ code, data, message }` 响应契约。  
 > **本文档只列需要手动约定的非标准接口。**
 
 ---
@@ -261,11 +262,11 @@ Authorization: Bearer {token}
 
 ## 1.5 标准 CRUD 接口命名规范
 
-> 以下由 cool-admin AI 编码自动生成，此处仅定义命名规范。
+> 以下命名规范供 weiji-server 控制器实现参考（实际已实现端点见根 README「核心业务能力」表）。
 
 | 模块 | 端点前缀 | 典型接口 |
 |------|----------|----------|
-| 用户 | `/api/user` | 内置（cool-admin 提供） |
+| 用户 | `/api/user` | 自实现（auth.controller / user.controller） |
 | 饮食记录 | `/api/record` | CRUD + 按日期/标签/评分筛选 |
 | 评分标记 | `/api/record/{id}/rate` | PATCH（更新评分和标签） |
 | 菜谱 | `/api/recipe` | CRUD + 按菜系/难度/食材搜索 |
@@ -314,7 +315,7 @@ erDiagram
 
 ## 2.2 核心表字段清单
 
-> 只列味记特有表，cool-admin 内置表（`user`、`role`、`menu`、`dict`、`log` 等）不列。
+> 以下为味记核心业务表的设计字段清单（设计参考）。**实际建表脚本**见 `weiji-server/db/init.sql`，共 12 张表（users / families / family_members / family_recipes / invitations / records / weekly_menu / shopping_items / achievements / user_achievements / check_ins / challenges）；下文部分表（如 record_photo / tag / recipe_version / explore_record 等）为设计扩展，尚未落库。
 
 ### record（饮食记录表）— 核心表
 
@@ -534,6 +535,8 @@ erDiagram
 
 # 三、模块边界图
 
+> **未采用：** 本节为 2026-06 草拟的 cool-admin 目标架构设计，**未落地**。实际架构为三服务分层（见根 README）：weiji-admin-web（Vue3 :5173）→ weiji-server（Koa + @koa/router + 装饰器简化方案，`bootstrap.ts` 装配 CORS / bodyParser / JWT 中间件并扫描 `@Controller` 路由，:8001）→ weiji-ai（FastAPI :8002）。下文图与流程中的 Socket.io / BullMQ / Redis PubSub / 腾讯云 COS / 微信小程序 / Flutter 客户端等**均未实现**，保留仅作目标设计参考。
+
 ## 3.1 架构总览
 
 ```
@@ -687,117 +690,72 @@ erDiagram
 
 | 软件 | 版本 | 用途 |
 |------|------|------|
-| Node.js | 18.x LTS | cool-admin 运行环境 |
-| MySQL | 8.0+ | 业务数据库 |
-| Redis | 7.x | 缓存/队列/实时通信 |
-| Python | 3.12+ | AI 服务层 |
-| pnpm | 8.x+ | 包管理器（推荐） |
+| Node.js | ≥ 20（推荐 24） | weiji-server / weiji-admin-web 运行环境 |
+| Python | ≥ 3.10 | weiji-ai 服务层 |
+| MySQL | 8.0+ | 业务数据库（**可选**，仅启用持久化时需要；默认内存模式无需） |
 
-## 4.2 cool-admin 初始化
+> 实际项目使用 `npm`（非 pnpm），不依赖 Redis / 腾讯云 COS；实时同步、任务队列等原 cool-admin 目标设计未实现。
+
+## 4.2 weiji-server 启动（Koa + 装饰器简化方案）
 
 ```bash
-# 1. 克隆 cool-admin midway 版
-git clone https://github.com/cool-team-official/cool-admin-midway.git weiji-server
 cd weiji-server
-
-# 2. 安装依赖
-pnpm install
-
-# 3. 配置数据库
-# 编辑 src/config/config.local.ts
-# 修改 MySQL 连接信息
-
-# 4. 初始化数据库
-pnpm run dev  # 首次启动自动建表
-
-# 5. 导入 cool-admin 内置数据
-# 通过浏览器打开 http://localhost:8001
-# 默认账号 admin / 123456
+npm install
+npm run dev          # ts-node src/bootstrap.ts，监听 :8001
 ```
+
+启动入口 `src/bootstrap.ts`：顶部 `import 'dotenv/config'` 加载 `.env` → 装配 CORS / bodyParser / JWT 中间件 → 扫描 `@Controller` 装饰器将路由注册到 `@koa/router` → 触发 `Configuration.onReady`。默认内存模式加载种子数据；AI 健康检查每 60s 一次，状态由 `/health` 暴露。
 
 ## 4.3 环境变量配置
 
-```bash
-# .env.local
-# === MySQL ===
-MYSQL_HOST=localhost
-MYSQL_PORT=3306
-MYSQL_USER=root
-MYSQL_PASSWORD=your_password
-MYSQL_DATABASE=weiji
-
-# === Redis ===
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=
-
-# === JWT ===
-JWT_SECRET=your_jwt_secret_key
-JWT_EXPIRE=7d
-
-# === 百度AI ===
-BAIDU_AI_APP_ID=your_app_id
-BAIDU_AI_API_KEY=your_api_key
-BAIDU_AI_SECRET_KEY=your_secret_key
-
-# === 通义千问 ===
-DASHSCOPE_API_KEY=your_dashscope_key
-
-# === 火山引擎 ===
-VOLCENGINE_ACCESS_KEY=your_access_key
-VOLCENGINE_SECRET_KEY=your_secret_key
-
-# === 科大讯飞 ===
-XFYUN_APP_ID=your_app_id
-XFYUN_API_KEY=your_api_key
-XFYUN_API_SECRET=your_api_secret
-
-# === 腾讯云COS ===
-COS_SECRET_ID=your_secret_id
-COS_SECRET_KEY=your_secret_key
-COS_BUCKET=weiji-records
-COS_REGION=ap-guangzhou
-
-# === Python AI 服务 ===
-AI_SERVICE_URL=http://localhost:8002
-```
-
-## 4.4 Python AI 服务初始化
+复制样例并按需编辑（`.env` 已在 `.gitignore`，不会提交）：
 
 ```bash
-# 创建 AI 服务项目
-mkdir weiji-ai && cd weiji-ai
-python -m venv venv && source venv/bin/activate
-
-# 安装依赖
-pip install fastapi uvicorn httpx openai dashscope
-
-# 启动
-uvicorn main:app --port 8002 --reload
+cd weiji-server
+cp .env.example .env
 ```
 
-## 4.5 本地启动命令
+| 变量 | 默认 | 说明 |
+|------|------|------|
+| `NODE_ENV` | development | production 下必须显式设置 `JWT_SECRET`，否则启动即退出 |
+| `PORT` | 8001 | 服务监听端口 |
+| `JWT_SECRET` | （开发回退默认值） | JWT 密钥；生产必填，建议 `openssl rand -hex 32` |
+| `DB_DRIVER` | memory | `memory`（内存+种子，重启丢失）/ `mysql`（持久化，需先执行 `db/init.sql`） |
+| `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | localhost / 3306 / root / 空 / weiji | MySQL 连接参数（仅 `DB_DRIVER=mysql` 时生效） |
+| `AI_SERVICE_URL` | http://localhost:8002 | weiji-ai 服务地址 |
+
+完整清单见 `weiji-server/.env.example`。weiji-ai 的 AI 厂商 Key 环境变量见 `weiji-ai/README.md`（缺失时自动降级返回 mock）。
+
+## 4.4 weiji-ai 启动
 
 ```bash
-# 终端1：启动 MySQL + Redis
-# (Docker 或本地服务)
-
-# 终端2：启动 cool-admin
-cd weiji-server && pnpm run dev
-# → http://localhost:8001
-
-# 终端3：启动 Python AI 服务
-cd weiji-ai && source venv/bin/activate && uvicorn main:app --port 8002
-# → http://localhost:8002
-
-# 终端4：启动前端（可选，cool-admin 自带前端）
-cd weiji-server && pnpm run dev:vue
-# → http://localhost:5173
+cd weiji-ai
+pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 8002
 ```
+
+无需配置任何 AI Key 即可启动：5 个端点会降级返回 mock 数据。完整环境变量与降级策略见 `weiji-ai/README.md`。
+
+## 4.5 本地启动（三终端）
+
+```bash
+# 终端1：AI 服务
+cd weiji-ai && uvicorn main:app --host 0.0.0.0 --port 8002
+
+# 终端2：业务后端
+cd weiji-server && npm run dev          # → http://localhost:8001
+
+# 终端3：前端
+cd weiji-admin-web && npm run dev       # → http://localhost:5173
+```
+
+如需 MySQL 持久化，在终端2 启动前执行 `cp .env.example .env`（设 `DB_DRIVER=mysql`）与 `mysql -u root -p < db/init.sql`，详见 `weiji-server/db/README.md`。
 
 ---
 
 # 五、MVP 任务拆分
+
+> **已废弃/未采用：** 本节为 2026-06 基于 cool-admin 方案的 Sprint 计划，**未按此执行**。实际实施采用 spec 驱动（见 `.trae/specs/`），三服务架构（weiji-admin-web / weiji-server / weiji-ai）已落地，详见根 README 与各服务 README。下列 Sprint 任务中涉及的 cool-admin AI 编码、uni-app / Flutter 客户端、腾讯云 COS、BullMQ 队列等**均未实现**，保留仅作历史参考。
 
 ## 5.1 Sprint 规划
 
@@ -972,4 +930,4 @@ cd weiji-server && pnpm run dev:vue
 
 ---
 
-> **手册使用说明：** 本文档替代传统 API 设计文档、数据库设计文档和系统架构设计文档。标准 CRUD 接口由 cool-admin AI 编码自动生成，Swagger 自动文档化。开发过程中遇到本文档未覆盖的接口，直接在 cool-admin 中定义 Controller 和 Entity 即可。
+> **手册使用说明：** 本文档为 MVP 设计速查，保留接口约定、表字段清单、种子账号等参考信息。实际架构与已实现端点以根 README 与各服务 README 为准；新增能力请在 weiji-server 中以 `@Controller` + `@Get`/`@Post` 装饰器定义，并在 `.trae/specs/` 下以 spec 三件套驱动。

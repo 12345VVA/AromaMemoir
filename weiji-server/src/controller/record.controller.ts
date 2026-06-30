@@ -7,8 +7,7 @@ import type { Context } from 'koa';
 import { Controller, Get, Post } from '../common/decorators';
 import { ok, fail, type ApiResponse } from '../common/response';
 import { records } from '../store/db';
-import { findById, insert, uuid } from '../store/helpers';
-import { checkAndUnlockAchievements } from '../store/helpers';
+import { uuid, checkAndUnlockAchievements } from '../store/helpers';
 import type { Record, IngredientWithConfidence, Nutrition } from '../store/types';
 
 // JWT 中间件挂载到 ctx.state.user 的用户信息
@@ -63,7 +62,7 @@ export class RecordController {
     const rating = ratingParam !== '' ? Number(ratingParam) : undefined;
 
     // 过滤：当前用户 + 未软删除 + 可选 tag/rating 筛选
-    const filtered = records.filter((r) => {
+    const filtered = await records.findAll((r) => {
       if (r.userId !== userId) return false;
       if (r.isDeleted) return false;
       if (tag && !r.tags.includes(tag)) return false;
@@ -123,10 +122,10 @@ export class RecordController {
 
     // 写入内存存储（insert 会保留已设置的 id，将记录置于数组末尾）
     // 由于 list 按 createdAt 降序，新记录 createdAt 为当前时间，会排在种子数据之前
-    insert(records, newRecord);
+    await records.insert(newRecord);
 
     // 自动检查并解锁成就
-    const newlyUnlocked = checkAndUnlockAchievements(userId);
+    const newlyUnlocked = await checkAndUnlockAchievements(userId);
 
     return ok({ record: newRecord, newAchievements: newlyUnlocked }, '保存成功');
   }
@@ -136,7 +135,7 @@ export class RecordController {
   @Get('/:id')
   async getById(ctx: Context): Promise<ApiResponse> {
     const id = ctx.params.id;
-    const record = findById(records, id);
+    const record = await records.findById(id);
 
     if (!record || record.isDeleted) {
       return fail('记录不存在', 404);

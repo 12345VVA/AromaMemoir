@@ -9,8 +9,7 @@ import { Controller, Get, Post } from '../common/decorators';
 import { ok, fail, type ApiResponse } from '../common/response';
 import { check_ins } from '../store/db';
 import type { CheckIn } from '../store/types';
-import { insert, uuid } from '../store/helpers';
-import { checkAndUnlockAchievements } from '../store/helpers';
+import { uuid, checkAndUnlockAchievements } from '../store/helpers';
 import { CheckinService } from '../service/checkin.service';
 
 // 打卡状态返回结构
@@ -44,12 +43,12 @@ export class CheckinController {
     const userId = ctx.state.user.userId;
 
     const today = CheckinService.todayStr();
-    const todayCheckIn = CheckinService.findCheckin(userId, today);
+    const todayCheckIn = await CheckinService.findCheckin(userId, today);
     const todayChecked = !!todayCheckIn;
 
     // 连续打卡天数（service 内部会处理今日未打卡时从昨天开始计算）
-    const streak = CheckinService.calculateStreak(userId);
-    const lastCheckDate = CheckinService.lastCheckDate(userId);
+    const streak = await CheckinService.calculateStreak(userId);
+    const lastCheckDate = await CheckinService.lastCheckDate(userId);
 
     return ok({ todayChecked, streak, lastCheckDate });
   }
@@ -62,11 +61,11 @@ export class CheckinController {
     const userId = ctx.state.user.userId;
 
     const today = CheckinService.todayStr();
-    const existing = CheckinService.findCheckin(userId, today);
+    const existing = await CheckinService.findCheckin(userId, today);
 
     if (existing) {
       // 今日已打卡，不重复增加天数
-      const streak = CheckinService.calculateStreak(userId);
+      const streak = await CheckinService.calculateStreak(userId);
       return ok({
         todayChecked: true,
         streak,
@@ -84,13 +83,13 @@ export class CheckinController {
       isReplenish: false,
       createdAt: new Date().toISOString(),
     };
-    insert(check_ins, newCheckIn);
+    await check_ins.insert(newCheckIn);
 
     // 重新计算最新连续天数
-    const streak = CheckinService.calculateStreak(userId);
+    const streak = await CheckinService.calculateStreak(userId);
 
     // 自动检查并解锁成就
-    const newlyUnlocked = checkAndUnlockAchievements(userId);
+    const newlyUnlocked = await checkAndUnlockAchievements(userId);
 
     return ok({
       todayChecked: true,
@@ -110,13 +109,13 @@ export class CheckinController {
     const yesterday = CheckinService.daysAgo(1);
 
     // 检查昨天是否已打卡（已打卡则无需补签）
-    const yesterdayCheckin = CheckinService.findCheckin(userId, yesterday);
+    const yesterdayCheckin = await CheckinService.findCheckin(userId, yesterday);
     if (yesterdayCheckin) {
       return fail('昨日已有打卡记录，无需补签', 400);
     }
 
     // 检查今日是否已打卡
-    const todayCheckin = CheckinService.findCheckin(userId, today);
+    const todayCheckin = await CheckinService.findCheckin(userId, today);
     if (!todayCheckin) {
       return fail('请先完成今日打卡，再补签昨日', 400);
     }
@@ -130,9 +129,9 @@ export class CheckinController {
     const mondayStr = monday.toISOString().split('T')[0];
 
     // 检查本周是否有补签记录
-    const weekReplenished = check_ins.some(
+    const weekReplenished = (await check_ins.count(
       (c) => c.userId === userId && c.isReplenish && c.checkDate >= mondayStr
-    );
+    )) > 0;
     if (weekReplenished) {
       return fail('本周补签次数已用完', 400);
     }
@@ -146,13 +145,13 @@ export class CheckinController {
       isReplenish: true,
       createdAt: new Date().toISOString(),
     };
-    insert(check_ins, newCheckIn);
+    await check_ins.insert(newCheckIn);
 
     // 重新计算连续天数
-    const streak = CheckinService.calculateStreak(userId);
+    const streak = await CheckinService.calculateStreak(userId);
 
     // 检查成就解锁
-    const newlyUnlocked = checkAndUnlockAchievements(userId);
+    const newlyUnlocked = await checkAndUnlockAchievements(userId);
 
     return ok({
       streak,

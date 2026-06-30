@@ -1,6 +1,6 @@
 # 味记 MySQL 初始化脚本
 
-> 当前 `weiji-server` 业务后端默认使用「内存存储层」运行 MVP 闭环，本目录下的 `init.sql` 仅作为**后续启用 MySQL 持久化时的接口预留**，本阶段不强制落地数据库连接。
+> `weiji-server` 业务后端**已支持 MySQL 持久化**：默认以「内存存储层」运行 MVP 闭环（`DB_DRIVER=memory`），需要数据库持久化时通过 `DB_DRIVER=mysql` 一键切换。本目录下的 `init.sql` 为 MySQL 8.0+ 初始化脚本：建库 + 12 张业务表 + 种子数据，启用 MySQL 模式前需先执行。
 
 ## 目录说明
 
@@ -10,21 +10,51 @@
 
 ## 启用 MySQL 持久化的步骤
 
-1. **初始化数据库（执行脚本）**
+1. **配置环境变量（复制并编辑 .env）**
 
    ```bash
-   mysql -u root -p < init.sql
+   cd weiji-server
+   cp .env.example .env
+   ```
+
+   编辑 `.env`，将存储驱动切换为 MySQL 并填写连接信息：
+
+   ```env
+   DB_DRIVER=mysql
+   DB_HOST=localhost
+   DB_PORT=3306
+   DB_USER=root
+   DB_PASSWORD=your_password
+   DB_NAME=weiji
+   ```
+
+   完整变量说明见 `weiji-server/.env.example`。生产环境务必同时设置 `JWT_SECRET`（未设置时启动即报错退出）。
+
+2. **初始化数据库（执行脚本）**
+
+   ```bash
+   mysql -u root -p < db/init.sql
    ```
 
    脚本会自动创建 `weiji` 库（若不存在）、12 张业务表，并填充与内存种子数据一致的初始数据。脚本幂等可重复执行（内部已 `DROP TABLE IF EXISTS`）。
 
-2. **切换 weiji-server 存储实现**
+3. **以 MySQL 模式启动服务**
 
-   修改 `weiji-server` 配置，将 store 实现从「内存存储」切换为「MySQL 存储」，并配置连接信息（host/port/user/password/database）。具体切换逻辑由后续 spec 处理，本脚本仅保证表结构与种子数据就绪。
+   ```bash
+   # 方式 A：已在 .env 中设置 DB_DRIVER=mysql
+   npm run dev
 
-3. **验证**
+   # 方式 B：临时通过环境变量覆盖（不修改 .env）
+   DB_DRIVER=mysql npm run dev
+   ```
 
-   执行后可执行 `SELECT COUNT(*) FROM <表名>;` 校验各表种子数据条数。
+   启动时 `bootstrap.ts` 会自动校验 MySQL 连通性（失败打印 host/port/database 并 `process.exit(1)`），并检查 `users` 表是否存在（缺失时打印"请先执行 `mysql -u root -p < db/init.sql`"指引）。
+
+4. **验证**
+
+   - 服务启动日志无报错即代表连通性与表结构校验通过。
+   - 可执行 `SELECT COUNT(*) FROM <表名>;` 校验各表种子数据条数。
+   - demo 账号密码为 `123456`（已写入真实 bcrypt 哈希，可直接登录）。
 
 ## 表清单速查（共 12 张，与内存存储层 12 个列表一一对应）
 
@@ -56,7 +86,7 @@
 
 | 表 | 条数 | 备注 |
 |----|------|------|
-| `users` | 4 | 演示账号 `demo` / `123456`（密码为 bcrypt 占位哈希，部署时用 `bcryptjs.hashSync('123456', 10)` 替换） |
+| `users` | 4 | 演示账号 `demo` / `123456`（已写入真实 bcrypt 哈希，可直接登录） |
 | `families` | 1 | 王家厨房 |
 | `family_members` | 4 | owner / admin / member / member 齐全 |
 | `family_recipes` | 4 | 红烧牛肉面、番茄炒蛋、清炒西兰花、桂花糕（family/private 混合） |
@@ -75,6 +105,6 @@
 
 ## 注意事项
 
-- 脚本顶部 `CREATE DATABASE IF NOT EXISTS weiji`，如需自定义库名请同步修改 `USE` 语句与应用配置。
-- 演示账号密码字段为占位符 `$2a$10$PLACEHOLDER_HASH_FOR_123456`，**非真实可用哈希**，正式启用前务必替换为真实 bcrypt 哈希。
-- 本脚本为接口预留产物，执行与否不影响当前内存存储模式下 MVP 闭环运行。
+- 脚本顶部 `CREATE DATABASE IF NOT EXISTS weiji`，如需自定义库名请同步修改 `USE` 语句与应用配置（`DB_NAME`）。
+- demo 账号密码为 `123456`，种子数据中已写入 `bcryptjs.hashSync('123456', 10)` 生成的真实哈希，无需手动替换。
+- 内存模式（`DB_DRIVER=memory`，默认）下执行本脚本与否不影响 MVP 闭环运行；切换到 MySQL 模式后必须先执行本脚本。

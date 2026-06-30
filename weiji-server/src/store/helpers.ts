@@ -90,7 +90,7 @@ const MEAT_KEYWORDS = [
 // - 按 dishName 聚合得到用户已记录的菜品 + 各自首次记录时间 + 记录次数
 // - 遍历 pokedexCatalog，匹配 dishName（大小写不敏感）则 unlocked=true
 // - 按 category 分组，统计 totalSlots / unlockedSlots / completionRate（0-1）
-export function aggregatePokedex(userId: string): PokedexSummary {
+export async function aggregatePokedex(userId: string): Promise<PokedexSummary> {
   // 聚合用户已记录的菜品（按 dishName 小写做 key，保留首次记录时间与计数）
   interface DishAgg {
     dishName: string;
@@ -98,7 +98,7 @@ export function aggregatePokedex(userId: string): PokedexSummary {
     recordCount: number;
   }
   const dishMap = new Map<string, DishAgg>();
-  for (const r of records) {
+  for (const r of await records.toArray()) {
     if (r.userId !== userId || r.isDeleted) continue;
     const key = r.dishName.toLowerCase();
     const existing = dishMap.get(key);
@@ -169,12 +169,12 @@ export function aggregatePokedex(userId: string): PokedexSummary {
 // - 取 records 中 userId 匹配且 recordDate 在最近 30 天内且 isDeleted=false 的记录
 // - 记录数 < 3 时返回 available:false
 // - 基于简单关键词规则推断人格类型，按 spec 顺序优先匹配
-export function buildPersonalityReport(userId: string): PersonalityReport {
+export async function buildPersonalityReport(userId: string): Promise<PersonalityReport> {
   const now = new Date();
   const thirtyAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const cutoff = thirtyAgo.toISOString().split('T')[0]; // YYYY-MM-DD
 
-  const recent = records.filter(
+  const recent = await records.findAll(
     (r) => r.userId === userId && !r.isDeleted && r.recordDate >= cutoff
   );
 
@@ -282,14 +282,14 @@ export function buildPersonalityReport(userId: string): PersonalityReport {
 // - 取今天的月-日（如 06-26）
 // - 在 records 中找 userId 匹配且 isDeleted=false 且 recordDate 月-日相同、年份小于今年的记录
 // - 按年份分组，每年组装成 TimemachineMemory
-export function queryTimemachine(userId: string): TimemachineResult {
+export async function queryTimemachine(userId: string): Promise<TimemachineResult> {
   const now = new Date();
   const currentYear = now.getFullYear();
   const todayDate = now.toISOString().split('T')[0]; // YYYY-MM-DD
   const todayMonthDay = todayDate.slice(5); // MM-DD
 
   // 找出往年今日的记录
-  const pastRecords: Record[] = records.filter((r) => {
+  const pastRecords: Record[] = await records.findAll((r) => {
     if (r.userId !== userId || r.isDeleted) return false;
     if (!r.recordDate || r.recordDate.length < 10) return false;
     const recordYear = parseInt(r.recordDate.slice(0, 4), 10);
@@ -343,8 +343,8 @@ export function queryTimemachine(userId: string): TimemachineResult {
 // - 排序：totalScore 降序 → correctCount 降序；rank 1-based，相同分同 rank（competition ranking）
 // - 最高分者（rank=1）标记 isChef=true
 // - 不修改数据库中的 status，由控制器负责更新
-export function scoreBlindGuess(roundId: string): BlindGuessResult | null {
-  const round = blindGuessRounds.find((r) => r.id === roundId);
+export async function scoreBlindGuess(roundId: string): Promise<BlindGuessResult | null> {
+  const round = await blindGuessRounds.findById(roundId);
   if (!round) return null;
 
   // 计算每个 guess 的得分
@@ -449,12 +449,12 @@ import { CheckinService } from '../service/checkin.service';
 // 检查并解锁满足条件的成就
 // 在用户创建记录或打卡后调用
 // 返回新解锁的成就列表
-export function checkAndUnlockAchievements(userId: string): AchievementDef[] {
+export async function checkAndUnlockAchievements(userId: string): Promise<AchievementDef[]> {
   const newlyUnlocked: AchievementDef[] = [];
 
   // 获取用户已解锁的成就ID集合
   const unlockedIds = new Set<string>();
-  for (const ua of user_achievements) {
+  for (const ua of await user_achievements.toArray()) {
     if (ua.userId === userId) {
       unlockedIds.add(ua.achievementId);
     }
@@ -462,14 +462,14 @@ export function checkAndUnlockAchievements(userId: string): AchievementDef[] {
 
   // 统计用户数据
   // 记录数
-  const recordCount = records.filter((r) => r.userId === userId && !r.isDeleted).length;
+  const recordCount = await records.count((r) => r.userId === userId && !r.isDeleted);
   // 连续打卡天数
-  const streak = CheckinService.calculateStreak(userId);
+  const streak = await CheckinService.calculateStreak(userId);
   // 是否创建过家庭组
-  const familyCreated = families.some((f) => f.ownerId === userId && !f.isDeleted);
+  const familyCreated = (await families.count((f) => f.ownerId === userId && !f.isDeleted)) > 0;
 
   // 遍历成就定义，检查解锁条件
-  for (const ach of achievements) {
+  for (const ach of await achievements.toArray()) {
     // 跳过已解锁的
     if (unlockedIds.has(ach.id)) continue;
 
@@ -500,7 +500,7 @@ export function checkAndUnlockAchievements(userId: string): AchievementDef[] {
     if (shouldUnlock) {
       // 创建用户成就记录
       const now = new Date().toISOString();
-      user_achievements.push({
+      await user_achievements.insert({
         id: crypto.randomUUID(),
         userId,
         achievementId: ach.id,
@@ -544,41 +544,46 @@ function computePrevMonth(month: string): string {
 // 6. avgRating：所有记录的平均 rating（无记录时为 0）
 // 7. tagDistribution：展开所有 tags 数组，按频次排序，最多 10 个
 // 8. 无数据时返回 totalRecords=0 等空结构
-export function generateFamilyDietReport(familyId: string, month: string): FamilyDietReport {
+export async function generateFamilyDietReport(familyId: string, month: string): Promise<FamilyDietReport> {
   // 通过 family_members 找出该家庭的所有 userIds
-  const memberUserIds = family_members
-    .filter((m) => m.familyId === familyId)
+  const memberUserIds = (await family_members
+    .findAll((m) => m.familyId === familyId))
     .map((m) => m.userId);
   const userIdSet = new Set(memberUserIds);
 
   const prevMonth = computePrevMonth(month);
 
   // 过滤当月记录：userId 在家庭组内 + 未删除 + recordDate 月份匹配
-  const monthRecords = records.filter(
+  const monthRecords = await records.findAll(
     (r) => userIdSet.has(r.userId) && !r.isDeleted && r.recordDate.startsWith(month)
   );
 
   // 过滤上月记录（用于环比）
-  const prevMonthRecords = records.filter(
+  const prevMonthRecords = await records.count(
     (r) => userIdSet.has(r.userId) && !r.isDeleted && r.recordDate.startsWith(prevMonth)
-  ).length;
+  );
 
   // memberContributions：按 userId 分组聚合，关联 users 表取昵称头像，按记录数倒序
   const memberMap = new Map<string, number>();
   for (const r of monthRecords) {
     memberMap.set(r.userId, (memberMap.get(r.userId) || 0) + 1);
   }
-  const memberContributions = Array.from(memberMap.entries())
-    .map(([userId, recordCount]) => {
-      const user = users.find((u) => u.id === userId);
-      return {
-        userId,
-        userNickname: user?.nickname ?? '',
-        userAvatar: user?.avatar ?? '',
-        recordCount,
-      };
-    })
-    .sort((a, b) => b.recordCount - a.recordCount);
+  const memberContributions: Array<{
+    userId: string;
+    userNickname: string;
+    userAvatar: string;
+    recordCount: number;
+  }> = [];
+  for (const [userId, recordCount] of Array.from(memberMap.entries())) {
+    const user = await users.findById(userId);
+    memberContributions.push({
+      userId,
+      userNickname: user?.nickname ?? '',
+      userAvatar: user?.avatar ?? '',
+      recordCount,
+    });
+  }
+  memberContributions.sort((a, b) => b.recordCount - a.recordCount);
 
   // topDishes：按 dishName 分组，统计 count + 平均 rating，取 Top 5
   const dishMap = new Map<string, { dishName: string; count: number; ratingSum: number }>();

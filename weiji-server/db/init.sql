@@ -2,8 +2,7 @@
 -- 味记（weiji）MySQL 初始化脚本
 -- ------------------------------------------------------------
 -- 说明：
---   当前 weiji-server 业务后端默认使用「内存存储层」运行 MVP 闭环，
---   本脚本作为后续启用 MySQL 持久化时的「接口预留」，本 spec 不强制落地连接。
+--   本脚本为 MySQL 持久化建表脚本，通过 DB_DRIVER=mysql 启用 weiji-server 持久化时执行。
 --   执行后可一次性创建 12 张业务表并填充与设计稿/内存种子数据一致的初始数据。
 --
 -- 适用：MySQL 8.0+
@@ -278,13 +277,13 @@ SET FOREIGN_KEY_CHECKS = 1;
 SET @week_start = DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY);
 
 -- ---------- users 用户(4) ----------
--- 注意：password 字段为 bcrypt 哈希占位符，
---   实际部署时请用 Node 执行 bcryptjs.hashSync('123456', 10) 生成真实哈希后替换。
+-- 注意：password 字段为 bcrypt 真实哈希（由 bcryptjs.hashSync('123456', 10) 生成），
+--   demo 账号密码统一为 123456；生产环境请改为各自强密码并重新生成哈希。
 INSERT INTO `users` (`id`,`username`,`password`,`nickname`,`avatar`,`createdAt`) VALUES
-('00000000-0000-0000-0000-000000000001','demo','$2a$10$PLACEHOLDER_HASH_FOR_123456','味记达人','https://cdn.weiji.app/avatar/demo.png',NOW() - INTERVAL 30 DAY),
-('00000000-0000-0000-0000-000000000002','wang_mama','$2a$10$PLACEHOLDER_HASH_FOR_123456','王妈妈','https://cdn.weiji.app/avatar/mama.png',NOW() - INTERVAL 28 DAY),
-('00000000-0000-0000-0000-000000000003','wang_baba','$2a$10$PLACEHOLDER_HASH_FOR_123456','王爸爸','https://cdn.weiji.app/avatar/baba.png',NOW() - INTERVAL 28 DAY),
-('00000000-0000-0000-0000-000000000004','wang_kid','$2a$10$PLACEHOLDER_HASH_FOR_123456','王小宝','https://cdn.weiji.app/avatar/kid.png',NOW() - INTERVAL 20 DAY);
+('00000000-0000-0000-0000-000000000001','demo','$2a$10$8A.mfPmXTioco4pWMmdznujyl/ajcGKlDKgg4HOAa6EK0p2cHgAV2','味记达人','https://cdn.weiji.app/avatar/demo.png',NOW() - INTERVAL 30 DAY),
+('00000000-0000-0000-0000-000000000002','wang_mama','$2a$10$8A.mfPmXTioco4pWMmdznujyl/ajcGKlDKgg4HOAa6EK0p2cHgAV2','王妈妈','https://cdn.weiji.app/avatar/mama.png',NOW() - INTERVAL 28 DAY),
+('00000000-0000-0000-0000-000000000003','wang_baba','$2a$10$8A.mfPmXTioco4pWMmdznujyl/ajcGKlDKgg4HOAa6EK0p2cHgAV2','王爸爸','https://cdn.weiji.app/avatar/baba.png',NOW() - INTERVAL 28 DAY),
+('00000000-0000-0000-0000-000000000004','wang_kid','$2a$10$8A.mfPmXTioco4pWMmdznujyl/ajcGKlDKgg4HOAa6EK0p2cHgAV2','王小宝','https://cdn.weiji.app/avatar/kid.png',NOW() - INTERVAL 20 DAY);
 
 -- ---------- families 家庭组(1) ----------
 INSERT INTO `families` (`id`,`name`,`ownerId`,`memberCount`,`createdAt`) VALUES

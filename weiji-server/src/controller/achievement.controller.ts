@@ -34,14 +34,15 @@ export class AchievementController {
 
     // 查询当前用户已解锁的成就记录，构造 achievementId -> earnedAt 映射
     const unlockedMap = new Map<string, string>();
-    for (const ua of user_achievements) {
+    for (const ua of await user_achievements.toArray()) {
       if (ua.userId === userId) {
         unlockedMap.set(ua.achievementId, ua.earnedAt);
       }
     }
 
     // 遍历成就定义，补充 unlocked / earnedAt 字段
-    const list: AchievementListItem[] = achievements.map((ach) => {
+    const allAchievements = await achievements.toArray();
+    const list: AchievementListItem[] = allAchievements.map((ach) => {
       const earnedAt = unlockedMap.get(ach.id) || null;
       return {
         ...ach,
@@ -66,13 +67,13 @@ export class AchievementController {
 
     // 计算用户已解锁成就的总经验值
     const unlockedIds = new Set<string>();
-    for (const ua of user_achievements) {
+    for (const ua of await user_achievements.toArray()) {
       if (ua.userId === userId) {
         unlockedIds.add(ua.achievementId);
       }
     }
     let exp = 0;
-    for (const ach of achievements) {
+    for (const ach of await achievements.toArray()) {
       if (unlockedIds.has(ach.id)) {
         exp += ach.expReward;
       }

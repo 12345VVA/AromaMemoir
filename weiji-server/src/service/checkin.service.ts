@@ -29,24 +29,24 @@ export class CheckinService {
 
   // 查找指定用户在指定日期的打卡记录
   // 找到返回 CheckIn，找不到返回 undefined
-  static findCheckin(userId: string, date: string): CheckIn | undefined {
-    return check_ins.find((c) => c.userId === userId && c.checkDate === date);
+  static async findCheckin(userId: string, date: string): Promise<CheckIn | undefined> {
+    return (await check_ins.findAll((c) => c.userId === userId && c.checkDate === date))[0];
   }
 
   // 计算连续打卡天数
   // 算法：先查今日，今日已打卡则从今日往前推；今日未打卡则从昨天往前推
   // 遇到有打卡记录的就 +1，遇到断档就停（不补算）
   // 这样可以避免今日尚未打卡时连续天数被强制清零
-  static calculateStreak(userId: string): number {
+  static async calculateStreak(userId: string): Promise<number> {
     const today = CheckinService.todayStr();
-    const todayChecked = !!CheckinService.findCheckin(userId, today);
+    const todayChecked = !!(await CheckinService.findCheckin(userId, today));
     // 今日已打卡 → 从今日（offset=0）开始；今日未打卡 → 从昨天（offset=1）开始
     const startOffset = todayChecked ? 0 : 1;
 
     let streak = 0;
     for (let i = startOffset; ; i++) {
       const date = CheckinService.daysAgo(i);
-      const found = CheckinService.findCheckin(userId, date);
+      const found = await CheckinService.findCheckin(userId, date);
       if (found) {
         streak++;
       } else {
@@ -58,12 +58,12 @@ export class CheckinService {
 
   // 查询用户最近一次打卡日期
   // 从今日开始往前扫描，遇到第一个有打卡记录的日期即返回；从未打卡返回 null
-  static lastCheckDate(userId: string): string | null {
+  static async lastCheckDate(userId: string): Promise<string | null> {
     for (let i = 0; ; i++) {
       // 最多回溯 365 天，避免极端情况下死循环
       if (i > 365) break;
       const date = CheckinService.daysAgo(i);
-      const found = CheckinService.findCheckin(userId, date);
+      const found = await CheckinService.findCheckin(userId, date);
       if (found) {
         return date;
       }

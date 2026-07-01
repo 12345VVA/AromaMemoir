@@ -2681,7 +2681,7 @@ body {
                 <div class="challenge-list" id="challenge-list"></div>
 
                 <div style="padding: 0 var(--space-5) var(--space-6);">
-                    <button class="btn btn-primary btn-lg" style="width: 100%; font-weight: 500;" onclick="showToast('挑战功能即将上线！')">
+                    <button class="btn btn-primary btn-lg" style="width: 100%; font-weight: 500;" onclick="joinChallenge()">
                         <i data-lucide="plus" style="width: 18px; height: 18px; margin-right: 6px;"></i>
                         参与挑战
                     </button>
@@ -2753,7 +2753,8 @@ body {
 
             <div id="page-profile" class="page">
                 <div class="profile-header">
-                    <div class="avatar avatar-lg avatar-profile" id="profile-avatar" style="background: var(--primary-100); cursor: pointer;" onclick="showToast('头像设置')">
+                    <input type="file" id="avatar-file-input" accept="image/*" style="display:none;" onchange="handleAvatarChange(event)" />
+                    <div class="avatar avatar-lg avatar-profile" id="profile-avatar" style="background: var(--primary-100); cursor: pointer;" onclick="triggerAvatarUpload()">
                         <span class="avatar-initials" style="color: var(--primary-700);"></span>
                     </div>
                     <div style="margin-top: var(--space-3); text-align: center;">
@@ -2792,7 +2793,7 @@ body {
 
                 <div style="padding: 0 var(--space-5) var(--space-4);">
                     <div style="display: flex; gap: var(--space-3);">
-                        <button class="btn btn-secondary" style="flex: 1;" onclick="showToast('邀请家人')">
+                        <button class="btn btn-secondary" style="flex: 1;" onclick="showInvitationDialog()">
                             <i data-lucide="users" style="width: 18px; height: 18px; margin-right: 6px;"></i>
                             邀请家人
                         </button>
@@ -2817,7 +2818,7 @@ body {
                         <i data-lucide="chevron-right" style="width: var(--size-icon-sm); height: var(--size-icon-sm); color: var(--neutral-400); flex-shrink: 0;"></i>
                     </div>
 
-                    <div class="menu-item" onclick="showToast('购物清单功能')">
+                    <div class="menu-item" onclick="navigateToShoppingList()">
                         <i data-lucide="shopping-cart" style="width: var(--size-icon-md); height: var(--size-icon-md); color: var(--color-on-surface-variant); flex-shrink: 0;"></i>
                         <span style="flex: 1; font-size: var(--font-size-body); color: var(--color-on-surface); min-width: 0;">购物清单</span>
                         <i data-lucide="chevron-right" style="width: var(--size-icon-sm); height: var(--size-icon-sm); color: var(--neutral-400); flex-shrink: 0;"></i>
@@ -2829,7 +2830,7 @@ body {
                         <i data-lucide="chevron-right" style="width: var(--size-icon-sm); height: var(--size-icon-sm); color: var(--neutral-400); flex-shrink: 0;"></i>
                     </div>
 
-                    <div class="menu-item" onclick="showToast('推荐菜谱功能')">
+                    <div class="menu-item" onclick="navigateTo('home')">
                         <i data-lucide="sparkles" style="width: var(--size-icon-md); height: var(--size-icon-md); color: var(--color-on-surface-variant); flex-shrink: 0;"></i>
                         <span style="flex: 1; font-size: var(--font-size-body); color: var(--color-on-surface); min-width: 0;">推荐菜谱</span>
                         <i data-lucide="chevron-right" style="width: var(--size-icon-sm); height: var(--size-icon-sm); color: var(--neutral-400); flex-shrink: 0;"></i>

@@ -10,8 +10,8 @@
         accept="image/*"
         :on-change="handleFileChange"
       >
-        <div v-if="imageUrl" class="preview-box">
-          <img :src="imageUrl" class="preview-img" alt="预览" />
+        <div v-if="previewUrl" class="preview-box">
+          <img :src="previewUrl" class="preview-img" alt="预览" />
         </div>
         <div v-else class="upload-placeholder">
           <el-icon class="upload-icon"><UploadFilled /></el-icon>
@@ -19,6 +19,14 @@
           <div class="upload-hint">支持 AI 识别菜品</div>
         </div>
       </el-upload>
+
+      <!-- 原图/美化图切换器（美化成功后显示） -->
+      <div v-if="beautifiedUrl" class="image-switcher">
+        <el-radio-group v-model="imageMode" size="small">
+          <el-radio-button value="original">原图</el-radio-button>
+          <el-radio-button value="beautified">美化图</el-radio-button>
+        </el-radio-group>
+      </div>
 
       <!-- 操作按钮 -->
       <div class="action-row">
@@ -50,19 +58,51 @@
               />
             </span>
           </div>
-          <div v-if="ingredients.length" class="result-row">
+          <!-- 烹饪方式 -->
+          <div v-if="cookingMethod" class="result-row">
+            <span class="result-label">烹饪方式</span>
+            <div class="result-tags">
+              <el-tag type="danger" effect="dark" size="small">{{ cookingMethod }}</el-tag>
+            </div>
+          </div>
+          <!-- 食材：可点击切换选中状态 -->
+          <div v-if="ingredientList.length" class="result-row">
             <span class="result-label">食材</span>
             <div class="result-tags">
-              <el-tag v-for="(ing, idx) in ingredients" :key="idx" size="small" type="warning" effect="plain">
-                {{ ing }}
+              <el-tag
+                v-for="(ing, idx) in ingredientList"
+                :key="idx"
+                size="small"
+                :type="isIngredientSelected(ing.name) ? 'success' : 'info'"
+                :effect="isIngredientSelected(ing.name) ? 'dark' : 'plain'"
+                class="ingredient-tag"
+                @click="toggleIngredient(ing.name)"
+              >
+                {{ ing.name }}
+                <span v-if="ing.confidence != null" class="ing-conf">
+                  {{ ingredientConfidencePercent(ing.confidence) }}%
+                </span>
               </el-tag>
             </div>
           </div>
-          <div v-if="nutrition" class="result-row">
-            <span class="result-label">营养信息</span>
-            <span class="result-value nutrition-text">{{ nutrition }}</span>
-          </div>
+          <div v-if="ingredientList.length" class="ingredient-hint">点击标签可切换选中状态，仅选中食材会保存</div>
         </div>
+      </div>
+
+      <!-- 营养信息：4 格卡片 -->
+      <div v-if="nutritionList.length" class="nutrition-section">
+        <div class="section-title">营养信息</div>
+        <el-row :gutter="12">
+          <el-col v-for="item in nutritionList" :key="item.key" :span="6">
+            <div class="nutrition-card" :class="`nutrition-card--${item.key}`">
+              <div class="nutrition-icon">{{ item.icon }}</div>
+              <div class="nutrition-title">{{ item.title }}</div>
+              <div class="nutrition-value">
+                {{ item.value }}<span class="nutrition-unit">{{ item.unit }}</span>
+              </div>
+            </div>
+          </el-col>
+        </el-row>
       </div>
 
       <!-- 保存记录表单 -->
@@ -73,8 +113,42 @@
             <el-form-item label="菜品名称">
               <el-input v-model="saveForm.dishName" placeholder="请输入菜品名称" />
             </el-form-item>
+            <el-form-item label="餐次">
+              <el-select v-model="saveForm.mealType" placeholder="请选择餐次" style="width: 100%">
+                <el-option label="早餐" value="breakfast" />
+                <el-option label="午餐" value="lunch" />
+                <el-option label="晚餐" value="dinner" />
+              </el-select>
+            </el-form-item>
             <el-form-item label="评分">
               <el-rate v-model="saveForm.rating" />
+            </el-form-item>
+            <el-form-item label="标签">
+              <div class="tags-area">
+                <el-tag
+                  v-for="(tag, idx) in saveForm.tags"
+                  :key="idx"
+                  closable
+                  size="small"
+                  type="primary"
+                  effect="plain"
+                  @close="removeTag(idx)"
+                >
+                  {{ tag }}
+                </el-tag>
+                <el-input
+                  v-if="tagInputVisible"
+                  ref="tagInputRef"
+                  v-model="tagInputValue"
+                  size="small"
+                  class="tag-input"
+                  @keyup.enter="addTag"
+                  @blur="addTag"
+                />
+                <el-button v-else size="small" class="tag-add-btn" @click="showTagInput">
+                  + 添加标签
+                </el-button>
+              </div>
             </el-form-item>
             <el-form-item label="备注">
               <el-input v-model="saveForm.note" type="textarea" :rows="2" placeholder="记录这道菜的感受" />
@@ -90,48 +164,80 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue';
+import { ref, reactive, computed, nextTick } from 'vue';
+import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { UploadFilled, MagicStick, Brush } from '@element-plus/icons-vue';
 import type { UploadFile } from 'element-plus';
 import Layout from '../components/Layout.vue';
 import { api } from '../api/client';
 
+const router = useRouter();
+
 const file = ref<File | null>(null);
-const imageUrl = ref('');
+// 原图 URL（本地上传后的 blob URL）
+const originalUrl = ref('');
+// 美化图 URL（后端返回）
+const beautifiedUrl = ref('');
+// 图片预览模式：原图 / 美化图
+const imageMode = ref<'original' | 'beautified'>('original');
 const recognizeLoading = ref(false);
 const beautifyLoading = ref(false);
 const saveLoading = ref(false);
 const recognizeResult = ref<any>(null);
 
+// 选中的食材列表（数组管理，便于响应式）
+const selectedIngredients = ref<string[]>([]);
+
 const saveForm = reactive({
   dishName: '',
   rating: 0,
   note: '',
+  mealType: 'lunch' as 'breakfast' | 'lunch' | 'dinner',
+  tags: [] as string[],
 });
 
-// 文件选择
-function handleFileChange(uploadFile: UploadFile) {
-  const raw = uploadFile.raw;
-  if (!raw) return;
-  file.value = raw;
-  imageUrl.value = URL.createObjectURL(raw);
-  recognizeResult.value = null;
-}
+// 标签输入控制
+const tagInputVisible = ref(false);
+const tagInputValue = ref('');
+const tagInputRef = ref<any>(null);
 
-// 识别食材（转数组）
-const ingredients = computed<string[]>(() => {
+// 当前预览图片地址：根据切换器返回原图或美化图
+const previewUrl = computed(() => {
+  if (imageMode.value === 'beautified' && beautifiedUrl.value) {
+    return beautifiedUrl.value;
+  }
+  return originalUrl.value;
+});
+
+// 食材列表（统一为 { name, confidence } 形式，兼容字符串数组/字符串）
+const ingredientList = computed<{ name: string; confidence?: number }[]>(() => {
   const val = recognizeResult.value?.ingredients;
-  if (Array.isArray(val)) return val;
-  if (typeof val === 'string') return val.split(/[,，、]/).filter(Boolean);
+  if (Array.isArray(val)) {
+    return val.map((ing: any) => {
+      if (typeof ing === 'string') return { name: ing };
+      return { name: ing.name || ing.ingredient || '', confidence: ing.confidence };
+    });
+  }
+  if (typeof val === 'string') {
+    return val.split(/[,，、]/).filter(Boolean).map((name: string) => ({ name }));
+  }
   return [];
 });
 
-// 营养信息
-const nutrition = computed(() => {
-  const r = recognizeResult.value;
-  if (!r) return '';
-  return r.nutrition || r.nutritionInfo || (r.calories ? `热量：${r.calories} kcal` : '');
+// 烹饪方式
+const cookingMethod = computed(() => recognizeResult.value?.cookingMethod || recognizeResult.value?.cooking_method || '');
+
+// 营养信息：4 格卡片（热量/蛋白质/脂肪/碳水）
+const nutritionList = computed(() => {
+  const n = recognizeResult.value?.nutrition;
+  if (!n || typeof n !== 'object') return [];
+  return [
+    { key: 'calories', title: '热量', value: n.calories ?? 0, unit: 'kcal', icon: '🔥' },
+    { key: 'protein', title: '蛋白质', value: n.protein ?? 0, unit: 'g', icon: '🥩' },
+    { key: 'fat', title: '脂肪', value: n.fat ?? 0, unit: 'g', icon: '🧈' },
+    { key: 'carbs', title: '碳水', value: n.carbs ?? 0, unit: 'g', icon: '🍚' },
+  ];
 });
 
 // 置信度百分比
@@ -142,6 +248,40 @@ const confidencePercent = computed(() => {
   return Math.min(100, Math.round(c));
 });
 
+// 食材置信度转百分比显示
+function ingredientConfidencePercent(c: number) {
+  if (c == null) return '';
+  if (c <= 1) return Math.round(c * 100);
+  return Math.min(100, Math.round(c));
+}
+
+// 判断食材是否选中
+function isIngredientSelected(name: string) {
+  return selectedIngredients.value.includes(name);
+}
+
+// 切换食材选中状态
+function toggleIngredient(name: string) {
+  const idx = selectedIngredients.value.indexOf(name);
+  if (idx >= 0) {
+    selectedIngredients.value.splice(idx, 1);
+  } else {
+    selectedIngredients.value.push(name);
+  }
+}
+
+// 文件选择
+function handleFileChange(uploadFile: UploadFile) {
+  const raw = uploadFile.raw;
+  if (!raw) return;
+  file.value = raw;
+  originalUrl.value = URL.createObjectURL(raw);
+  beautifiedUrl.value = '';
+  imageMode.value = 'original';
+  recognizeResult.value = null;
+  selectedIngredients.value = [];
+}
+
 // AI 识别
 async function handleRecognize() {
   if (!file.value) return;
@@ -150,6 +290,17 @@ async function handleRecognize() {
     const data: any = await api.recognizeFood(file.value);
     recognizeResult.value = data;
     saveForm.dishName = data.dishName || data.name || '';
+    // 默认选中所有识别到的食材
+    selectedIngredients.value = ingredientList.value.map((i) => i.name);
+    // 初始化标签（用识别返回的 tags）
+    const tags = data.tags;
+    if (Array.isArray(tags)) {
+      saveForm.tags = tags.filter((t: any) => typeof t === 'string');
+    } else if (typeof tags === 'string') {
+      saveForm.tags = tags.split(/[,，、]/).filter(Boolean);
+    } else {
+      saveForm.tags = [];
+    }
     ElMessage.success('识别完成');
   } catch (err: any) {
     ElMessage.error(err.message || '识别失败');
@@ -164,19 +315,59 @@ async function handleBeautify() {
   beautifyLoading.value = true;
   try {
     const data: any = await api.beautifyImage(file.value);
-    // 后端返回美化后的图片 URL 或 base64
-    const url = data?.url || data?.imageUrl || data;
-    if (typeof url === 'string') {
-      imageUrl.value = url;
+    // 后端返回 { imageUrl }，兼容其它字段名
+    const url = data?.imageUrl || data?.url || (typeof data === 'string' ? data : '');
+    if (url) {
+      beautifiedUrl.value = url;
+      imageMode.value = 'beautified';
       ElMessage.success('美化完成');
     } else {
-      ElMessage.success('美化完成');
+      ElMessage.warning('美化接口未返回图片地址');
     }
   } catch (err: any) {
     ElMessage.error(err.message || '美化失败');
   } finally {
     beautifyLoading.value = false;
   }
+}
+
+// 标签：显示输入框
+function showTagInput() {
+  tagInputVisible.value = true;
+  tagInputValue.value = '';
+  nextTick(() => {
+    tagInputRef.value?.focus?.();
+  });
+}
+
+// 标签：添加
+function addTag() {
+  const v = tagInputValue.value.trim();
+  if (v && !saveForm.tags.includes(v)) {
+    saveForm.tags.push(v);
+  }
+  tagInputVisible.value = false;
+  tagInputValue.value = '';
+}
+
+// 标签：删除
+function removeTag(idx: number) {
+  saveForm.tags.splice(idx, 1);
+}
+
+// 重置表单与状态
+function resetForm() {
+  recognizeResult.value = null;
+  file.value = null;
+  originalUrl.value = '';
+  beautifiedUrl.value = '';
+  imageMode.value = 'original';
+  selectedIngredients.value = [];
+  saveForm.dishName = '';
+  saveForm.rating = 0;
+  saveForm.note = '';
+  saveForm.mealType = 'lunch';
+  saveForm.tags = [];
 }
 
 // 保存记录
@@ -187,20 +378,26 @@ async function handleSave() {
   }
   saveLoading.value = true;
   try {
+    // 只包含选中的食材
+    const selectedIngs = [...selectedIngredients.value];
     await api.saveRecord({
       dishName: saveForm.dishName,
+      cookingMethod: cookingMethod.value,
       rating: saveForm.rating,
       note: saveForm.note,
-      ingredients: ingredients.value,
+      aiConfidence: recognizeResult.value?.confidence,
+      nutrition: recognizeResult.value?.nutrition,
+      ingredients: selectedIngs,
+      tags: saveForm.tags,
+      mealType: saveForm.mealType,
+      imageUrl: originalUrl.value,
+      beautifiedUrl: beautifiedUrl.value,
+      source: 'ai',
     });
     ElMessage.success('保存成功');
-    // 重置
-    recognizeResult.value = null;
-    file.value = null;
-    imageUrl.value = '';
-    saveForm.dishName = '';
-    saveForm.rating = 0;
-    saveForm.note = '';
+    resetForm();
+    // 跳转首页
+    router.push('/');
   } catch (err: any) {
     ElMessage.error(err.message || '保存失败');
   } finally {
@@ -246,6 +443,12 @@ async function handleSave() {
   font-size: 12px;
   color: var(--muted-foreground);
 }
+/* 原图/美化图切换器 */
+.image-switcher {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+}
 .action-row {
   display: flex;
   gap: 12px;
@@ -255,6 +458,7 @@ async function handleSave() {
   flex: 1;
 }
 .result-section,
+.nutrition-section,
 .save-section {
   margin-top: 16px;
 }
@@ -285,10 +489,87 @@ async function handleSave() {
   gap: 6px;
   flex: 1;
 }
-.nutrition-text {
+/* 食材标签：可点击 */
+.ingredient-tag {
+  cursor: pointer;
+  user-select: none;
+}
+.ing-conf {
+  margin-left: 4px;
+  font-size: 11px;
+  opacity: 0.75;
+}
+.ingredient-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+/* 营养信息 4 格卡片 */
+.nutrition-card {
+  border-radius: var(--radius-lg);
+  padding: 12px 8px;
+  text-align: center;
+  box-shadow: var(--shadow-1);
+  background: var(--card);
+}
+.nutrition-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+.nutrition-title {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.nutrition-value {
+  margin-top: 4px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--foreground);
+}
+.nutrition-unit {
+  margin-left: 2px;
+  font-size: 12px;
   font-weight: 400;
-  font-size: 13px;
-  line-height: 1.6;
+  color: var(--muted-foreground);
+}
+.nutrition-card--calories {
+  background: linear-gradient(135deg, #fff1f0, #ffe3e0);
+}
+.nutrition-card--calories .nutrition-value {
+  color: #e8584a;
+}
+.nutrition-card--protein {
+  background: linear-gradient(135deg, #fff5e6, #ffe8c7);
+}
+.nutrition-card--protein .nutrition-value {
+  color: #d9751a;
+}
+.nutrition-card--fat {
+  background: linear-gradient(135deg, #fffbe6, #fff3bf);
+}
+.nutrition-card--fat .nutrition-value {
+  color: #ca9a2b;
+}
+.nutrition-card--carbs {
+  background: linear-gradient(135deg, #f0f7ff, #dcecff);
+}
+.nutrition-card--carbs .nutrition-value {
+  color: #2f6fd6;
+}
+/* 标签编辑区 */
+.tags-area {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.tag-input {
+  width: 110px;
+}
+.tag-add-btn {
+  border-style: dashed;
 }
 .save-btn {
   width: 100%;

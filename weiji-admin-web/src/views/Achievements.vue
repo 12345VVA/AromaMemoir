@@ -58,16 +58,22 @@
       <!-- 美食挑战 -->
       <div class="section-title">美食挑战</div>
       <div v-loading="challengesLoading" class="challenge-list">
-        <div v-for="c in challenges" :key="c.id || c.name" class="wj-card challenge-card">
+        <div v-for="c in challenges" :key="c.id || c.title || c.name" class="wj-card challenge-card">
           <div class="challenge-header">
-            <span class="challenge-name">{{ c.name || c.title }}</span>
+            <span class="challenge-name">{{ c.title || c.name }}</span>
             <el-tag size="small" :type="challengeTagType(c)" effect="plain">
               {{ c.status || '进行中' }}
             </el-tag>
           </div>
           <p v-if="c.description" class="challenge-desc">{{ c.description }}</p>
-          <div v-if="c.progress != null" class="challenge-progress">
-            <el-progress :percentage="Math.round((c.progress / (c.total || 100)) * 100)" :stroke-width="6" />
+          <!-- 已参与时展示进度条 -->
+          <div v-if="isJoined(c) && c.progress != null" class="challenge-progress">
+            <el-progress :percentage="Math.round((c.progress / (c.target || c.total || 100)) * 100)" :stroke-width="6" />
+          </div>
+          <!-- 参与挑战按钮 -->
+          <div class="challenge-footer">
+            <el-button v-if="isJoined(c)" type="success" size="small" plain disabled>已参与</el-button>
+            <el-button v-else type="primary" size="small" @click="handleJoinChallenge(c)">参与挑战</el-button>
           </div>
         </div>
         <div v-if="!challenges.length && !challengesLoading" class="empty-tip">暂无挑战</div>
@@ -78,6 +84,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { ElMessage } from 'element-plus';
 import { Trophy, Medal, Star, GoldMedal, Flag, Sunny } from '@element-plus/icons-vue';
 import Layout from '../components/Layout.vue';
 import { api } from '../api/client';
@@ -89,6 +96,12 @@ const levelLoading = ref(false);
 const badgesLoading = ref(false);
 const challengesLoading = ref(false);
 
+// 已参与挑战 ID 集合（来自 localStorage，用于恢复按钮状态）
+const joinedChallenges = ref<Set<string>>(new Set());
+
+// localStorage 存储键
+const JOINED_KEY = 'joinedChallenges';
+
 // 进度百分比
 const progressPercent = computed(() => {
   const cur = level.value.currentExp || 0;
@@ -97,13 +110,56 @@ const progressPercent = computed(() => {
   return Math.min(100, Math.round((cur / next) * 100));
 });
 
+// 从 localStorage 读取已参与挑战
+function loadJoinedChallenges() {
+  try {
+    const raw = localStorage.getItem(JOINED_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) {
+        joinedChallenges.value = new Set(arr.map((id) => String(id)));
+      }
+    }
+  } catch {
+    // 数据损坏时重置为空集合
+    joinedChallenges.value = new Set();
+  }
+}
+
+// 保存已参与挑战到 localStorage
+function saveJoinedChallenges() {
+  localStorage.setItem(JOINED_KEY, JSON.stringify(Array.from(joinedChallenges.value)));
+}
+
+// 判断是否已参与（后端 joined 字段或 localStorage 记录）
+function isJoined(c: any) {
+  const id = c.id ?? c.title ?? c.name;
+  if (id == null) return false;
+  return !!c.joined || joinedChallenges.value.has(String(id));
+}
+
+// 参与挑战：记录到 localStorage 并刷新按钮 UI
+function handleJoinChallenge(c: any) {
+  const id = c.id ?? c.title ?? c.name;
+  if (id == null) return;
+  const sid = String(id);
+  if (joinedChallenges.value.has(sid)) return;
+  // 重新赋值以触发响应式更新
+  const next = new Set(joinedChallenges.value);
+  next.add(sid);
+  joinedChallenges.value = next;
+  saveJoinedChallenges();
+  ElMessage.success(`已参与挑战：${c.title || c.name || ''}`);
+}
+
 // 加载等级
 async function loadLevel() {
   levelLoading.value = true;
   try {
     const data: any = await api.getLevel();
     level.value = data || {};
-  } catch (err) {
+  } catch (err: any) {
+    ElMessage.error(err.message || '获取等级失败');
     level.value = {};
   } finally {
     levelLoading.value = false;
@@ -116,7 +172,8 @@ async function loadBadges() {
   try {
     const data: any = await api.getAchievements();
     badges.value = Array.isArray(data) ? data : data?.list || [];
-  } catch (err) {
+  } catch (err: any) {
+    ElMessage.error(err.message || '获取徽章失败');
     badges.value = [];
   } finally {
     badgesLoading.value = false;
@@ -129,7 +186,8 @@ async function loadChallenges() {
   try {
     const data: any = await api.getChallenges();
     challenges.value = Array.isArray(data) ? data : data?.list || [];
-  } catch (err) {
+  } catch (err: any) {
+    ElMessage.error(err.message || '获取挑战失败');
     challenges.value = [];
   } finally {
     challengesLoading.value = false;
@@ -161,6 +219,8 @@ function challengeTagType(c: any) {
 }
 
 onMounted(() => {
+  // 先恢复本地已参与状态，再加载列表数据
+  loadJoinedChallenges();
   loadLevel();
   loadBadges();
   loadChallenges();
@@ -303,5 +363,10 @@ onMounted(() => {
 }
 .challenge-progress {
   margin-top: 4px;
+}
+.challenge-footer {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
 }
 </style>

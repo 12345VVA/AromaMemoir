@@ -4,7 +4,7 @@
 //   - getUserProfile() → GET /api/user/profile
 
 import type { Context } from 'koa';
-import { Controller, Get } from '../common/decorators';
+import { Controller, Get, Patch } from '../common/decorators';
 import { ok, fail, type ApiResponse } from '../common/response';
 import { users, records, family_recipes, user_achievements } from '../store/db';
 import { CheckinService } from '../service/checkin.service';
@@ -76,5 +76,35 @@ export class UserController {
     if (user.phone !== undefined) profile.phone = user.phone;
 
     return ok(profile);
+  }
+
+  // PATCH /api/user/profile
+  // 更新当前登录用户的资料（昵称、头像），不返回 password 字段
+  @Patch('/profile')
+  async updateProfile(ctx: Context): Promise<ApiResponse> {
+    const userId = ctx.state.user.userId;
+    const body = (ctx.request.body || {}) as { nickname?: string; avatar?: string };
+
+    // 仅更新提供的字段
+    const patch: { nickname?: string; avatar?: string } = {};
+    if (body.nickname !== undefined) patch.nickname = body.nickname;
+    if (body.avatar !== undefined) patch.avatar = body.avatar;
+
+    const updated = await users.updateById(userId, patch);
+    if (!updated) {
+      return fail('用户不存在', 404);
+    }
+
+    // 返回安全用户对象（剔除 password）
+    return ok(
+      {
+        id: updated.id,
+        username: updated.username,
+        nickname: updated.nickname,
+        avatar: updated.avatar,
+        createdAt: updated.createdAt,
+      },
+      '资料更新成功',
+    );
   }
 }

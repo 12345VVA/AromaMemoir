@@ -4,7 +4,7 @@
 // 权限模型：owner（家庭组创建者）> admin（管理员）> member（普通成员）
 
 import type { Context } from 'koa';
-import { Controller, Get, Post, Patch, Delete } from '../common/decorators';
+import { Controller, Get, Post, Put, Patch, Delete } from '../common/decorators';
 import { ok, fail, forbidden, escapeHtml, type ApiResponse } from '../common/response';
 import {
   families,
@@ -366,6 +366,12 @@ export class FamilyController {
       list = list.filter((r) => r.category === category);
     }
 
+    // 关键词过滤（按菜谱名称模糊匹配）
+    const keyword = ctx.query.keyword as string | undefined;
+    if (keyword) {
+      list = list.filter((r) => r.name.includes(keyword));
+    }
+
     return ok(list);
   }
 
@@ -419,6 +425,87 @@ export class FamilyController {
     });
 
     return ok(newRecipe, '上传成功');
+  }
+
+  // GET /api/family/recipes/:id
+  // 菜谱详情：返回单条菜谱；找不到或已软删除时返回 404
+  @Get('/recipes/:id')
+  async getRecipeDetail(ctx: Context): Promise<ApiResponse> {
+    const recipeId = ctx.params.id as string;
+    const recipe = await family_recipes.findById(recipeId);
+
+    // 找不到或已软删除 → 菜谱不存在
+    if (!recipe || recipe.isDeleted) {
+      return fail('菜谱不存在', 404);
+    }
+
+    return ok(recipe);
+  }
+
+  // PUT /api/family/recipes/:id
+  // 编辑菜谱：仅作者可操作，仅更新 body 中提供的字段
+  @Put('/recipes/:id')
+  async updateRecipe(ctx: Context): Promise<ApiResponse> {
+    const { userId } = ctx.state.user as { userId: string; username: string };
+    const recipeId = ctx.params.id as string;
+    const body = (ctx.request.body || {}) as {
+      name?: string;
+      category?: string;
+      ingredients?: RecipeIngredient[];
+      steps?: RecipeStep[];
+      coverUrl?: string;
+      difficulty?: string;
+      cookTime?: number;
+      visibility?: RecipeVisibility;
+    };
+
+    const recipe = await family_recipes.findById(recipeId);
+    // 找不到或已删除 → 菜谱不存在
+    if (!recipe || recipe.isDeleted) {
+      return fail('菜谱不存在', 404);
+    }
+
+    // 权限校验：仅作者可编辑
+    if (recipe.uploaderId !== userId) {
+      return forbidden('无权操作');
+    }
+
+    // 仅更新提供的字段（构造 patch）
+    const patch: Partial<FamilyRecipe> = {};
+    if (body.name !== undefined) patch.name = body.name;
+    if (body.category !== undefined) patch.category = body.category;
+    if (body.ingredients !== undefined) patch.ingredients = body.ingredients;
+    if (body.steps !== undefined) patch.steps = body.steps;
+    if (body.coverUrl !== undefined) patch.coverUrl = body.coverUrl;
+    if (body.difficulty !== undefined) patch.difficulty = body.difficulty;
+    if (body.cookTime !== undefined) patch.cookTime = body.cookTime;
+    if (body.visibility !== undefined) patch.visibility = body.visibility;
+
+    const updated = await family_recipes.updateById(recipeId, patch);
+    return ok(updated);
+  }
+
+  // DELETE /api/family/recipes/:id
+  // 软删除菜谱：仅作者可操作
+  @Delete('/recipes/:id')
+  async deleteRecipe(ctx: Context): Promise<ApiResponse> {
+    const { userId } = ctx.state.user as { userId: string; username: string };
+    const recipeId = ctx.params.id as string;
+
+    const recipe = await family_recipes.findById(recipeId);
+    // 找不到或已删除 → 菜谱不存在
+    if (!recipe || recipe.isDeleted) {
+      return fail('菜谱不存在', 404);
+    }
+
+    // 权限校验：仅作者可删除
+    if (recipe.uploaderId !== userId) {
+      return forbidden('无权操作');
+    }
+
+    // 软删除：置 isDeleted = true
+    await family_recipes.softDelete(recipeId);
+    return ok(null, '删除成功');
   }
 
   // PATCH /api/family/recipes/:id/visibility

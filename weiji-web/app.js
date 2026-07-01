@@ -533,8 +533,8 @@ function renderAchievements(list) {
     const bgStyle = locked ? '' : ' style="background: ' + (a.bgColor || 'var(--primary-50)') + ';"';
     const iconColor = locked ? 'var(--neutral-400)' : (a.iconColor || 'var(--color-primary)');
     const labelColor = locked ? 'var(--color-muted-foreground)' : 'var(--color-on-surface)';
-    const desc = a.description ? a.name + '：' + a.description : a.name;
-    return '<div class="badge-item" onclick="showToast(\'' + escapeAttr(desc) + '\')">' +
+    const desc = a.description || '';
+    return '<div class="badge-item" onclick="showBadgeDetail(\'' + escapeAttr(a.name || '') + '\',\'' + escapeAttr(desc) + '\')">' +
       '<div class="badge-icon ' + (locked ? 'locked' : '') + '"' + bgStyle + '>' +
         '<i data-lucide="' + escapeAttr(a.icon || 'award') + '" style="width:24px;height:24px;color:' + iconColor + ';"></i>' +
       '</div>' +
@@ -591,7 +591,7 @@ function renderChallenges(list) {
       ? '<div style="font-size: var(--font-size-caption); color: var(--color-on-surface-variant); margin-top: var(--space-2);">' + escapeHTML(c.note) + '</div>'
       : '';
 
-    return '<div class="challenge-card" onclick="showToast(\'' + escapeAttr(c.name) + '挑战\')">' +
+    return '<div class="challenge-card" onclick="joinChallenge(\'' + escapeAttr(c.name || '') + '\')">' +
       '<div style="display: flex; align-items: center; justify-content: space-between;' + (progressSection ? ' margin-bottom: var(--space-2);' : '') + '">' +
         '<div style="display: flex; align-items: center; gap: var(--space-2);">' +
           '<i data-lucide="' + escapeAttr(c.icon) + '" style="width: var(--size-icon-md); height: var(--size-icon-md); color: ' + (c.iconColor || 'var(--color-on-surface-variant)') + ';"></i>' +
@@ -629,6 +629,221 @@ function renderProfile(data) {
     const el = document.getElementById(id);
     if (el) el.textContent = (map[id] === undefined || map[id] === null) ? '0' : map[id];
   });
+}
+
+/* ===== 占位功能补齐 ===== */
+
+// 参与挑战：用 localStorage 记录已参与状态
+function joinChallenge(name) {
+  // 未指定挑战名时，取第一个兜底挑战
+  if (!name) {
+    name = (CHALLENGES[0] && CHALLENGES[0].name) || '美食挑战';
+  }
+  const KEY = 'weiji_joined_challenges';
+  let joined = [];
+  try { joined = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { joined = []; }
+  if (joined.indexOf(name) >= 0) {
+    showToast('你已经参与过「' + name + '」挑战');
+    return;
+  }
+  joined.push(name);
+  try { localStorage.setItem(KEY, JSON.stringify(joined)); } catch (e) {}
+  showToast('已参与「' + name + '」挑战，加油！');
+}
+
+// 徽章详情弹窗
+function showBadgeDetail(name, desc) {
+  const existing = document.getElementById('badge-detail-dialog');
+  if (existing) existing.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'badge-detail-dialog';
+  overlay.className = 'dialog-overlay';
+  overlay.innerHTML =
+    '<div class="dialog">' +
+      '<div class="dialog-title">' + escapeHTML(name || '徽章') + '</div>' +
+      '<div class="dialog-section">' +
+        '<div style="font-size:var(--font-size-body);color:var(--color-on-surface);line-height:1.6;">' +
+          escapeHTML(desc || '该徽章暂无描述信息。') +
+        '</div>' +
+      '</div>' +
+      '<div class="dialog-actions">' +
+        '<button class="btn btn-primary" id="badge-detail-close">知道了</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  lucide.createIcons();
+  const closeBtn = overlay.querySelector('#badge-detail-close');
+  if (closeBtn) closeBtn.addEventListener('click', function() { overlay.remove(); });
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+}
+
+// 首页美食记录搜索
+async function searchHomeRecords(value) {
+  const keyword = (value || '').trim();
+  const listEl = document.getElementById('food-diary-list');
+  if (!keyword) {
+    // 关键字为空，恢复全部
+    loadHomeData();
+    return;
+  }
+  showLoading(listEl);
+  try {
+    const data = await api.getRecords({ keyword: keyword });
+    const list = (data && data.list) || [];
+    renderRecords(list);
+    showToast('找到 ' + list.length + ' 条记录');
+  } catch (err) {
+    hideLoading(listEl);
+    showToast(err.message);
+  }
+}
+
+// 家庭菜谱搜索
+async function searchFamilyRecipes(value) {
+  const keyword = (value || '').trim();
+  const gridEl = document.getElementById('recipe-grid');
+  if (!keyword) {
+    filterRecipes('all');
+    return;
+  }
+  showLoading(gridEl);
+  try {
+    const data = await api.getRecipesFiltered({ keyword: keyword });
+    const list = data || [];
+    renderRecipes(list);
+    showToast('找到 ' + list.length + ' 道菜谱');
+  } catch (err) {
+    hideLoading(gridEl);
+    showToast(err.message);
+  }
+}
+
+// 按关键字查找菜谱并弹窗展示步骤详情
+async function showRecipeStepsByKeyword(text) {
+  const keyword = (text || '').trim();
+  if (!keyword) return;
+  showToast('正在查找菜谱...');
+  try {
+    const list = await api.getRecipesFiltered({ keyword: keyword });
+    if (!list || list.length === 0) {
+      showToast('未找到「' + keyword + '」相关菜谱');
+      return;
+    }
+    const first = list[0];
+    let detail = first;
+    try { detail = await api.getRecipeDetail(first.id); } catch (e) { detail = first; }
+    showRecipeDetailDialog(detail);
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+// 菜谱详情弹窗（展示食材与步骤）
+function showRecipeDetailDialog(recipe) {
+  if (!recipe) return;
+  const existing = document.getElementById('recipe-detail-dialog');
+  if (existing) existing.remove();
+  const steps = (recipe.steps && recipe.steps.length) ? recipe.steps : [];
+  const ingredients = (recipe.ingredients && recipe.ingredients.length) ? recipe.ingredients : [];
+  const stepsHTML = steps.length
+    ? steps.map(function(s) {
+        const num = (s && s.stepNum) || '';
+        const txt = s ? (s.text || (typeof s === 'string' ? s : '')) : '';
+        return '<div style="display:flex;gap:8px;margin-bottom:8px;">' +
+                 (num ? '<span style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--primary-100);color:var(--primary-700);font-size:12px;display:flex;align-items:center;justify-content:center;font-weight:600;">' + escapeHTML(String(num)) + '</span>' : '') +
+                 '<span style="flex:1;font-size:var(--font-size-body);color:var(--color-on-surface);line-height:1.6;">' + escapeHTML(txt) + '</span>' +
+               '</div>';
+      }).join('')
+    : '<div style="font-size:var(--font-size-caption);color:var(--color-on-surface-variant);">该菜谱暂无步骤信息</div>';
+  const ingHTML = ingredients.length
+    ? ingredients.map(function(i) {
+        const name = typeof i === 'string' ? i : (i.name || '');
+        const amount = (typeof i === 'object' && i) ? ((i.amount || '') + (i.unit ? (' ' + i.unit) : '')) : '';
+        return '<span class="chip filled">' + escapeHTML(name + (amount ? (' ' + amount) : '')) + '</span>';
+      }).join('')
+    : '<span style="font-size:var(--font-size-caption);color:var(--color-on-surface-variant);">暂无食材信息</span>';
+  const coverHTML = recipe.coverUrl
+    ? '<img src="' + escapeAttr(recipe.coverUrl) + '" alt="' + escapeAttr(recipe.name || '') + '" style="width:100%;max-height:180px;object-fit:cover;border-radius:8px;margin-bottom:12px;" />'
+    : '';
+  const overlay = document.createElement('div');
+  overlay.id = 'recipe-detail-dialog';
+  overlay.className = 'dialog-overlay';
+  overlay.innerHTML =
+    '<div class="dialog" style="max-width:440px;">' +
+      '<div class="dialog-title">' + escapeHTML(recipe.name || '菜谱详情') + '</div>' +
+      '<div class="dialog-section">' +
+        coverHTML +
+        (ingredients.length ? '<div style="font-size:var(--font-size-caption);color:var(--color-on-surface-variant);margin-bottom:6px;">食材</div>' : '') +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">' + ingHTML + '</div>' +
+        '<div style="font-size:var(--font-size-caption);color:var(--color-on-surface-variant);margin-bottom:6px;">步骤</div>' +
+        stepsHTML +
+      '</div>' +
+      '<div class="dialog-actions">' +
+        '<button class="btn btn-primary" id="recipe-detail-close">关闭</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  lucide.createIcons();
+  const closeBtn = overlay.querySelector('#recipe-detail-close');
+  if (closeBtn) closeBtn.addEventListener('click', function() { overlay.remove(); });
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+}
+
+// 触发头像上传
+function triggerAvatarUpload() {
+  const input = document.getElementById('avatar-file-input');
+  if (input) input.click();
+}
+
+// 头像选择后预览并调用 api.updateProfile
+async function handleAvatarChange(event) {
+  const input = event && event.target;
+  const file = input && input.files && input.files[0];
+  if (!file) return;
+  if (!/^image\//.test(file.type || '')) {
+    showToast('请选择图片文件');
+    if (input) input.value = '';
+    return;
+  }
+  try {
+    // FileReader 读取为 DataURL 用于本地预览
+    const dataUrl = await new Promise(function(resolve, reject) {
+      const reader = new FileReader();
+      reader.onload = function(e) { resolve(e.target.result); };
+      reader.onerror = function() { reject(new Error('图片读取失败')); };
+      reader.readAsDataURL(file);
+    });
+    // 立即预览到头像元素
+    const avatar = document.getElementById('profile-avatar');
+    if (avatar) {
+      avatar.style.backgroundImage = 'url(' + dataUrl + ')';
+      avatar.style.backgroundSize = 'cover';
+      avatar.style.backgroundPosition = 'center';
+      const initials = avatar.querySelector('.avatar-initials');
+      if (initials) initials.style.display = 'none';
+    }
+    // 调用后端持久化
+    try {
+      await api.updateProfile({ avatar: dataUrl });
+      showToast('头像更新成功');
+    } catch (err) {
+      showToast(err.message || '头像保存失败');
+    }
+  } catch (err) {
+    showToast(err.message || '头像读取失败');
+  } finally {
+    if (input) input.value = '';
+  }
+}
+
+// 跳转到购物清单（家庭菜谱页 → 本周菜单 tab，其中包含购物清单）
+function navigateToShoppingList() {
+  navigateTo('family');
+  setTimeout(function() {
+    switchFamilyTab('weekly');
+    const shopping = document.getElementById('shopping-section');
+    if (shopping) shopping.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
 }
 
 /* ===== 交互函数 ===== */
@@ -1824,7 +2039,7 @@ function initInteractions() {
   if (homeSearch) {
     homeSearch.addEventListener('keypress', function(e) {
       if (e.key === 'Enter') {
-        showToast('搜索：' + this.value);
+        searchHomeRecords(this.value);
       }
     });
   }
@@ -1832,7 +2047,7 @@ function initInteractions() {
   if (familySearch) {
     familySearch.addEventListener('keypress', function(e) {
       if (e.key === 'Enter') {
-        showToast('搜索：' + this.value);
+        searchFamilyRecipes(this.value);
       }
     });
   }
@@ -2437,7 +2652,7 @@ function handleVoiceResult(text, intent) {
       } catch (e) {}
     }, 500);
   } else if (intent === 'cooking_step') {
-    showToast('"' + text + '"的步骤功能开发中，请查看菜谱详情');
+    showRecipeStepsByKeyword(text);
   } else {
     // unknown，仅显示文本
   }

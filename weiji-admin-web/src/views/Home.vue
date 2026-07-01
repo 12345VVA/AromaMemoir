@@ -23,9 +23,27 @@
         </div>
       </div>
 
-      <!-- 美食日记 -->
-      <div class="section-title">美食日记</div>
-      <div v-loading="recordsLoading">
+      <!-- 搜索框 -->
+      <div class="search-box">
+        <el-input
+          v-model="keyword"
+          placeholder="搜索美食记录..."
+          clearable
+          @keyup.enter="handleSearch"
+          @clear="handleClearSearch"
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+          <template #append>
+            <el-button :loading="searchLoading" @click="handleSearch">搜索</el-button>
+          </template>
+        </el-input>
+      </div>
+
+      <!-- 美食日记 / 搜索结果 -->
+      <div class="section-title">{{ keyword ? '搜索结果' : '美食日记' }}</div>
+      <div v-loading="recordsLoading || searchLoading">
         <div v-if="records.length" class="record-list">
           <div v-for="item in records" :key="item.id" class="wj-card record-card">
             <div class="record-header">
@@ -48,7 +66,9 @@
             </div>
           </div>
         </div>
-        <div v-else-if="!recordsLoading" class="empty-tip">还没有美食记录，去 AI 记录页添加吧～</div>
+        <div v-else-if="!recordsLoading && !searchLoading" class="empty-tip">
+          {{ keyword ? '未找到匹配的美食记录' : '还没有美食记录，去 AI 记录页添加吧～' }}
+        </div>
       </div>
 
       <!-- AI 推荐 -->
@@ -61,6 +81,18 @@
           <div v-for="(rec, idx) in recommendations" :key="idx" class="recommend-card">
             <div class="recommend-name">{{ rec.dishName || rec.name || '推荐菜' }}</div>
             <div class="recommend-desc">{{ rec.reason || rec.description || 'AI 根据你的口味精选' }}</div>
+            <!-- 推荐菜谱的难度 / 烹饪时间 / 匹配度 -->
+            <div class="recommend-meta">
+              <span v-if="rec.difficulty" class="meta-tag">
+                <el-icon><Histogram /></el-icon>{{ rec.difficulty }}
+              </span>
+              <span v-if="rec.cookTime" class="meta-tag">
+                <el-icon><Timer /></el-icon>{{ rec.cookTime }}
+              </span>
+              <span v-if="rec.matchScore != null" class="meta-tag match">
+                匹配度 {{ formatMatchScore(rec.matchScore) }}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -71,7 +103,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
-import { MagicStick } from '@element-plus/icons-vue';
+import { MagicStick, Search, Histogram, Timer } from '@element-plus/icons-vue';
 import Layout from '../components/Layout.vue';
 import { api } from '../api/client';
 
@@ -79,6 +111,8 @@ const records = ref<any[]>([]);
 const recordsLoading = ref(false);
 const recommendations = ref<any[]>([]);
 const checkinLoading = ref(false);
+const keyword = ref('');
+const searchLoading = ref(false);
 
 const checkin = reactive({
   checked: false,
@@ -91,12 +125,38 @@ async function loadRecords() {
   try {
     const data: any = await api.getRecords();
     records.value = Array.isArray(data) ? data : data?.list || data?.records || [];
-  } catch (err) {
-    // 接口未就绪时静默处理
+  } catch (err: any) {
+    ElMessage.error(err.message || '加载美食记录失败');
     records.value = [];
   } finally {
     recordsLoading.value = false;
   }
+}
+
+// 搜索美食记录
+async function handleSearch() {
+  const kw = keyword.value.trim();
+  if (!kw) {
+    // 关键字为空时恢复全部记录
+    handleClearSearch();
+    return;
+  }
+  searchLoading.value = true;
+  try {
+    const data: any = await api.getRecords({ keyword: kw });
+    records.value = Array.isArray(data) ? data : data?.list || data?.records || [];
+  } catch (err: any) {
+    ElMessage.error(err.message || '搜索失败');
+    records.value = [];
+  } finally {
+    searchLoading.value = false;
+  }
+}
+
+// 清空搜索，重新加载全部记录
+function handleClearSearch() {
+  keyword.value = '';
+  loadRecords();
 }
 
 // 加载打卡状态
@@ -105,8 +165,8 @@ async function loadCheckin() {
     const data: any = await api.getCheckinStatus();
     checkin.checked = !!data.checked;
     checkin.streak = data.streak || data.continuousDays || 0;
-  } catch (err) {
-    // 静默处理
+  } catch (err: any) {
+    ElMessage.error(err.message || '获取打卡状态失败');
   }
 }
 
@@ -130,7 +190,8 @@ async function loadRecommendations() {
   try {
     const data: any = await api.getRecommendations('');
     recommendations.value = Array.isArray(data) ? data : data?.list || [];
-  } catch (err) {
+  } catch (err: any) {
+    ElMessage.error(err.message || '获取推荐失败');
     recommendations.value = [];
   }
 }
@@ -146,6 +207,14 @@ function toArray(val: any): any[] {
 function formatTime(t: string) {
   if (!t) return '';
   return String(t).replace('T', ' ').slice(0, 16);
+}
+
+// 工具：格式化匹配度（兼容 0~1 小数、0~100 整数、字符串）
+function formatMatchScore(score: any): string {
+  const n = Number(score);
+  if (isNaN(n)) return String(score);
+  if (n <= 1) return Math.round(n * 100) + '%';
+  return n + '%';
 }
 
 onMounted(() => {
@@ -173,6 +242,9 @@ onMounted(() => {
   font-size: 12px;
   color: var(--muted-foreground);
   margin-top: 2px;
+}
+.search-box {
+  margin-bottom: 12px;
 }
 .record-list {
   display: flex;
@@ -232,5 +304,28 @@ onMounted(() => {
   font-size: 12px;
   color: var(--muted-foreground);
   line-height: 1.5;
+}
+.recommend-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.meta-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  background: var(--surface-container-low);
+  border-radius: var(--radius-full);
+  padding: 2px 8px;
+}
+.meta-tag .el-icon {
+  font-size: 12px;
+}
+.meta-tag.match {
+  color: var(--primary-700);
+  background: var(--primary-100);
 }
 </style>

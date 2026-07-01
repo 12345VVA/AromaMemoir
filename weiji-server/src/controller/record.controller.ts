@@ -60,13 +60,15 @@ export class RecordController {
     const tag = typeof query.tag === 'string' ? query.tag : '';
     const ratingParam = typeof query.rating === 'string' ? query.rating : '';
     const rating = ratingParam !== '' ? Number(ratingParam) : undefined;
+    const keyword = typeof query.keyword === 'string' ? query.keyword : '';
 
-    // 过滤：当前用户 + 未软删除 + 可选 tag/rating 筛选
+    // 过滤：当前用户 + 未软删除 + 可选 tag/rating/keyword 筛选
     const filtered = await records.findAll((r) => {
       if (r.userId !== userId) return false;
       if (r.isDeleted) return false;
       if (tag && !r.tags.includes(tag)) return false;
       if (rating !== undefined && r.rating !== rating) return false;
+      if (keyword && !r.dishName.includes(keyword)) return false;
       return true;
     });
 

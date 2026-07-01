@@ -215,6 +215,26 @@ const api = {
   uploadRecipe(data) {
     return request('POST', '/api/family/recipes', data);
   },
+  // 菜谱详情
+  getRecipeDetail(id) {
+    return request('GET', '/api/family/recipes/' + encodeURIComponent(id));
+  },
+  // 新建菜谱（与 uploadRecipe 等价，命名更通用）
+  createRecipe(data) {
+    return request('POST', '/api/family/recipes', data);
+  },
+  // 更新菜谱
+  updateRecipe(id, data) {
+    return request('PUT', '/api/family/recipes/' + encodeURIComponent(id), data);
+  },
+  // 删除菜谱
+  deleteRecipe(id) {
+    return request('DELETE', '/api/family/recipes/' + encodeURIComponent(id));
+  },
+  // 更新用户资料（头像、昵称、简介等）
+  updateProfile(data) {
+    return request('PATCH', '/api/user/profile', data);
+  },
   replenishCheckin() {
     return request('POST', '/api/checkin/replenish');
   },
@@ -233,6 +253,7 @@ const api = {
     if (params.visibility) query.set('visibility', params.visibility);
     if (params.authorId) query.set('authorId', params.authorId);
     if (params.category) query.set('category', params.category);
+    if (params.keyword) query.set('keyword', params.keyword);
     const qs = query.toString();
     return request('GET', '/api/family/recipes' + (qs ? '?' + qs : ''));
   },

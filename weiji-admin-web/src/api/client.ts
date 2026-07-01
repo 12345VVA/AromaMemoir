@@ -58,11 +58,36 @@ export const api = {
   getFamilyInfo() {
     return instance.get('/family');
   },
+  createFamily(name: string) {
+    return instance.post('/family', { name });
+  },
   getFamilyMembers() {
     return instance.get('/family/members');
   },
+  updateMemberRole(memberId: string, role: 'admin' | 'member') {
+    return instance.patch(`/family/members/${memberId}`, { role });
+  },
+  removeMember(memberId: string) {
+    return instance.delete(`/family/members/${memberId}`);
+  },
   getFamilyRecipes(params?: any) {
     return instance.get('/family/recipes', { params });
+  },
+  // 菜谱筛选查询（按 keyword/category/authorId/visibility 组合过滤）
+  getRecipesFiltered(params: { keyword?: string; category?: string; authorId?: string; visibility?: string }) {
+    return instance.get('/family/recipes', { params });
+  },
+  getRecipeDetail(recipeId: string) {
+    return instance.get(`/family/recipes/${recipeId}`);
+  },
+  createRecipe(data: any) {
+    return instance.post('/family/recipes', data);
+  },
+  updateRecipe(recipeId: string, data: any) {
+    return instance.put(`/family/recipes/${recipeId}`, data);
+  },
+  deleteRecipe(recipeId: string) {
+    return instance.delete(`/family/recipes/${recipeId}`);
   },
   createInvitation() {
     return instance.post('/family/invitations');
@@ -76,11 +101,44 @@ export const api = {
   updateRecipeVisibility(recipeId: string, visibility: string) {
     return instance.patch(`/family/recipes/${recipeId}/visibility`, { visibility });
   },
+  // 本周菜单
   getWeeklyMenu() {
     return instance.get('/family/menu');
   },
+  addToMenu(data: { dayOfWeek: number; mealType: 'breakfast' | 'lunch' | 'dinner'; recipeId: string; recipeName: string }) {
+    return instance.post('/family/menu', data);
+  },
+  voteMenuItem(menuItemId: string, vote: 'like' | 'dislike') {
+    return instance.post(`/family/menu/${menuItemId}/vote`, { vote });
+  },
+  // 购物清单
   getShoppingList() {
     return instance.get('/family/shopping');
+  },
+  addShoppingItem(data: { name: string; category?: string; quantity?: string }) {
+    return instance.post('/family/shopping', data);
+  },
+  toggleShoppingItem(itemId: string, checked?: boolean) {
+    return instance.patch(`/family/shopping/${itemId}`, { checked });
+  },
+  deleteShoppingItem(itemId: string) {
+    return instance.delete(`/family/shopping/${itemId}`);
+  },
+  generateShoppingFromMenu() {
+    return instance.post('/family/shopping/generate');
+  },
+  // 家庭动态（成员记录流 + 点赞 + 评论 + 饮食报告）
+  getFamilyRecords(params?: { page?: number; pageSize?: number }) {
+    return instance.get('/family/records', { params });
+  },
+  toggleRecordLike(recordId: string) {
+    return instance.post(`/family/records/${recordId}/like`);
+  },
+  addRecordComment(recordId: string, content: string) {
+    return instance.post(`/family/records/${recordId}/comments`, { content });
+  },
+  getFamilyReport() {
+    return instance.get('/family/report');
   },
   // 成就
   getAchievements() {
@@ -99,6 +157,27 @@ export const api = {
   // 用户
   getUserProfile() {
     return instance.get('/user/profile');
+  },
+  updateProfile(data: { nickname?: string; avatar?: string }) {
+    return instance.patch('/user/profile', data);
+  },
+  // 头像上传：读取 File 为 base64 DataURL 后调用 PATCH /user/profile 持久化
+  // 注：后端无独立上传端点，avatar 字段直接存储 DataURL 字符串
+  uploadAvatar(file: File): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const dataUrl = e.target?.result as string;
+        try {
+          const result = await instance.patch('/user/profile', { avatar: dataUrl });
+          resolve(result);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = () => reject(new Error('图片读取失败'));
+      reader.readAsDataURL(file);
+    });
   },
   // 挑战
   getChallenges() {

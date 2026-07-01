@@ -1,0 +1,70 @@
+{
+  "weiji_achievement": [
+    {
+      "id": 1,
+      "code": "first_record",
+      "name": "美食初体验",
+      "description": "记录第一道美食，开启味记之旅",
+      "icon": "utensils",
+      "type": "record",
+      "condition": { "recordCount": 1 },
+      "exp": 50,
+      "isActive": true
+    },
+    {
+      "id": 2,
+      "code": "streak_7",
+      "name": "一周全勤",
+      "description": "连续打卡7天，养成记录习惯",
+      "icon": "flame",
+      "type": "streak",
+      "condition": { "streakDays": 7 },
+      "exp": 200,
+      "isActive": true
+    },
+    {
+      "id": 3,
+      "code": "streak_30",
+      "name": "月度达人",
+      "description": "连续打卡30天，月度全勤",
+      "icon": "trophy",
+      "type": "streak",
+      "condition": { "streakDays": 30 },
+      "exp": 500,
+      "isActive": true
+    },
+    {
+      "id": 4,
+      "code": "record_100",
+      "name": "百道美食家",
+      "description": "记录满100道美食，资深吃货",
+      "icon": "medal",
+      "type": "record",
+      "condition": { "recordCount": 100 },
+      "exp": 1000,
+      "isActive": true
+    },
+    {
+      "id": 5,
+      "code": "cuisine_10",
+      "name": "菜系探险家",
+      "description": "尝试10种以上菜系，味觉探索者",
+      "icon": "compass",
+      "type": "variety",
+      "condition": { "cuisineCount": 10 },
+      "exp": 500,
+      "isActive": true
+    },
+    {
+      "id": 6,
+      "code": "family_create",
+      "name": "家的味道",
+      "description": "创建第一个家庭组，开启协作",
+      "icon": "users",
+      "type": "family",
+      "condition": { "familyCreated": true },
+      "exp": 100,
+      "isActive": true
+    }
+  ]
+}

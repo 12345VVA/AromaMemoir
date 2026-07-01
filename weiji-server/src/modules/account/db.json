@@ -1,0 +1,40 @@
+{
+  "weiji_app_user": [
+    {
+      "id": 1,
+      "username": "demo",
+      "password": "$2a$10$8A.mfPmXTioco4pWMmdznujyl/ajcGKlDKgg4HOAa6EK0p2cHgAV2",
+      "nickName": "演示账号",
+      "avatarUrl": "",
+      "status": 1,
+      "passwordV": 1
+    },
+    {
+      "id": 2,
+      "username": "wang_mama",
+      "password": "$2a$10$8A.mfPmXTioco4pWMmdznujyl/ajcGKlDKgg4HOAa6EK0p2cHgAV2",
+      "nickName": "王妈妈",
+      "avatarUrl": "",
+      "status": 1,
+      "passwordV": 1
+    },
+    {
+      "id": 3,
+      "username": "wang_baba",
+      "password": "$2a$10$8A.mfPmXTioco4pWMmdznujyl/ajcGKlDKgg4HOAa6EK0p2cHgAV2",
+      "nickName": "王爸爸",
+      "avatarUrl": "",
+      "status": 1,
+      "passwordV": 1
+    },
+    {
+      "id": 4,
+      "username": "wang_kid",
+      "password": "$2a$10$8A.mfPmXTioco4pWMmdznujyl/ajcGKlDKgg4HOAa6EK0p2cHgAV2",
+      "nickName": "王小宝",
+      "avatarUrl": "",
+      "status": 1,
+      "passwordV": 1
+    }
+  ]
+}

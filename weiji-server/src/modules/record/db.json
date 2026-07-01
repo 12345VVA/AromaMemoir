@@ -1,0 +1,68 @@
+{
+  "weiji_record": [
+    {
+      "id": 1,
+      "userId": 1,
+      "dishName": "红烧牛肉面",
+      "cookingMethod": "炖",
+      "rating": 5,
+      "note": "汤浓肉烂，家传做法",
+      "nutrition": { "calories": 520, "protein": 28.5, "fat": 18.2, "carbs": 62.0 },
+      "ingredients": [
+        { "name": "牛腩", "amount": "300g", "unit": "g" },
+        { "name": "面条", "amount": "200g", "unit": "g" },
+        { "name": "青菜", "amount": "100g", "unit": "g" },
+        { "name": "八角", "amount": "2个", "unit": "个" }
+      ],
+      "tags": ["家的味道", "下饭"],
+      "mealType": "lunch",
+      "recordDate": "2026-06-30",
+      "imageUrl": "https://cdn.weiji.app/record/beef-noodle.jpg",
+      "beautifiedUrl": "",
+      "source": "manual",
+      "familyId": 1
+    },
+    {
+      "id": 2,
+      "userId": 2,
+      "dishName": "番茄炒蛋",
+      "cookingMethod": "炒",
+      "rating": 4,
+      "note": "酸甜下饭",
+      "nutrition": { "calories": 220, "protein": 12.0, "fat": 14.5, "carbs": 10.0 },
+      "ingredients": [
+        { "name": "番茄", "amount": "2个", "unit": "个" },
+        { "name": "鸡蛋", "amount": "3个", "unit": "个" },
+        { "name": "白糖", "amount": "5g", "unit": "g" }
+      ],
+      "tags": ["下饭", "家常"],
+      "mealType": "dinner",
+      "recordDate": "2026-06-29",
+      "imageUrl": "https://cdn.weiji.app/record/tomato-egg.jpg",
+      "beautifiedUrl": "",
+      "source": "manual",
+      "familyId": 1
+    },
+    {
+      "id": 3,
+      "userId": 3,
+      "dishName": "清炒西兰花",
+      "cookingMethod": "炒",
+      "rating": 4,
+      "note": "清爽健康",
+      "nutrition": { "calories": 90, "protein": 5.0, "fat": 3.5, "carbs": 11.0 },
+      "ingredients": [
+        { "name": "西兰花", "amount": "1颗", "unit": "颗" },
+        { "name": "蒜", "amount": "3瓣", "unit": "瓣" },
+        { "name": "盐", "amount": "2g", "unit": "g" }
+      ],
+      "tags": ["健康", "轻食"],
+      "mealType": "breakfast",
+      "recordDate": "2026-06-28",
+      "imageUrl": "https://cdn.weiji.app/record/broccoli.jpg",
+      "beautifiedUrl": "",
+      "source": "manual",
+      "familyId": 1
+    }
+  ]
+}

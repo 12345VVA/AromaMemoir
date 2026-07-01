@@ -1,29 +1,21 @@
 {
-  "extends": "@vue/tsconfig/tsconfig.json",
-  "compilerOptions": {
-    "sourceMap": true,
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./src/*"]
-    },
-    "lib": ["esnext", "dom"],
-    "types": [
-      "@dcloudio/types",
-      "@types/node"
-    ],
-    "jsx": "preserve",
-    "experimentalDecorators": true,
-    "useDefineForClassFields": true,
-    "strict": true,
-    "noImplicitAny": false,
-    "skipLibCheck": true,
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": false
-  },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.d.ts",
-    "src/**/*.tsx",
-    "src/**/*.vue"
-  ]
+	"extends": "@vue/tsconfig/tsconfig.json",
+	"compilerOptions": {
+		"ignoreDeprecations": "5.0",
+		"verbatimModuleSyntax": true,
+		"experimentalDecorators": true,
+		"sourceMap": true,
+		"resolveJsonModule": true,
+		"esModuleInterop": true,
+		"allowJs": true,
+		"paths": {
+			"/@/*": ["./*"],
+			"/$/*": ["./uni_modules/*"]
+		},
+		"lib": ["esnext", "dom"],
+		"types": ["@dcloudio/types"],
+		"outDir": "esbuild"
+	},
+	"include": ["**/*.ts", "**/*.vue", "main.js", "types/*.d.ts"],
+	"exclude": ["node_modules", "dist"]
 }

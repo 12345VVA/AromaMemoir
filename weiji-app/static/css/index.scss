@@ -1,0 +1,160 @@
+/* #ifdef H5 */
+* {
+	font-family: Arial, "Microsoft Yahei", "微软雅黑";
+}
+
+.uni-page-head-btn {
+	display: inline-flex;
+	align-items: center;
+}
+/* #endif */
+
+/* ========== 味记业务页主题变量与公共类（迁移自 weiji-app）========== */
+:root,
+page {
+	--wj-primary: #ff6b35;
+	--wj-primary-light: #ff8a5c;
+	--wj-primary-dark: #e5511e;
+	--wj-bg: #f7f7f8;
+	--wj-card-bg: #ffffff;
+	--wj-text: #1f1f22;
+	--wj-text-muted: #8a8a8f;
+	--wj-border: #ececee;
+	--wj-radius: 12px;
+	--wj-radius-lg: 16px;
+	--wj-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+view,
+text,
+button,
+input,
+textarea {
+	box-sizing: border-box;
+}
+
+/* 通用卡片 */
+.wj-card {
+	background: var(--wj-card-bg);
+	border-radius: var(--wj-radius);
+	box-shadow: var(--wj-shadow);
+	padding: 14px 16px;
+	margin-bottom: 12px;
+}
+
+/* 区块标题 */
+.section-title {
+	font-size: 16px;
+	font-weight: 600;
+	color: var(--wj-text);
+	margin: 16px 0 10px;
+}
+
+/* 页面容器 */
+.page-content {
+	padding: 12px 14px 24px;
+}
+
+/* 空提示 */
+.empty-tip {
+	text-align: center;
+	color: var(--wj-text-muted);
+	font-size: 13px;
+	padding: 32px 0;
+}
+
+/* 主按钮 */
+.wj-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--wj-primary);
+	color: #fff;
+	border: none;
+	border-radius: var(--wj-radius);
+	padding: 10px 18px;
+	font-size: 14px;
+	font-weight: 600;
+	line-height: 1.4;
+}
+.wj-btn::after {
+	border: none;
+}
+.wj-btn[disabled] {
+	background: var(--wj-primary-light);
+	opacity: 0.6;
+}
+.wj-btn-ghost {
+	background: #fff;
+	color: var(--wj-primary);
+	border: 1px solid var(--wj-primary);
+}
+
+/* 隐藏滚动条 */
+.no-scrollbar::-webkit-scrollbar {
+	display: none;
+}
+.no-scrollbar {
+	-ms-overflow-style: none;
+	scrollbar-width: none;
+}
+
+// 主题
+.cl-page {
+	&.theme-default {
+		// 渐变色
+		.cl-tag.cl-tag--primary:not(.is-plain),
+		.cl-button--primary:not(.is-plain) {
+			background: linear-gradient(120deg, rgba($cl-color-primary, 0.7), $cl-color-primary);
+			border: 0;
+		}
+
+		.cl-button {
+			&.is-custom {
+				height: 80rpx;
+				font-size: 30rpx;
+				width: 100%;
+			}
+		}
+	}
+
+	&.theme-grey {
+		$color: #f6f7fa;
+
+		@mixin set() {
+			background-color: $color;
+			border-color: $color;
+		}
+
+		.cl-button--default,
+		.cl-input,
+		.cl-select-inner,
+		.cl-upload,
+		.cl-textarea,
+		.cl-checkbox.is-border,
+		.cl-search__input {
+			@include set();
+		}
+
+		.cl-upload {
+			border: 0;
+		}
+	}
+}
+
+// 其他
+.mp-html {
+	// #ifndef MP
+	img,
+	// #endif
+	image {
+		display: block;
+		max-width: 100%;
+	}
+
+	.hl-pre {
+		border-radius: 20rpx;
+		box-sizing: border-box;
+		// width 看页面情况设置，如：calc(100vw - 48rpx)
+	}
+}

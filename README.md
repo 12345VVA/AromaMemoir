@@ -4,26 +4,28 @@
 >
 > 核心理念：每一餐都值得被记住，每一个家庭都有自己的味道。
 
-> 📌 **目标架构（2026-07）**：将基于 cool-admin 全家桶（cool-admin-midway / cool-admin-vue / cool-uni）重建三端工程，[weiji-web](weiji-web/) 作为功能参考原型，[weiji-ai](weiji-ai/) 保留为独立 AI 层。完整设计见 [架构设计与迁移方案.md](架构设计与迁移方案.md)。下文「架构概览 / 目录结构」描述的是**当前**可运行的旧实现，迁移按上述方案分阶段进行。
+> 📌 **当前架构（2026-07）**：三端已基于 cool-admin 全家桶（cool-admin-midway / cool-admin-vue / cool-uni）完成重建。`weiji-web` 作为功能参考原型，`weiji-ai` 保留为独立 AI 层。完整设计见 [架构设计与迁移方案.md](架构设计与迁移方案.md)。
 
 ---
 
 ## 架构概览
 
-味记采用**三服务分层架构**，前端 → 业务后端 → AI 服务，职责清晰、可独立部署。
+味记采用 **cool-admin 全家桶四服务分层架构**，前端 → 业务后端 → AI 服务，职责清晰、可独立部署。
 
 ```
-weiji-admin-web (:5173)   →   weiji-server (:8001)   →   weiji-ai (:8002)
-   Vue3 前端                  Koa 业务后端               FastAPI AI 服务
-   Element Plus               JWT 鉴权 + bcrypt          6 家 AI 厂商集成
-   Pinia                      内存存储 + 种子数据         无 key 自动降级
-                               代理 /api/ai/* → :8002
+weiji-app (:9900 H5)         →   weiji-server (:8001)   →   weiji-ai (:8002)
+weiji-admin-web (:9000)  ─┘      cool-admin-midway           FastAPI AI 服务
+   cool-uni 移动端                Midway.js + TypeORM          6 家 AI 厂商集成
+   cool-admin-vue 后台            JWT 鉴权 + bcrypt            无 key 自动降级
+   Vue3 + Vite + Element Plus     MySQL + Redis
+   cl-crud 管理页                 9 个业务模块 + base 模块
 ```
 
 | 服务 | 端口 | 技术栈 | 职责 |
 |------|------|--------|------|
-| [weiji-admin-web](file:///workspace/weiji-admin-web) | 5173 | Vue3 + Vite + Element Plus + Pinia | 管理后台前端，路由守卫 + 401 重定向 |
-| [weiji-server](file:///workspace/weiji-server) | 8001 | Koa + 装饰器路由 + JWT + bcrypt | 业务后端，鉴权 / 记录 / 家庭 / 成就 / 打卡等 |
+| [weiji-server](file:///workspace/weiji-server) | 8001 | cool-admin-midway（Midway.js + TypeORM + MySQL + Redis + `@cool-midway/core`） | 业务后端，base 模块 + 9 个业务模块（account/record/family/achievement/checkin/challenge/gamification/ai/analytics） |
+| [weiji-admin-web](file:///workspace/weiji-admin-web) | 9000 | cool-admin-vue（Vue3 + Vite + Element Plus + cl-crud/cl-form） | PC 管理后台，9 业务页面 + cl-crud 管理页 |
+| [weiji-app](file:///workspace/weiji-app) | 9900 | cool-uni（uni-app + Vue3 组合式 + Pinia） | 移动端 H5 / 微信小程序，8 页面 + Gameplay |
 | [weiji-ai](file:///workspace/weiji-ai) | 8002 | FastAPI + httpx + AsyncOpenAI | AI 服务层，6 家厂商集成 + 三级降级 |
 
 ---
@@ -32,9 +34,10 @@ weiji-admin-web (:5173)   →   weiji-server (:8001)   →   weiji-ai (:8002)
 
 ### 环境要求
 
-- Node.js ≥ 20（推荐 24）
+- Node.js ≥ 18（推荐 20+）
 - Python ≥ 3.10
 - 各服务分别 `npm install` / `pip install -r requirements.txt`
+- 后端依赖 MySQL 8.0+ 与 Redis（本地开发 cool-admin 默认 sqlite 内存兼容模式）
 
 ### 1. 启动 AI 服务（:8002）
 
@@ -51,12 +54,12 @@ uvicorn main:app --host 0.0.0.0 --port 8002
 ```bash
 cd weiji-server
 npm install
-npm run dev
+NODE_ENV=local node bootstrap-local.js
 ```
 
-启动后会代理 `/api/ai/*` 到 `http://localhost:8002`，并加载演示账号种子数据。
+启动后 cool-admin 自动建表并加载各模块 `db.json` 种子数据；AI 代理转发 `/app/ai/*` → `http://localhost:8002`。
 
-### 3. 启动前端（:5173）
+### 3. 启动 PC 后台（:9000）
 
 ```bash
 cd weiji-admin-web
@@ -64,7 +67,19 @@ npm install
 npm run dev
 ```
 
-打开浏览器访问 `http://localhost:5173`，使用演示账号登录。
+打开浏览器访问 `http://localhost:9000`，后台用 `admin/123456` 登录（cool-admin 内置）；C 端业务页用演示账号 `demo/123456`。
+
+### 4. 启动移动端 H5（:9900）
+
+```bash
+cd weiji-app
+npm install
+npm run dev:h5
+```
+
+打开浏览器访问 `http://localhost:9900`，使用演示账号登录。
+
+> CI / 只读环境需加 `CHOKIDAR_USEPOLLING=true` 启动前端 dev server。
 
 ### 演示账号
 
@@ -72,27 +87,12 @@ npm run dev
 
 | 用户名 | 昵称 | 家庭组角色 |
 |--------|------|------------|
-| demo | 小明 | owner |
-| mom | 妈妈 | admin |
-| dad | 爸爸 | member |
-| grandma | 奶奶 | member |
+| demo | 演示账号 | admin |
+| wang_mama | 王妈妈 | owner |
+| wang_baba | 王爸爸 | member |
+| wang_kid | 王小宝 | member |
 
-家庭组：王家厨房（inviteCode: `WJ1234`）
-
-### 持久化与后端配置（可选）
-
-weiji-server 默认以**内存模式**运行（`DB_DRIVER=memory`，重启后数据丢失，适合本地开发与测试）。需要数据持久化时切换为 MySQL：
-
-```bash
-cd weiji-server
-cp .env.example .env              # 复制样例配置（.env 已在 .gitignore，不会提交）
-# 编辑 .env：DB_DRIVER=mysql，并填写 DB_HOST / DB_PORT / DB_USER / DB_PASSWORD / DB_NAME
-# 生产环境（NODE_ENV=production）务必同时设置 JWT_SECRET，否则启动即报错退出
-mysql -u root -p < db/init.sql    # 初始化 weiji 库 + 12 张业务表 + 种子数据（幂等可重复执行）
-npm run dev                       # 启动时自动校验 MySQL 连通性与 users 表存在性
-```
-
-完整环境变量清单见 [weiji-server/.env.example](file:///workspace/weiji-server/.env.example)；MySQL 模式启用步骤与表清单见 [weiji-server/db/README.md](file:///workspace/weiji-server/db/README.md)。
+家庭组：王家厨房（inviteCode: `WJ1234`），含 4 道菜谱、3 条记录、7 条打卡。
 
 ---
 
@@ -136,7 +136,7 @@ export TENCENT_SECRET_KEY="..."
 
 ## 测试
 
-项目建立了**分层测试体系**（单元 + 集成），共 **82 个测试用例全绿**。
+项目建立了**分层测试体系**（单元 + 集成），三端测试全绿。
 
 ### 一键运行全量测试
 
@@ -150,14 +150,14 @@ bash scripts/run-all-tests.sh
 
 | 服务 | 命令 | 测试栈 | 用例数 |
 |------|------|--------|--------|
-| weiji-server | `cd weiji-server && npm test` | node:test + supertest + tsx | 36 |
+| weiji-server | `cd weiji-server && npm test` | jest@29 + ts-jest | 117 passed / 8 skipped |
+| weiji-admin-web | `cd weiji-admin-web && npm test` | vitest@2 + @vue/test-utils + jsdom | 27 passed / 4 skipped |
 | weiji-ai | `cd weiji-ai && pytest` | pytest + pytest-asyncio | 21 |
-| weiji-admin-web | `cd weiji-admin-web && npm test` | Vitest + @vue/test-utils + jsdom | 25 |
 
 测试特点：
-- **后端**：`supertest + app.callback()` 不占真实端口；`loginAsDemo()` 辅助获取 JWT
+- **后端**：17 套件通过 / 3 套件 skip（in-memory/mysql/store 废弃），覆盖 9 业务模块 + 核心闭环（注册→登录→记录→家庭→成就打卡）+ AI 代理降级
+- **前端**：3 套件通过 / 1 套件 skip（cool-admin 内置登录页），覆盖 app-api 契约 + token 管理 + ai-record 交互 + 401 处理
 - **AI 服务**：`autouse` fixture 清理 12 个环境变量，覆盖无 key 降级路径
-- **前端**：mock axios 捕获拦截器回调，验证 JWT 注入 + 401 重定向
 
 ---
 
@@ -165,76 +165,93 @@ bash scripts/run-all-tests.sh
 
 ```
 workspace/
-├── weiji-admin-web/          # Vue3 前端 (:5173)
+├── weiji-server/             # cool-admin-midway 业务后端 (:8001)
 │   ├── src/
-│   │   ├── api/client.ts        # axios 实例 + JWT 拦截器 + 401 重定向
-│   │   ├── router/index.ts      # 路由守卫（requiresAuth）
-│   │   ├── stores/auth.ts       # Pinia 认证状态
-│   │   └── views/               # Login / Home / AiRecord / FamilyRecipes / Achievements / Profile
-│   ├── vitest.config.ts
+│   │   ├── configuration.ts     # cool-admin 生命周期配置
+│   │   ├── config/              # config.default/local/prod（typeorm 数据源、端口、redis）
+│   │   ├── comm/                # 公共工具（path/port/utils）
+│   │   └── modules/             # base（cool-admin 内置）+ 9 业务模块
+│   │       ├── account/         # C 端 weiji_app_user + 登录鉴权
+│   │       ├── record/          # 美食记录 weiji_record + 点赞/评论
+│   │       ├── family/          # 家庭组/成员/邀请/菜谱/周菜单/购物
+│   │       ├── achievement/     # 成就定义 + 用户成就
+│   │       ├── checkin/         # 每日打卡 + streak
+│   │       ├── challenge/       # 周期挑战
+│   │       ├── gamification/    # 图鉴 + 人格 + 盲猜
+│   │       ├── ai/              # AI 代理转发 :8002
+│   │       └── analytics/       # 埋点
+│   ├── test/                    # unit/ + integration/
+│   ├── docs/api-path-mapping.md # API 路径映射契约
+│   ├── bootstrap-local.js       # 本地启动入口
 │   └── package.json
-├── weiji-server/             # Koa 业务后端 (:8001)
+├── weiji-admin-web/          # cool-admin-vue PC 后台 (:9000)
 │   ├── src/
-│   │   ├── bootstrap.ts         # 应用启动入口（createApp + 路由扫描）
-│   │   ├── configuration.ts     # 端口 / CORS / JWT / AI 服务地址 / 存储驱动
-│   │   ├── common/decorators.ts # Midway 风格 @Controller / @Get / @Post ...
-│   │   ├── common/response.ts   # ok() / fail() / unauthorized() 统一响应
-│   │   ├── middleware/jwt.middleware.ts
-│   │   ├── controller/          # health/auth/record/family/achievement/checkin/user/challenge/ai/gamification/analytics
-│   │   ├── service/             # auth/family/checkin/achievement/ai-proxy
-│   │   └── store/               # Repository 抽象（内存 / MySQL）+ 种子数据 + 查询辅助
-│   ├── tests/                   # unit/ + integration/ + helpers/
+│   │   ├── modules/             # 业务页面（home/record/family/achievement/gamification 等）
+│   │   │   ├── business/utils/app-api.ts  # C 端 /app API 实例
+│   │   │   └── */views/         # AiRecord/FamilyRecipes/RecipeForm/RecipeDetail/Achievements/Gameplay
+│   │   ├── cool/                # cool-admin-vue 框架层
+│   │   └── __tests__/           # app-api/auth/ai-record/login spec
+│   ├── vite.config.ts           # proxy /admin、/app → :8001
 │   └── package.json
-├── weiji-ai/                 # FastAPI AI 服务 (:8002)
+├── weiji-app/                # cool-uni 移动端 (:9900 H5)
+│   ├── pages/                   # login/home/ai-record/family/recipe-*/achievement/gamification/profile
+│   ├── utils/api.ts             # uni 请求封装（/app/* + /open/*）
+│   ├── config/                  # dev/prod/proxy
+│   ├── manifest.json            # 微信小程序 appid / H5
+│   └── package.json
+├── weiji-ai/                 # FastAPI AI 服务 (:8002，独立 AI 层，不变)
 │   ├── main.py                  # 5 个 AI 端点 + 统一响应格式
 │   ├── config.py                # Settings 单例 + *_ready 就绪判断
-│   ├── exceptions.py            # AiProviderError / AiAuthError / AiQuotaError / AiInvalidInputError
-│   ├── services/                # baidu/openai/tencent/volcano/qwen/xfyun 6 个厂商模块
-│   ├── tests/                   # unit/ + integration/
 │   └── requirements.txt
-├── weiji-web/                # ⚠️ 功能参考原型（纯静态 HTML+JS，不参与构建/部署，详见 [weiji-web/README.md](weiji-web/README.md)）
-│   ├── api.js
-│   ├── app.js
-│   └── index.html
+├── weiji-web/                # ⚠️ 功能参考原型（纯静态 HTML+JS，不参与构建/部署，不变）
 ├── scripts/
 │   └── run-all-tests.sh         # 统一测试入口
 ├── 味记PRD.md                 # 产品需求文档
 ├── MVP开发速查手册.md          # MVP 功能与数据模型速查
-└── cool-admin适配度分析.md      # cool-admin 后端适配分析
+└── 架构设计与迁移方案.md        # cool-admin 全家桶迁移方案与路线图
 ```
 
 ---
 
 ## 统一响应契约
 
-三服务遵循统一的 `{ code, data, message }` 响应格式，前后端契约一致：
+cool-admin 全家桶遵循统一的 `{ code, data, message }` 响应格式：
 
 ```ts
 // 成功
-{ code: 0, data: <payload>, message: "" }
+{ code: 1000, data: <payload>, message: "success" }
 
 // 失败
-{ code: <非零错误码>, data: null, message: "人类可读消息" }
+{ code: <非 1000 错误码>, data: null, message: "人类可读消息" }
 ```
 
-- **HTTP 状态码**：鉴权失败 401，业务参数错误 400，资源不存在 404，其余成功路径 200
-- **业务错误码**：`code: 0` 表示成功，非零表示业务失败（AI 降级时 HTTP 仍为 200，由 `code` 区分）
-- 前端 [client.ts](file:///workspace/weiji-admin-web/src/api/client.ts) 响应拦截器自动解包 `data`，并在 401 时清除 token 重定向到 `/login`
+- **业务码**：`code: 1000` 表示成功，其余为业务失败码（AI 降级时仍返回 200，由 `code` 区分）
+- **路径划分**：
+  - `/open/*` —— 公开端点（health 等，无需鉴权）
+  - `/app/*` —— C 端业务 API（App 用户，独立 JWT，绑定 `weiji_app_user.id`）
+  - `/admin/*` —— B 端管理 API（cool-admin token + RBAC，cl-crud 自动生成 CRUD）
+- C 端 `weiji_app_user` 与 B 端 `base_sys_user` 分离，鉴权互不混淆
+- 完整端点映射见 [weiji-server/docs/api-path-mapping.md](file:///workspace/weiji-server/docs/api-path-mapping.md)
 
 ---
 
 ## 核心业务能力
 
-| 模块 | 后端端点 | 说明 |
+| 模块 | C 端端点（/app/*） | 说明 |
 |------|----------|------|
-| 鉴权 | `/api/auth/login` `/register` `/logout` | JWT 签发 + bcrypt 校验 |
-| 记录 | `/api/record/list` `POST /api/record` `/api/record/:id` | 美食日记，分页查询 |
-| 家庭 | `/api/family/*` | 家庭组 / 成员 / 邀请码 / 共享菜谱 / 本周菜单 / 购物清单 |
-| 成就 | `/api/achievement/list` `/level` | 成就徽章 + 美食家等级 |
-| 打卡 | `/api/checkin/status` `POST /api/checkin` | 连续打卡 + streak |
-| 用户 | `/api/user/profile` | 用户档案 |
-| 挑战 | `/api/challenge/list` | 周期主题挑战 |
-| AI 代理 | `/api/ai/*` | 代理转发到 weiji-ai，统一加 `/api` 前缀 |
+| 鉴权 | `/app/account/login` `/register` | JWT 签发 + bcrypt 校验 |
+| 记录 | `/app/record/list` `POST /app/record` | 美食日记，分页查询 |
+| 家庭 | `/app/family/*` `/app/family/recipe/*` | 家庭组 / 成员 / 邀请码 / 共享菜谱 / 周菜单 / 购物清单 |
+| 成就 | `/app/achievement/list` | 成就徽章 |
+| 打卡 | `/app/checkin` `/app/checkin/status` | 连续打卡 + streak |
+| 用户 | `/app/user/profile` | 用户档案 |
+| 挑战 | `/app/challenge/list` | 周期主题挑战 |
+| 玩法 | `/app/gamification/pokedex` `/app/gamification/blindGuess` | 图鉴 + 盲猜 |
+| AI 代理 | `/app/ai/*` | 代理转发到 weiji-ai:8002，30s 超时 + 降级 |
+| 埋点 | `/app/analytics/event` | 行为埋点 |
+| 健康检查 | `/open/health` | 服务 + AI 状态 |
+
+B 端管理用 cl-crud 在 `/admin/*` 自动生成 record/family/recipe/achievement 等 CRUD。
 
 ---
 
@@ -244,14 +261,17 @@ workspace/
 - **不硬编码凭证**：AI 厂商 Key 一律从环境变量读取，缺失时降级
 - **降级优先**：AI 端点任何异常都返回友好提示，不抛 500
 - **测试先行**：新增能力需补单元 + 集成测试，并通过 `scripts/run-all-tests.sh`
+- **生产配置**：`config.prod.ts` 强制 `synchronize:false`，启动校验
 
 ---
 
 ## 相关文档
 
 - [味记PRD.md](file:///workspace/味记PRD.md) — 产品需求文档（功能全景、AI 规格、路线图）
-- [weiji-admin-web README](file:///workspace/weiji-admin-web) — 前端说明（Vue3 管理后台）
-- [weiji-server README](file:///workspace/weiji-server/README.md) — 业务后端说明（端点、种子数据、技术说明）
+- [weiji-server README](file:///workspace/weiji-server/README.md) — 业务后端说明（cool-admin-midway）
+- [weiji-admin-web README](file:///workspace/weiji-admin-web/README.md) — PC 后台说明（cool-admin-vue）
+- [weiji-app README](file:///workspace/weiji-app/README.md) — 移动端说明（cool-uni）
 - [weiji-ai README](file:///workspace/weiji-ai/README.md) — AI 服务说明（环境变量、降级策略、目录结构）
+- [weiji-server/docs/api-path-mapping.md](file:///workspace/weiji-server/docs/api-path-mapping.md) — API 路径映射契约
 - [MVP开发速查手册.md](file:///workspace/MVP开发速查手册.md) — MVP 功能与数据模型速查
-- [架构设计与迁移方案.md](架构设计与迁移方案.md) — 目标架构（cool-admin 全家桶）与迁移路线图
+- [架构设计与迁移方案.md](架构设计与迁移方案.md) — cool-admin 全家桶迁移方案与路线图

@@ -1,0 +1,164 @@
+{
+  "weiji_family": [
+    {
+      "id": 1,
+      "name": "王家厨房",
+      "ownerId": 2,
+      "inviteCode": "WJ1234",
+      "memberCount": 4,
+      "description": "王家的家庭厨房，记录每一道家的味道"
+    }
+  ],
+  "weiji_family_member": [
+    {
+      "id": 1,
+      "familyId": 1,
+      "userId": 2,
+      "role": "owner",
+      "joinedAt": "2026-06-01 00:00:00"
+    },
+    {
+      "id": 2,
+      "familyId": 1,
+      "userId": 1,
+      "role": "admin",
+      "joinedAt": "2026-06-03 00:00:00"
+    },
+    {
+      "id": 3,
+      "familyId": 1,
+      "userId": 3,
+      "role": "member",
+      "joinedAt": "2026-06-03 00:00:00"
+    },
+    {
+      "id": 4,
+      "familyId": 1,
+      "userId": 4,
+      "role": "member",
+      "joinedAt": "2026-06-11 00:00:00"
+    }
+  ],
+  "weiji_family_recipe": [
+    {
+      "id": 1,
+      "familyId": 1,
+      "authorId": 1,
+      "name": "红烧牛肉面",
+      "category": "面食",
+      "ingredients": [
+        { "name": "牛腩", "amount": "300g", "unit": "g" },
+        { "name": "面条", "amount": "200g", "unit": "g" },
+        { "name": "青菜", "amount": "100g", "unit": "g" },
+        { "name": "八角", "amount": "2个", "unit": "个" }
+      ],
+      "steps": [
+        { "stepNum": 1, "text": "牛腩切块冷水下锅焯水去血沫", "imageUrl": "" },
+        { "stepNum": 2, "text": "热锅冷油爆香葱姜八角，下牛腩翻炒上色", "imageUrl": "" },
+        { "stepNum": 3, "text": "加开水没过牛肉，小火炖煮90分钟", "imageUrl": "" },
+        { "stepNum": 4, "text": "另锅煮面，出锅前烫青菜，浇上牛肉汤", "imageUrl": "" }
+      ],
+      "coverUrl": "https://cdn.weiji.app/recipe/beef-noodle.jpg",
+      "difficulty": "medium",
+      "cookTime": 90,
+      "visibility": "family"
+    },
+    {
+      "id": 2,
+      "familyId": 1,
+      "authorId": 2,
+      "name": "番茄炒蛋",
+      "category": "家常菜",
+      "ingredients": [
+        { "name": "番茄", "amount": "2个", "unit": "个" },
+        { "name": "鸡蛋", "amount": "3个", "unit": "个" },
+        { "name": "白糖", "amount": "5g", "unit": "g" }
+      ],
+      "steps": [
+        { "stepNum": 1, "text": "番茄顶部划十字，开水烫后去皮切块", "imageUrl": "" },
+        { "stepNum": 2, "text": "鸡蛋打散，热油下锅炒散盛出", "imageUrl": "" },
+        { "stepNum": 3, "text": "另起锅炒番茄出汁，回锅鸡蛋，加糖盐翻匀", "imageUrl": "" }
+      ],
+      "coverUrl": "https://cdn.weiji.app/recipe/tomato-egg.jpg",
+      "difficulty": "easy",
+      "cookTime": 15,
+      "visibility": "family"
+    },
+    {
+      "id": 3,
+      "familyId": 1,
+      "authorId": 3,
+      "name": "清炒西兰花",
+      "category": "家常菜",
+      "ingredients": [
+        { "name": "西兰花", "amount": "1颗", "unit": "颗" },
+        { "name": "蒜", "amount": "3瓣", "unit": "瓣" },
+        { "name": "盐", "amount": "2g", "unit": "g" }
+      ],
+      "steps": [
+        { "stepNum": 1, "text": "西兰花掰小朵，盐水浸泡10分钟", "imageUrl": "" },
+        { "stepNum": 2, "text": "沸水焯烫30秒捞出过凉", "imageUrl": "" },
+        { "stepNum": 3, "text": "热油爆香蒜末，下西兰花大火快炒，加盐出锅", "imageUrl": "" }
+      ],
+      "coverUrl": "https://cdn.weiji.app/recipe/broccoli.jpg",
+      "difficulty": "easy",
+      "cookTime": 10,
+      "visibility": "private"
+    },
+    {
+      "id": 4,
+      "familyId": 1,
+      "authorId": 1,
+      "name": "桂花糕",
+      "category": "烘焙",
+      "ingredients": [
+        { "name": "糯米粉", "amount": "150g", "unit": "g" },
+        { "name": "桂花", "amount": "20g", "unit": "g" },
+        { "name": "白糖", "amount": "40g", "unit": "g" },
+        { "name": "水", "amount": "120ml", "unit": "ml" }
+      ],
+      "steps": [
+        { "stepNum": 1, "text": "糯米粉加糖桂花加水和成软面团", "imageUrl": "" },
+        { "stepNum": 2, "text": "模具抹油，倒入面糊震出气泡", "imageUrl": "" },
+        { "stepNum": 3, "text": "上锅大火蒸25分钟，晾凉脱模切块", "imageUrl": "" }
+      ],
+      "coverUrl": "https://cdn.weiji.app/recipe/osmanthus-cake.jpg",
+      "difficulty": "medium",
+      "cookTime": 40,
+      "visibility": "family"
+    }
+  ],
+  "weiji_family_invitation": [],
+  "weiji_weekly_menu": [
+    { "id": 1, "familyId": 1, "dayOfWeek": 1, "mealType": "breakfast", "recipeId": 4, "recipeName": "桂花糕", "likes": [], "dislikes": [] },
+    { "id": 2, "familyId": 1, "dayOfWeek": 1, "mealType": "lunch", "recipeId": 1, "recipeName": "红烧牛肉面", "likes": [], "dislikes": [] },
+    { "id": 3, "familyId": 1, "dayOfWeek": 1, "mealType": "dinner", "recipeId": 2, "recipeName": "番茄炒蛋", "likes": [], "dislikes": [] },
+    { "id": 4, "familyId": 1, "dayOfWeek": 2, "mealType": "breakfast", "recipeId": null, "recipeName": "待定", "likes": [], "dislikes": [] },
+    { "id": 5, "familyId": 1, "dayOfWeek": 2, "mealType": "lunch", "recipeId": 3, "recipeName": "清炒西兰花", "likes": [], "dislikes": [] },
+    { "id": 6, "familyId": 1, "dayOfWeek": 2, "mealType": "dinner", "recipeId": 1, "recipeName": "红烧牛肉面", "likes": [], "dislikes": [] },
+    { "id": 7, "familyId": 1, "dayOfWeek": 3, "mealType": "breakfast", "recipeId": 4, "recipeName": "桂花糕", "likes": [], "dislikes": [] },
+    { "id": 8, "familyId": 1, "dayOfWeek": 3, "mealType": "lunch", "recipeId": 2, "recipeName": "番茄炒蛋", "likes": [], "dislikes": [] },
+    { "id": 9, "familyId": 1, "dayOfWeek": 3, "mealType": "dinner", "recipeId": 3, "recipeName": "清炒西兰花", "likes": [], "dislikes": [] },
+    { "id": 10, "familyId": 1, "dayOfWeek": 4, "mealType": "breakfast", "recipeId": null, "recipeName": "待定", "likes": [], "dislikes": [] },
+    { "id": 11, "familyId": 1, "dayOfWeek": 4, "mealType": "lunch", "recipeId": 1, "recipeName": "红烧牛肉面", "likes": [], "dislikes": [] },
+    { "id": 12, "familyId": 1, "dayOfWeek": 4, "mealType": "dinner", "recipeId": 2, "recipeName": "番茄炒蛋", "likes": [], "dislikes": [] },
+    { "id": 13, "familyId": 1, "dayOfWeek": 5, "mealType": "breakfast", "recipeId": 4, "recipeName": "桂花糕", "likes": [], "dislikes": [] },
+    { "id": 14, "familyId": 1, "dayOfWeek": 5, "mealType": "lunch", "recipeId": 3, "recipeName": "清炒西兰花", "likes": [], "dislikes": [] },
+    { "id": 15, "familyId": 1, "dayOfWeek": 5, "mealType": "dinner", "recipeId": 1, "recipeName": "红烧牛肉面", "likes": [], "dislikes": [] },
+    { "id": 16, "familyId": 1, "dayOfWeek": 6, "mealType": "breakfast", "recipeId": null, "recipeName": "待定", "likes": [], "dislikes": [] },
+    { "id": 17, "familyId": 1, "dayOfWeek": 6, "mealType": "lunch", "recipeId": 2, "recipeName": "番茄炒蛋", "likes": [], "dislikes": [] },
+    { "id": 18, "familyId": 1, "dayOfWeek": 6, "mealType": "dinner", "recipeId": 3, "recipeName": "清炒西兰花", "likes": [], "dislikes": [] },
+    { "id": 19, "familyId": 1, "dayOfWeek": 7, "mealType": "breakfast", "recipeId": 4, "recipeName": "桂花糕", "likes": [], "dislikes": [] },
+    { "id": 20, "familyId": 1, "dayOfWeek": 7, "mealType": "lunch", "recipeId": 1, "recipeName": "红烧牛肉面", "likes": [], "dislikes": [] },
+    { "id": 21, "familyId": 1, "dayOfWeek": 7, "mealType": "dinner", "recipeId": 2, "recipeName": "番茄炒蛋", "likes": [], "dislikes": [] }
+  ],
+  "weiji_shopping_item": [
+    { "id": 1, "familyId": 1, "name": "牛腩", "category": "肉类", "quantity": "300g", "checked": false, "checkedBy": null, "checkedAt": null, "sort": 1 },
+    { "id": 2, "familyId": 1, "name": "番茄", "category": "蔬菜", "quantity": "5个", "checked": false, "checkedBy": null, "checkedAt": null, "sort": 2 },
+    { "id": 3, "familyId": 1, "name": "西兰花", "category": "蔬菜", "quantity": "2颗", "checked": false, "checkedBy": null, "checkedAt": null, "sort": 3 },
+    { "id": 4, "familyId": 1, "name": "鲈鱼", "category": "水产", "quantity": "1条", "checked": true, "checkedBy": 2, "checkedAt": "2026-06-30 00:00:00", "sort": 4 },
+    { "id": 5, "familyId": 1, "name": "生抽", "category": "调料", "quantity": "1瓶", "checked": false, "checkedBy": null, "checkedAt": null, "sort": 5 },
+    { "id": 6, "familyId": 1, "name": "八角", "category": "调料", "quantity": "1包", "checked": false, "checkedBy": null, "checkedAt": null, "sort": 6 },
+    { "id": 7, "familyId": 1, "name": "干桂花", "category": "干货", "quantity": "50g", "checked": false, "checkedBy": null, "checkedAt": null, "sort": 7 }
+  ]
+}

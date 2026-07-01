@@ -17,7 +17,7 @@ echo "=========================================="
 echo ""
 
 # ------------------------------------------------
-# 1. weiji-server (Node.js + node:test + supertest)
+# 1. weiji-server (cool-admin-midway, Node.js + jest + ts-jest)
 # ------------------------------------------------
 echo "[1/3] weiji-server 测试..."
 cd "$ROOT_DIR/weiji-server"
@@ -47,7 +47,7 @@ fi
 echo ""
 
 # ------------------------------------------------
-# 3. weiji-admin-web (Vitest)
+# 3. weiji-admin-web (cool-admin-vue, Vitest + @vue/test-utils + jsdom)
 # ------------------------------------------------
 echo "[3/3] weiji-admin-web 测试..."
 cd "$ROOT_DIR/weiji-admin-web"

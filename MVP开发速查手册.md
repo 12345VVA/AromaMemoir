@@ -26,8 +26,10 @@
 
 ## 1.1 拍照 → AI 识别 → 保存
 
+> 新架构（cool-admin）将旧 `/api/record/analyze` 拆为三步：`POST /app/ai/recognize`（识别）→ `POST /app/ai/beautify`（美化）→ `POST /app/record`（保存记录）。下文规格以识别端点为例。
+
 ```
-POST /api/record/analyze
+POST /app/ai/recognize
 Content-Type: multipart/form-data
 Authorization: Bearer {token}
 ```
@@ -112,7 +114,7 @@ Authorization: Bearer {token}
 ## 1.2 菜谱推荐（LLM + RAG，流式响应）
 
 ```
-POST /api/recommend/recipe
+POST /app/ai/recommend
 Content-Type: application/json
 Authorization: Bearer {token}
 ```
@@ -222,7 +224,7 @@ data: {"recipes": [{"name": "酸汤肥牛", "difficulty": "中等", "time": 30, 
 ## 1.4 语音识别代理
 
 ```
-POST /api/voice/recognize
+POST /app/ai/voice/recognize
 Content-Type: multipart/form-data
 Authorization: Bearer {token}
 ```
@@ -263,21 +265,23 @@ Authorization: Bearer {token}
 ## 1.5 标准 CRUD 接口命名规范
 
 > 以下命名规范供 weiji-server 控制器实现参考（实际已实现端点见根 README「核心业务能力」表）。
+> 当前架构（cool-admin-midway）端点按 `/open/*`（公开）/ `/app/*`（C 端）/ `/admin/*`（B 端 cl-crud）三段划分，下表为 C 端 `/app/*` 前缀。
 
 | 模块 | 端点前缀 | 典型接口 |
 |------|----------|----------|
-| 用户 | `/api/user` | 自实现（auth.controller / user.controller） |
-| 饮食记录 | `/api/record` | CRUD + 按日期/标签/评分筛选 |
-| 评分标记 | `/api/record/{id}/rate` | PATCH（更新评分和标签） |
-| 菜谱 | `/api/recipe` | CRUD + 按菜系/难度/食材搜索 |
-| 家庭组 | `/api/family` | CRUD + 邀请/移除成员 + 成员列表 |
-| 家庭菜谱 | `/api/family/{id}/recipe` | 家庭空间内的菜谱 CRUD |
-| 协作菜单 | `/api/family/{id}/menu` | 周菜单 CRUD + 投票 |
-| 购物清单 | `/api/family/{id}/shopping` | 购物清单 CRUD + 勾选 |
-| 成就 | `/api/achievement` | 成就定义 + 用户成就记录 |
-| 打卡 | `/api/checkin` | 打卡记录 + 连续天数查询 |
-| 挑战赛 | `/api/challenge` | 挑战赛定义 + 参与记录 + 排行榜 |
-| 探店 | `/api/explore` | 探店记录 CRUD + 按地理位置筛选 |
+| 账户 | `/app/account` | login / register（account 模块，weiji_app_user） |
+| 用户 | `/app/user` | profile / 个人档案 |
+| 饮食记录 | `/app/record` | CRUD + 按日期/标签/评分筛选 |
+| 评分标记 | `/app/record/{id}/rate` | PATCH（更新评分和标签） |
+| 菜谱 | `/app/family/recipe` | 家庭空间菜谱 CRUD + 按菜系/难度/食材搜索 |
+| 家庭组 | `/app/family` | CRUD + 邀请/移除成员 + 成员列表 |
+| 协作菜单 | `/app/family/menu` | 周菜单 CRUD + 投票 |
+| 购物清单 | `/app/family/shopping` | 购物清单 CRUD + 勾选 |
+| 成就 | `/app/achievement` | 成就定义 + 用户成就记录 |
+| 打卡 | `/app/checkin` | 打卡记录 + 连续天数查询 |
+| 挑战赛 | `/app/challenge` | 挑战赛定义 + 参与记录 + 排行榜 |
+| 玩法 | `/app/gamification` | 图鉴 / 人格 / 盲猜 |
+| AI 代理 | `/app/ai` | recognize / beautify / recommend / voice / sticker（转发 :8002） |
 
 **统一规范：**
 
@@ -285,7 +289,8 @@ Authorization: Bearer {token}
 - 排序：`?sort=createdAt&order=desc`
 - 筛选：`?tag=家的味道&rating=4`
 - 时间范围：`?startDate=2026-06-01&endDate=2026-06-30`
-- 统一错误响应：`{ "code": 错误码, "message": "人类可读消息", "data": null }`
+- 统一响应：成功 `{ "code": 1000, "message": "success", "data": <payload> }`；失败 `{ "code": <非1000>, "message": "人类可读消息", "data": null }`
+- B 端管理 CRUD 由 cl-crud 在 `/admin/*` 自动生成（record/family/recipe/achievement 等）
 
 ---
 
@@ -535,7 +540,7 @@ erDiagram
 
 # 三、模块边界图
 
-> **未采用：** 本节为 2026-06 草拟的 cool-admin 目标架构设计，**未落地**。实际架构为三服务分层（见根 README）：weiji-admin-web（Vue3 :5173）→ weiji-server（Koa + @koa/router + 装饰器简化方案，`bootstrap.ts` 装配 CORS / bodyParser / JWT 中间件并扫描 `@Controller` 路由，:8001）→ weiji-ai（FastAPI :8002）。下文图与流程中的 Socket.io / BullMQ / Redis PubSub / 腾讯云 COS / 微信小程序 / Flutter 客户端等**均未实现**，保留仅作目标设计参考。
+> **已落地：** 本节为 2026-06 草拟的 cool-admin 目标架构设计，**已按此方向落地**为 cool-admin 全家桶（见根 README）：weiji-admin-web（cool-admin-vue :9000）+ weiji-app（cool-uni :9900 H5）→ weiji-server（cool-admin-midway，Midway.js + TypeORM + MySQL + Redis，:8001）→ weiji-ai（FastAPI :8002）。下文图与流程中的 Socket.io / BullMQ / Redis PubSub / 腾讯云 COS / Flutter 客户端等**均未实现**，保留仅作目标设计参考。
 
 ## 3.1 架构总览
 
@@ -621,7 +626,7 @@ erDiagram
   │                              │                           │                          │
   │  拍照                         │                           │                          │
   │─────────────────────────────>│                           │                          │
-  │  POST /api/record/analyze    │                           │                          │
+  │  POST /app/ai/recognize    │                           │                          │
   │                              │  审核图片                  │                          │
   │                              │──────────────────────────>│                          │
   │                              │                           │  腾讯云COS数据万象审核      │
@@ -654,7 +659,7 @@ erDiagram
   │                              │                           │                          │
   │  用户确认/编辑后保存           │                           │                          │
   │─────────────────────────────>│                           │                          │
-  │  POST /api/record            │                           │                          │
+  │  POST /app/record            │                           │                          │
   │                              │  保存记录                  │                          │
   │                              │  触发成就事件 (BullMQ)      │                          │
   │                              │  推送打卡事件 (WebSocket)   │                          │
@@ -736,20 +741,25 @@ uvicorn main:app --host 0.0.0.0 --port 8002
 
 无需配置任何 AI Key 即可启动：5 个端点会降级返回 mock 数据。完整环境变量与降级策略见 `weiji-ai/README.md`。
 
-## 4.5 本地启动（三终端）
+## 4.5 本地启动（四终端）
+
+> 当前架构基于 cool-admin 全家桶：weiji-server（cool-admin-midway :8001）/ weiji-admin-web（cool-admin-vue :9000）/ weiji-app（cool-uni :9900 H5）/ weiji-ai（FastAPI :8002）。
 
 ```bash
 # 终端1：AI 服务
 cd weiji-ai && uvicorn main:app --host 0.0.0.0 --port 8002
 
-# 终端2：业务后端
-cd weiji-server && npm run dev          # → http://localhost:8001
+# 终端2：业务后端（cool-admin-midway）
+cd weiji-server && NODE_ENV=local node bootstrap-local.js   # → http://localhost:8001
 
-# 终端3：前端
-cd weiji-admin-web && npm run dev       # → http://localhost:5173
+# 终端3：PC 后台（cool-admin-vue）
+cd weiji-admin-web && npm run dev       # → http://localhost:9000（admin/123456）
+
+# 终端4：移动端 H5（cool-uni）
+cd weiji-app && npm run dev:h5          # → http://localhost:9900（demo/123456）
 ```
 
-如需 MySQL 持久化，在终端2 启动前执行 `cp .env.example .env`（设 `DB_DRIVER=mysql`）与 `mysql -u root -p < db/init.sql`，详见 `weiji-server/db/README.md`。
+CI / 只读环境需加 `CHOKIDAR_USEPOLLING=true` 启动前端 dev server。后端 cool-admin 启动时自动建表并加载各模块 `db.json` 种子数据；生产配置 `config.prod.ts` 强制 `synchronize:false`。
 
 ---
 
@@ -787,7 +797,7 @@ cd weiji-admin-web && npm run dev       # → http://localhost:5173
 
 - [ ] 定义 `record`、`record_photo` Entity
 - [ ] 使用 cool-admin AI 编码生成 CRUD 接口
-- [ ] 实现 `POST /api/record/analyze` 接口（图片上传 → COS → 审核 → 识别）
+- [ ] 实现 `POST /app/ai/recognize` 接口（图片上传 → COS → 审核 → 识别）
 - [ ] Python AI 服务：食物识别 API 封装（百度AI + GPT-4o 兜底）
 - [ ] Python AI 服务：图片美化 API 封装（火山引擎）
 - [ ] 前端拍照页面（uni-app 调用相机 + Flutter 自定义相机）

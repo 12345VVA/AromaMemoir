@@ -1,0 +1,37 @@
+{
+  "weiji_challenge": [
+    {
+      "id": 1,
+      "name": "夏日轻食挑战",
+      "description": "30天内记录10道低卡轻食，健康过夏",
+      "type": "record_count",
+      "rules": { "type": "record_count", "target": 10, "maxCalories": 300, "category": "light" },
+      "exp": 0,
+      "startTime": "2026-07-01",
+      "endTime": "2026-07-31",
+      "isActive": true
+    },
+    {
+      "id": 2,
+      "name": "家庭菜谱大赏",
+      "description": "与家人共创5道家庭菜谱，传承家的味道",
+      "type": "family_recipe",
+      "rules": { "type": "family_recipe", "target": 5, "requireFamily": true },
+      "exp": 0,
+      "startTime": "2026-06-24",
+      "endTime": "2026-07-24",
+      "isActive": true
+    },
+    {
+      "id": 3,
+      "name": "连续打卡30天",
+      "description": "坚持每日打卡30天，养成记录习惯",
+      "type": "streak",
+      "rules": { "type": "streak", "target": 30 },
+      "exp": 0,
+      "startTime": "2026-06-21",
+      "endTime": "2026-07-21",
+      "isActive": false
+    }
+  ]
+}

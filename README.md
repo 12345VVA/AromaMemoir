@@ -4,6 +4,8 @@
 >
 > 核心理念：每一餐都值得被记住，每一个家庭都有自己的味道。
 
+> 📌 **目标架构（2026-07）**：将基于 cool-admin 全家桶（cool-admin-midway / cool-admin-vue / cool-uni）重建三端工程，[weiji-web](weiji-web/) 作为功能参考原型，[weiji-ai](weiji-ai/) 保留为独立 AI 层。完整设计见 [架构设计与迁移方案.md](架构设计与迁移方案.md)。下文「架构概览 / 目录结构」描述的是**当前**可运行的旧实现，迁移按上述方案分阶段进行。
+
 ---
 
 ## 架构概览
@@ -190,7 +192,7 @@ workspace/
 │   ├── services/                # baidu/openai/tencent/volcano/qwen/xfyun 6 个厂商模块
 │   ├── tests/                   # unit/ + integration/
 │   └── requirements.txt
-├── weiji-web/                # 原生 HTML+JS 原型前端（与 admin-web 并存，功能更全）
+├── weiji-web/                # ⚠️ 功能参考原型（纯静态 HTML+JS，不参与构建/部署，详见 [weiji-web/README.md](weiji-web/README.md)）
 │   ├── api.js
 │   ├── app.js
 │   └── index.html
@@ -252,3 +254,4 @@ workspace/
 - [weiji-server README](file:///workspace/weiji-server/README.md) — 业务后端说明（端点、种子数据、技术说明）
 - [weiji-ai README](file:///workspace/weiji-ai/README.md) — AI 服务说明（环境变量、降级策略、目录结构）
 - [MVP开发速查手册.md](file:///workspace/MVP开发速查手册.md) — MVP 功能与数据模型速查
+- [架构设计与迁移方案.md](架构设计与迁移方案.md) — 目标架构（cool-admin 全家桶）与迁移路线图

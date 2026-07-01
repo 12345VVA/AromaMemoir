@@ -1,0 +1,167 @@
+sequenceDiagram
+    actor U as C端用户
+    participant FE as cool-uni (App前端)
+    participant BE as weiji-server (:8001)
+    participant AI as weiji-ai (:8002)
+    participant DB as MySQL
+
+    %% ===== 场景1：C端登录 → AI识别 → 保存记录 → 打卡 → 成就 =====
+
+    Note over U,DB: ===== 场景1：C端用户登录 → AI 识别 → 保存记录 → 自动打卡 → 成就解锁 =====
+
+    rect rgb(240, 248, 255)
+        Note over U,DB: 阶段1：C端登录 (POST /app/account/login)
+        U->>FE: 输入 username/password
+        FE->>BE: POST /app/account/login {username, password}
+        BE->>DB: SELECT FROM weiji_app_user WHERE username=?
+        DB-->>BE: user row (bigint id)
+        BE->>BE: bcrypt.compare(password, hash)
+        BE->>BE: jwt.sign({userId, username}, JWT_SECRET, 7d)
+        BE-->>FE: {code:0, data:{token, user:{id:bigint, nickname, avatar, level}}}
+        FE->>FE: uni.setStorageSync('token')
+    end
+
+    rect rgb(255, 250, 240)
+        Note over U,DB: 阶段2：AI 食物识别 (POST /app/ai/recognize)
+        U->>FE: 拍照 / 选照片
+        FE->>FE: Canvas 压缩 (≤2MB)
+        FE->>BE: POST /app/ai/recognize (multipart image)<br/>Authorization: Bearer {app_token}
+        Note over BE: App JWT 中间件校验<br/>→ ctx.appUser = {id: bigint, username}
+        BE->>AI: POST /ai/recognize (multipart image)<br/>30s 超时
+        AI->>AI: 百度AI 识别 + GPT-4o 兜底
+        AI-->>BE: {dishName, ingredients, confidence, nutrition}
+        BE-->>FE: {code:0, data:{dishName, ingredients, confidence, nutrition}}
+        FE-->>U: 展示 AI 识别结果 + 营养分析
+    end
+
+    rect rgb(240, 255, 240)
+        Note over U,DB: 阶段3：保存记录 + 自动打卡 + 成就检查 (POST /app/record/save)
+        U->>FE: 确认/编辑 → 评分 1-5 → 选标签 → 保存
+        FE->>BE: POST /app/record/save {dishName, rating, mealType, tags, ...}
+        BE->>DB: INSERT INTO weiji_record (bigint id AUTO_INCREMENT)<br/>VALUES (userId=bigint, dishName, rating, nutrition JSON, ...)
+        BE->>DB: INSERT INTO weiji_checkin (userId, today, recordCount:1)<br/>ON DUPLICATE KEY UPDATE recordCount++
+        BE->>DB: SELECT checkDate FROM weiji_checkin<br/>WHERE userId=? ORDER BY checkDate DESC
+        BE->>BE: calculateStreak(userId) → streak=N
+        BE->>BE: checkAndUnlockAchievements(userId)
+        Note over BE: streak=7 → 解锁 "一周全勤" 徽章<br/>recordCount=100 → 解锁 "百味达人" 徽章
+        BE->>DB: INSERT INTO weiji_user_achievement<br/>(userId=bigint, achievementId=bigint, earnedAt)
+        BE-->>FE: {code:0, data:{record:{id:bigint,...}, newAchievements:[{name:"一周全勤",icon:"🔥"},...]}}
+        FE-->>U: Toast "保存成功" + 徽章弹出动效
+    end
+
+    %% ===== 场景2：家庭菜谱共享 + 菜单投票 =====
+
+    Note over U,DB: ===== 场景2：家庭菜谱共享 + 周菜单投票（/app/family/*） =====
+
+    actor M as 妈妈(C端)
+    actor D as 小明(C端)
+
+    rect rgb(255, 240, 255)
+        Note over M,DB: 妈妈上传菜谱 (POST /app/family/recipes)
+        M->>FE: 填写菜谱表单（名称/食材JSON/步骤JSON/封面）
+        FE->>BE: POST /app/family/recipes<br/>{name, category, ingredients:[{name,amount,unit}],<br/> steps:[{stepNo,description}], difficulty, cookTime}
+        BE->>BE: App JWT 校验 → ctx.appUser.id (bigint)<br/>查找用户所属家庭组 familyId
+        BE->>DB: INSERT INTO weiji_family_recipe<br/>(familyId=bigint, uploaderId=bigint, name, ingredients JSON, steps JSON)
+        BE-->>FE: {code:0, data: {id:bigint, name, ingredients, steps, ...}}
+        FE-->>M: Toast "菜谱上传成功"
+    end
+
+    rect rgb(240, 255, 255)
+        Note over D,DB: 小明浏览菜谱并加入本周菜单
+        D->>FE: 进入家庭菜谱页
+        FE->>BE: GET /app/family/recipes?visibility=family&page=1
+        BE->>DB: SELECT FROM weiji_family_recipe<br/>WHERE familyId=? AND deleteTime IS NULL<br/>ORDER BY createTime DESC
+        DB-->>BE: recipes[] (bigint id)
+        BE-->>FE: {code:0, data: {list:[{id:bigint, name, coverUrl, difficulty, ...}], pagination:{...}}}
+        FE-->>D: 展示菜谱卡片网格
+
+        D->>FE: 点击菜谱 → "加入周一午餐"
+        FE->>BE: POST /app/family/menu<br/>{weekStart:"2026-06-29", dayOfWeek:1, mealType:"lunch",<br/> recipeId:bigint, recipeName:"红烧排骨"}
+        BE->>DB: INSERT INTO weiji_weekly_menu<br/>(familyId=bigint, recipeId=bigint, weekStart, dayOfWeek, mealType)
+        BE-->>FE: {code:0, data: {id:bigint, votes:{like:0, dislike:0}}}
+        FE-->>D: Toast "已加入周一午餐" → 菜单网格更新
+    end
+
+    rect rgb(255, 255, 240)
+        Note over M,DB: 妈妈投票 (POST /app/family/menu/:id/vote)
+        M->>FE: 看到新菜单项 → 点赞
+        FE->>BE: POST /app/family/menu/42/vote {vote:"like"}
+        BE->>DB: UPDATE weiji_weekly_menu<br/>SET votes = JSON_SET(votes, '$.like', votes->'$.like'+1)<br/>WHERE id=42
+        BE-->>FE: {code:0, data:{likes:3, dislikes:0}}
+        FE-->>M: 点赞图标高亮 + 数字 +1
+    end
+
+    %% ===== 场景3：打卡状态 → 补签 =====
+
+    Note over U,DB: ===== 场景3：打卡状态查询 + 补签（/app/checkin/*） =====
+
+    rect rgb(255, 245, 238)
+        Note over U,DB: 每日打卡状态 (GET /app/checkin/status)
+        U->>FE: 打开 App → 首页
+        FE->>BE: GET /app/checkin/status
+        BE->>DB: SELECT checkDate, isReplenish FROM weiji_checkin<br/>WHERE userId=? ORDER BY checkDate DESC
+        DB-->>BE: checkIns[]
+        BE->>BE: calculateStreak(userId) → 连续天数<br/>todayChecked = 最新 checkDate === today
+        BE-->>FE: {code:0, data:{todayChecked:false, streak:6,<br/>  totalDays:45, thisMonth:22}}
+        FE-->>U: 日历组件：已打卡日绿色 ✓，今天空心 ○<br/>"连续打卡 6 天 🔥"
+    end
+
+    rect rgb(232, 255, 232)
+        Note over U,DB: 补签 (POST /app/checkin/replenish)
+        U->>FE: 昨天忘打卡 → 点击"补签"
+        FE->>BE: POST /app/checkin/replenish {date:"2026-06-30"}
+        BE->>DB: INSERT INTO weiji_checkin<br/>(userId=bigint, checkDate="2026-06-30", isReplenish=true)
+        BE->>BE: recalculateStreak(userId) → 补签后连续天数=7
+        BE-->>FE: {code:0, data:{streak:7, replenished:true}}
+        FE-->>U: Toast "补签成功" + 日历昨天变绿 + streak=7
+    end
+
+    %% ===== 场景4：B端管理员操作 =====
+
+    Note over U,DB: ===== 场景4：B端管理员操作（/admin/*） =====
+
+    actor AD as B端管理员
+
+    rect rgb(248, 248, 255)
+        Note over AD,DB: B端登录 + 后台管理 (cool-admin 内置)
+        AD->>FE: 访问后台 :9000
+        FE->>BE: POST /admin/base/open/login {username:"admin", password:"123456", captchaId, verifyCode}
+        BE->>BE: cool-admin 内置 token + RBAC 校验
+        BE-->>FE: {code:0, data:{token, user:{...}, menus:[...], permissions:[...]}}
+        FE->>FE: 渲染左侧菜单 + 权限按钮
+
+        AD->>FE: 点击"美食记录管理"
+        FE->>BE: POST /admin/record/page {page:1, pageSize:20, keyword:"红烧"}
+        Note over BE: AdminRecordController (cl-crud 自动生成)<br/>无需手写任何代码
+        BE->>DB: SELECT FROM weiji_record<br/>WHERE dishName LIKE '%红烧%' AND deleteTime IS NULL<br/>ORDER BY recordDate DESC LIMIT 20
+        DB-->>BE: records[] (bigint id)
+        BE-->>FE: {code:0, data:{list:[{id:bigint, dishName, userId:bigint, rating, ...}], pagination:{total:156,...}}}
+        FE-->>AD: cl-crud 表格展示记录列表<br/>操作栏：查看 | 编辑 | 删除（软删除）
+
+        AD->>FE: 点击"编辑"某条记录
+        FE->>BE: POST /admin/record/info?id=42
+        BE->>DB: SELECT FROM weiji_record WHERE id=42 AND deleteTime IS NULL
+        DB-->>BE: record row
+        BE-->>FE: {code:0, data:{id:42, dishName:"红烧排骨", ...}}
+        FE-->>AD: cl-form 表单回显，可编辑所有字段
+
+        AD->>FE: 修改评分 → 点击"保存"
+        FE->>BE: POST /admin/record/update {id:42, rating:5}
+        BE->>DB: UPDATE weiji_record SET rating=5, updateTime=NOW() WHERE id=42
+        BE-->>FE: {code:0, message:"更新成功"}
+        FE-->>AD: Toast "更新成功" → 列表刷新
+    end
+
+    %% ===== 场景5：健康检查 =====
+
+    Note over U,DB: ===== 场景5：健康检查（/open/health，无需鉴权） =====
+
+    rect rgb(255, 248, 240)
+        Note over U,DB: 开放接口 (GET /open/health)
+        participant MON as 监控系统
+        MON->>BE: GET /open/health
+        BE->>DB: SELECT 1
+        BE->>AI: GET /health (weiji-ai :8002)
+        AI-->>BE: {status:"ok"}
+        BE-->>MON: {code:0, data:{db:"ok", ai:"ok", uptime:12345}}
+    end

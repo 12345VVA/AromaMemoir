@@ -1,0 +1,330 @@
+classDiagram
+    direction TB
+
+    %% ===== cool-admin BaseEntity 能力说明 =====
+    %% 所有 Entity 继承 BaseEntity，自带以下字段（无需手写）：
+    %%   +bigint id PK (自增)
+    %%   +Date createTime
+    %%   +Date updateTime
+    %%   +Date deleteTime (软删除, softDelete:true 启用)
+
+    %% ===== C端用户 (account 模块) =====
+    class AppUserEntity {
+        +bigint id PK
+        +string username UK
+        +string password (select:false)
+        +string nickname
+        +string avatar
+        +string email
+        +string phone
+        +int exp
+        +int level
+        +Date createTime
+        +Date updateTime
+        +Date deleteTime
+    }
+    note for AppUserEntity "表名: weiji_app_user\nC端用户，独立鉴权"
+
+    %% ===== B端用户 (cool-admin 内置) =====
+    class SysUserEntity {
+        +bigint id PK
+        +string username UK
+        +string password
+        +string nickName
+        +int status
+        +Date createTime
+        +Date updateTime
+    }
+    note for SysUserEntity "表名: base_sys_user\ncool-admin 内置 RBAC\nB端管理员，不混用"
+
+    %% ===== 家庭组 (family 模块) =====
+    class FamilyEntity {
+        +bigint id PK
+        +string name
+        +bigint ownerId FK
+        +int memberCount
+        +string inviteCode
+        +Date createTime
+        +Date updateTime
+        +Date deleteTime
+    }
+    note for FamilyEntity "表名: weiji_family"
+
+    class FamilyMemberEntity {
+        +bigint id PK
+        +bigint familyId FK
+        +bigint userId FK
+        +string role
+        +Date joinedAt
+        +Date createTime
+    }
+    note for FamilyMemberEntity "表名: weiji_family_member\n唯一索引: (familyId, userId)"
+
+    class InvitationEntity {
+        +bigint id PK
+        +string code UK
+        +bigint familyId FK
+        +bigint createdBy FK
+        +Date expiresAt
+        +boolean used
+        +Date createTime
+    }
+    note for InvitationEntity "表名: weiji_family_invitation"
+
+    %% ===== 菜谱 (family 模块) =====
+    class FamilyRecipeEntity {
+        +bigint id PK
+        +bigint familyId FK
+        +string name
+        +string category
+        +json ingredients
+        +json steps
+        +string coverUrl
+        +string difficulty
+        +int cookTime
+        +bigint uploaderId FK
+        +string visibility
+        +int versionCount
+        +Date createTime
+        +Date updateTime
+        +Date deleteTime
+    }
+    note for FamilyRecipeEntity "表名: weiji_family_recipe\nJSON: ingredients[], steps[]"
+
+    %% ===== 美食记录 (record 模块) =====
+    class RecordEntity {
+        +bigint id PK
+        +bigint userId FK
+        +string dishName
+        +string cookingMethod
+        +int rating
+        +string note
+        +decimal aiConfidence
+        +json nutrition
+        +json ingredients
+        +json tags
+        +string mealType
+        +string recordDate
+        +string imageUrl
+        +string beautifiedUrl
+        +string source
+        +Date createTime
+        +Date updateTime
+        +Date deleteTime
+    }
+    note for RecordEntity "表名: weiji_record\n核心表, JSON: nutrition/ingredients/tags"
+
+    class RecordLikeEntity {
+        +bigint id PK
+        +bigint recordId FK
+        +bigint userId FK
+        +Date createTime
+    }
+    note for RecordLikeEntity "表名: weiji_record_like\n新增持久化, 幂等 (recordId, userId)"
+
+    class RecordCommentEntity {
+        +bigint id PK
+        +bigint recordId FK
+        +bigint userId FK
+        +string userNickname
+        +string content
+        +Date createTime
+    }
+    note for RecordCommentEntity "表名: weiji_record_comment\n新增持久化"
+
+    %% ===== 菜单与购物 (family 模块) =====
+    class WeeklyMenuEntity {
+        +bigint id PK
+        +bigint familyId FK
+        +string weekStart
+        +int dayOfWeek
+        +string mealType
+        +bigint recipeId FK
+        +string recipeName
+        +json votes
+        +Date createTime
+        +Date updateTime
+    }
+    note for WeeklyMenuEntity "表名: weiji_weekly_menu\nJSON: votes {like, dislike}"
+
+    class ShoppingItemEntity {
+        +bigint id PK
+        +bigint familyId FK
+        +string name
+        +string category
+        +string quantity
+        +boolean checked
+        +bigint checkedBy FK
+        +Date checkedAt
+        +int sort
+        +Date createTime
+        +Date updateTime
+    }
+    note for ShoppingItemEntity "表名: weiji_shopping_item"
+
+    %% ===== 成就与打卡 (achievement + checkin 模块) =====
+    class AchievementEntity {
+        +bigint id PK
+        +string code UK
+        +string name
+        +string description
+        +string icon
+        +string type
+        +json condition
+        +int expReward
+        +Date createTime
+        +Date updateTime
+    }
+    note for AchievementEntity "表名: weiji_achievement\nJSON: condition {type, threshold}"
+
+    class UserAchievementEntity {
+        +bigint id PK
+        +bigint userId FK
+        +bigint achievementId FK
+        +Date earnedAt
+        +Date createTime
+    }
+    note for UserAchievementEntity "表名: weiji_user_achievement\n唯一索引: (userId, achievementId)"
+
+    class CheckinEntity {
+        +bigint id PK
+        +bigint userId FK
+        +string checkDate
+        +int recordCount
+        +boolean isReplenish
+        +Date createTime
+    }
+    note for CheckinEntity "表名: weiji_checkin\n唯一索引: (userId, checkDate)"
+
+    %% ===== 挑战赛 (challenge 模块) =====
+    class ChallengeEntity {
+        +bigint id PK
+        +string title
+        +string description
+        +json rules
+        +string startDate
+        +string endDate
+        +string badgeCode
+        +boolean isActive
+        +Date createTime
+        +Date updateTime
+    }
+    note for ChallengeEntity "表名: weiji_challenge\nJSON: rules {target, duration, reward}"
+
+    %% ===== 趣味玩法 (gamification 模块) =====
+    class BlindGuessRoundEntity {
+        +bigint id PK
+        +bigint familyId FK
+        +bigint creatorId FK
+        +json items
+        +json guesses
+        +string status
+        +Date createTime
+        +Date updateTime
+    }
+    note for BlindGuessRoundEntity "表名: weiji_blind_guess_round\nJSON: items[], guesses[]"
+
+    class PokedexCatalogEntity {
+        +bigint id PK
+        +string code UK
+        +string name
+        +string icon
+        +string category
+        +string description
+        +json unlockCondition
+        +Date createTime
+    }
+    note for PokedexCatalogEntity "表名: weiji_pokedex_catalog\n静态数据, db.json 初始化"
+
+    %% ===== 关系连线 =====
+    AppUserEntity "1" --> "0..*" RecordEntity : owns
+    AppUserEntity "1" --> "0..*" CheckinEntity : does
+    AppUserEntity "1" --> "0..*" UserAchievementEntity : earns
+    AppUserEntity "1" --> "0..*" FamilyMemberEntity : belongs_to
+
+    FamilyEntity "1" --> "0..*" FamilyMemberEntity : contains
+    FamilyEntity "1" --> "0..*" FamilyRecipeEntity : contains
+    FamilyEntity "1" --> "0..*" InvitationEntity : issues
+    FamilyEntity "1" --> "0..*" WeeklyMenuEntity : plans
+    FamilyEntity "1" --> "0..*" ShoppingItemEntity : tracks
+    FamilyEntity "1" --> "0..*" BlindGuessRoundEntity : plays
+
+    FamilyRecipeEntity "1" --> "0..*" WeeklyMenuEntity : referenced_by
+
+    RecordEntity "1" --> "0..*" RecordLikeEntity : liked_by
+    RecordEntity "1" --> "0..*" RecordCommentEntity : commented_on
+
+    AchievementEntity "1" --> "0..*" UserAchievementEntity : unlocked_by
+
+    %% ===== 服务层接口 =====
+    class AuthService {
+        +login(username, password) LoginResult
+        +register(username, password, nickname) LoginResult
+        +getProfile(userId) AppUserEntity
+        +validateToken(token) JwtPayload
+        +generateToken(user) string
+    }
+
+    class RecordService {
+        +list(userId, query) PaginatedResult
+        +create(userId, body) RecordEntity
+        +getById(id, userId) RecordEntity
+    }
+
+    class FamilyService {
+        +getFamily(userId) FamilyEntity
+        +createFamily(userId, name) FamilyEntity
+        +getMembers(familyId) FamilyMemberEntity[]
+        +updateRole(operatorId, memberId, role) FamilyMemberEntity
+        +removeMember(operatorId, memberId) void
+        +createInvitation(userId, familyId) InvitationEntity
+        +joinByCode(userId, code) FamilyEntity
+        +listRecipes(familyId, filters) FamilyRecipeEntity[]
+        +uploadRecipe(uploaderId, body) FamilyRecipeEntity
+        +updateRecipe(userId, recipeId, patch) FamilyRecipeEntity
+        +deleteRecipe(userId, recipeId) void
+        +getMenu(familyId) WeeklyMenuEntity[]
+        +addMenuItem(familyId, item) WeeklyMenuEntity
+        +voteMenuItem(userId, menuId, voteType) json
+        +getShoppingList(familyId) ShoppingItemEntity[]
+        +addShoppingItem(familyId, item) ShoppingItemEntity
+        +toggleShoppingItem(userId, itemId, checked) ShoppingItemEntity
+        +generateShoppingFromMenu(familyId) json
+        +getFamilyRecords(familyId, page, pageSize) PaginatedResult
+        +toggleLike(userId, recordId) json
+        +addComment(userId, recordId, content) RecordCommentEntity
+        +getMonthlyReport(familyId, month) json
+    }
+
+    class CheckinService {
+        +getStatus(userId) CheckinStatus
+        +doCheckin(userId) CheckinResult
+        +replenish(userId) CheckinResult
+        +calculateStreak(userId) number
+        +lastCheckDate(userId) string
+    }
+
+    class AchievementService {
+        +listAchievements(userId) AchievementWithStatus[]
+        +getLevel(userId) LevelInfo
+        +checkAndUnlock(userId) AchievementEntity[]
+    }
+
+    class AiProxyService {
+        +forward(endpoint, ctx) any
+        +recognize(imageBuffer) RecognizeResult
+        +beautify(imageBuffer, style) BeautifyResult
+        +recommend(dishName, context) RecommendResult
+        +voiceRecognize(audioBuffer) VoiceResult
+        +sticker(imageBuffer, style) StickerResult
+        +healthCheck() boolean
+    }
+
+    class GamificationService {
+        +getPokedex(userId) PokedexSummary
+        +getPersonality(userId) PersonalityReport
+        +getTimemachine(userId) TimemachineResult
+        +createBlindRound(familyId, creatorId, items) BlindGuessRoundEntity
+        +submitBlindGuess(userId, roundId, guesses) BlindGuessRoundEntity
+        +revealBlindRound(roundId) json
+    }

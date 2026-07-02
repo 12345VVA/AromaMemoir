@@ -138,7 +138,7 @@ const Upsert = useUpsert({
 // cl-crud（family 模块 eps 自动生成的 /admin/family/* 服务）
 const Crud = useCrud(
 	{
-		service: (service as any).family.family
+		service: service.family
 	},
 	app => {
 		app.refresh();

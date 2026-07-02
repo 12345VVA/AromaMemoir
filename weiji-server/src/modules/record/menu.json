@@ -1,0 +1,210 @@
+[
+    {
+        "name": "美食记录管理",
+        "router": null,
+        "perms": null,
+        "type": 0,
+        "icon": "icon-food",
+        "orderNum": 20,
+        "viewPath": null,
+        "keepAlive": true,
+        "isShow": true,
+        "childMenus": [
+            {
+                "name": "美食记录列表",
+                "router": "/record/list",
+                "perms": null,
+                "type": 1,
+                "icon": "icon-menu",
+                "orderNum": 1,
+                "viewPath": "modules/record/views/list.vue",
+                "keepAlive": true,
+                "isShow": true,
+                "childMenus": [
+                    {
+                        "name": "新增",
+                        "router": null,
+                        "perms": "record:info:add",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 1,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "删除",
+                        "router": null,
+                        "perms": "record:info:delete",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 2,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "修改",
+                        "router": null,
+                        "perms": "record:info:update,record:info:info",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 3,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "查询",
+                        "router": null,
+                        "perms": "record:info:page,record:info:list,record:info:info",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 4,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    }
+                ]
+            },
+            {
+                "name": "AI 记录页",
+                "router": "/record/ai-record",
+                "perms": null,
+                "type": 1,
+                "icon": "icon-ai",
+                "orderNum": 2,
+                "viewPath": "modules/record/views/ai-record.vue",
+                "keepAlive": true,
+                "isShow": true,
+                "childMenus": []
+            },
+            {
+                "name": "点赞管理",
+                "router": "/record/like",
+                "perms": null,
+                "type": 1,
+                "icon": "icon-like",
+                "orderNum": 3,
+                "viewPath": "modules/record/views/list.vue",
+                "keepAlive": true,
+                "isShow": true,
+                "childMenus": [
+                    {
+                        "name": "新增",
+                        "router": null,
+                        "perms": "record:like:add",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 1,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "删除",
+                        "router": null,
+                        "perms": "record:like:delete",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 2,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "修改",
+                        "router": null,
+                        "perms": "record:like:update,record:like:info",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 3,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "查询",
+                        "router": null,
+                        "perms": "record:like:page,record:like:list,record:like:info",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 4,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    }
+                ]
+            },
+            {
+                "name": "评论管理",
+                "router": "/record/comment",
+                "perms": null,
+                "type": 1,
+                "icon": "icon-comment",
+                "orderNum": 4,
+                "viewPath": "modules/record/views/list.vue",
+                "keepAlive": true,
+                "isShow": true,
+                "childMenus": [
+                    {
+                        "name": "新增",
+                        "router": null,
+                        "perms": "record:comment:add",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 1,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "删除",
+                        "router": null,
+                        "perms": "record:comment:delete",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 2,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "修改",
+                        "router": null,
+                        "perms": "record:comment:update,record:comment:info",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 3,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "查询",
+                        "router": null,
+                        "perms": "record:comment:page,record:comment:list,record:comment:info",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 4,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    }
+                ]
+            }
+        ]
+    }
+]

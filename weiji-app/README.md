@@ -4,6 +4,43 @@
 
 [演示、文档地址](https://uni-docs.cool-js.com/)
 
+## 本地启动
+
+### 依赖安装
+
+```bash
+pnpm install
+```
+
+> **注意**：`vite.config.ts` 中引用的 `@dcloudio/vite-plugin-uni` 不能直接 `npm install`，该依赖由 `@dcloudio/uni-cli-shared` 间接引入（已在 `devDependencies` 中声明）。直接执行 `pnpm install` 即可，无需手动安装该包。
+
+> **⚠️ 不要使用 `npm install`**：项目依赖 `@dcloudio/vite-plugin-uni@3.0.0-3081220230817001`，其 peer 依赖声明为 `vite@^4.0.0`，而项目实际使用 `vite@^5.4.14`。npm 7+ 默认严格校验 peer 依赖，会抛出 `ERESOLVE unable to resolve dependency tree` 错误并终止安装。必须使用 pnpm（pnpm 对 peer 依赖更宽容）。如本机未安装 pnpm，请先执行：
+>
+> ```bash
+> npm install -g pnpm
+> ```
+
+如遇依赖安装失败或 lock 文件冲突，可清理后重试：
+
+```bash
+rm -rf node_modules pnpm-lock.yaml
+pnpm install
+```
+
+### 启动 H5 开发服务
+
+```bash
+pnpm dev:h5
+```
+
+启动后访问 `http://localhost:9900`。
+
+### 环境要求
+
+- Node.js >= 16
+- pnpm（推荐）或 npm
+- 后端服务 `weiji-server` 需在 `http://localhost:8001` 运行（代理配置见 `config/proxy.ts`）
+
 ## 更快
 
 #### 启动快

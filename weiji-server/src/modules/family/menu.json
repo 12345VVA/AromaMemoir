@@ -1,0 +1,381 @@
+[
+    {
+        "name": "家庭管理",
+        "router": null,
+        "perms": null,
+        "type": 0,
+        "icon": "icon-family",
+        "orderNum": 30,
+        "viewPath": null,
+        "keepAlive": true,
+        "isShow": true,
+        "childMenus": [
+            {
+                "name": "家庭组管理",
+                "router": "/family/list",
+                "perms": null,
+                "type": 1,
+                "icon": "icon-menu",
+                "orderNum": 1,
+                "viewPath": "modules/family/views/list.vue",
+                "keepAlive": true,
+                "isShow": true,
+                "childMenus": [
+                    {
+                        "name": "新增",
+                        "router": null,
+                        "perms": "family:info:add",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 1,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "删除",
+                        "router": null,
+                        "perms": "family:info:delete",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 2,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "修改",
+                        "router": null,
+                        "perms": "family:info:update,family:info:info",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 3,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "查询",
+                        "router": null,
+                        "perms": "family:info:page,family:info:list,family:info:info",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 4,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    }
+                ]
+            },
+            {
+                "name": "家庭菜谱",
+                "router": "/family/recipes",
+                "perms": null,
+                "type": 1,
+                "icon": "icon-recipe",
+                "orderNum": 2,
+                "viewPath": "modules/family/views/recipes.vue",
+                "keepAlive": true,
+                "isShow": true,
+                "childMenus": [
+                    {
+                        "name": "新增",
+                        "router": null,
+                        "perms": "family:recipe:add",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 1,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "删除",
+                        "router": null,
+                        "perms": "family:recipe:delete",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 2,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "修改",
+                        "router": null,
+                        "perms": "family:recipe:update,family:recipe:info",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 3,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "查询",
+                        "router": null,
+                        "perms": "family:recipe:page,family:recipe:list,family:recipe:info",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 4,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    }
+                ]
+            },
+            {
+                "name": "周菜单管理",
+                "router": "/family/menu",
+                "perms": null,
+                "type": 1,
+                "icon": "icon-calendar",
+                "orderNum": 3,
+                "viewPath": "modules/family/views/menu.vue",
+                "keepAlive": true,
+                "isShow": true,
+                "childMenus": [
+                    {
+                        "name": "新增",
+                        "router": null,
+                        "perms": "family:menu:add",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 1,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "删除",
+                        "router": null,
+                        "perms": "family:menu:delete",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 2,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "修改",
+                        "router": null,
+                        "perms": "family:menu:update,family:menu:info",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 3,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "查询",
+                        "router": null,
+                        "perms": "family:menu:page,family:menu:list,family:menu:info",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 4,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    }
+                ]
+            },
+            {
+                "name": "家庭成员",
+                "router": "/family/member",
+                "perms": null,
+                "type": 1,
+                "icon": "icon-user",
+                "orderNum": 4,
+                "viewPath": "modules/family/views/member.vue",
+                "keepAlive": true,
+                "isShow": true,
+                "childMenus": [
+                    {
+                        "name": "新增",
+                        "router": null,
+                        "perms": "family:member:add",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 1,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "删除",
+                        "router": null,
+                        "perms": "family:member:delete",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 2,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "修改",
+                        "router": null,
+                        "perms": "family:member:update,family:member:info",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 3,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "查询",
+                        "router": null,
+                        "perms": "family:member:page,family:member:list,family:member:info",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 4,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    }
+                ]
+            },
+            {
+                "name": "邀请码管理",
+                "router": "/family/invitation",
+                "perms": null,
+                "type": 1,
+                "icon": "icon-invite",
+                "orderNum": 5,
+                "viewPath": "modules/family/views/invitation.vue",
+                "keepAlive": true,
+                "isShow": true,
+                "childMenus": [
+                    {
+                        "name": "新增",
+                        "router": null,
+                        "perms": "family:invitation:add",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 1,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "删除",
+                        "router": null,
+                        "perms": "family:invitation:delete",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 2,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "修改",
+                        "router": null,
+                        "perms": "family:invitation:update,family:invitation:info",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 3,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "查询",
+                        "router": null,
+                        "perms": "family:invitation:page,family:invitation:list,family:invitation:info",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 4,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    }
+                ]
+            },
+            {
+                "name": "购物清单",
+                "router": "/family/shopping",
+                "perms": null,
+                "type": 1,
+                "icon": "icon-cart",
+                "orderNum": 6,
+                "viewPath": "modules/family/views/shopping.vue",
+                "keepAlive": true,
+                "isShow": true,
+                "childMenus": [
+                    {
+                        "name": "新增",
+                        "router": null,
+                        "perms": "family:shopping:add",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 1,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "删除",
+                        "router": null,
+                        "perms": "family:shopping:delete",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 2,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "修改",
+                        "router": null,
+                        "perms": "family:shopping:update,family:shopping:info",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 3,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "查询",
+                        "router": null,
+                        "perms": "family:shopping:page,family:shopping:list,family:shopping:info",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 4,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    }
+                ]
+            }
+        ]
+    }
+]

@@ -1,0 +1,137 @@
+[
+    {
+        "name": "成就管理",
+        "router": null,
+        "perms": null,
+        "type": 0,
+        "icon": "icon-trophy",
+        "orderNum": 40,
+        "viewPath": null,
+        "keepAlive": true,
+        "isShow": true,
+        "childMenus": [
+            {
+                "name": "成就定义管理",
+                "router": "/achievement/list",
+                "perms": null,
+                "type": 1,
+                "icon": "icon-menu",
+                "orderNum": 1,
+                "viewPath": "modules/achievement/views/list.vue",
+                "keepAlive": true,
+                "isShow": true,
+                "childMenus": [
+                    {
+                        "name": "新增",
+                        "router": null,
+                        "perms": "achievement:info:add",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 1,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "删除",
+                        "router": null,
+                        "perms": "achievement:info:delete",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 2,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "修改",
+                        "router": null,
+                        "perms": "achievement:info:update,achievement:info:info",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 3,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "查询",
+                        "router": null,
+                        "perms": "achievement:info:page,achievement:info:list,achievement:info:info",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 4,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    }
+                ]
+            },
+            {
+                "name": "用户成就解锁记录",
+                "router": "/achievement/user",
+                "perms": null,
+                "type": 1,
+                "icon": "icon-user",
+                "orderNum": 2,
+                "viewPath": "modules/achievement/views/list.vue",
+                "keepAlive": true,
+                "isShow": true,
+                "childMenus": [
+                    {
+                        "name": "新增",
+                        "router": null,
+                        "perms": "achievement:user:add",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 1,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "删除",
+                        "router": null,
+                        "perms": "achievement:user:delete",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 2,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "修改",
+                        "router": null,
+                        "perms": "achievement:user:update,achievement:user:info",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 3,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "查询",
+                        "router": null,
+                        "perms": "achievement:user:page,achievement:user:list,achievement:user:info",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 4,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    }
+                ]
+            }
+        ]
+    }
+]

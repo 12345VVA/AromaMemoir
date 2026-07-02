@@ -1,0 +1,76 @@
+[
+    {
+        "name": "打卡管理",
+        "router": null,
+        "perms": null,
+        "type": 0,
+        "icon": "icon-checkin",
+        "orderNum": 50,
+        "viewPath": null,
+        "keepAlive": true,
+        "isShow": true,
+        "childMenus": [
+            {
+                "name": "打卡记录",
+                "router": "/checkin/list",
+                "perms": null,
+                "type": 1,
+                "icon": "icon-menu",
+                "orderNum": 1,
+                "viewPath": "modules/checkin/views/list.vue",
+                "keepAlive": true,
+                "isShow": true,
+                "childMenus": [
+                    {
+                        "name": "新增",
+                        "router": null,
+                        "perms": "checkin:info:add",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 1,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "删除",
+                        "router": null,
+                        "perms": "checkin:info:delete",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 2,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "修改",
+                        "router": null,
+                        "perms": "checkin:info:update,checkin:info:info",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 3,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "查询",
+                        "router": null,
+                        "perms": "checkin:info:page,checkin:info:list,checkin:info:info",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 4,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    }
+                ]
+            }
+        ]
+    }
+]

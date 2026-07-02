@@ -1,0 +1,88 @@
+[
+    {
+        "name": "趣味玩法",
+        "router": null,
+        "perms": null,
+        "type": 0,
+        "icon": "icon-game",
+        "orderNum": 70,
+        "viewPath": null,
+        "keepAlive": true,
+        "isShow": true,
+        "childMenus": [
+            {
+                "name": "趣味玩法首页",
+                "router": "/gamification",
+                "perms": null,
+                "type": 1,
+                "icon": "icon-menu",
+                "orderNum": 1,
+                "viewPath": "modules/gamification/views/index.vue",
+                "keepAlive": true,
+                "isShow": true,
+                "childMenus": []
+            },
+            {
+                "name": "盲猜轮次管理",
+                "router": "/gamification/blindguess",
+                "perms": null,
+                "type": 1,
+                "icon": "icon-menu",
+                "orderNum": 2,
+                "viewPath": "modules/gamification/views/list.vue",
+                "keepAlive": true,
+                "isShow": true,
+                "childMenus": [
+                    {
+                        "name": "新增",
+                        "router": null,
+                        "perms": "gamification:blindguess:add",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 1,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "删除",
+                        "router": null,
+                        "perms": "gamification:blindguess:delete",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 2,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "修改",
+                        "router": null,
+                        "perms": "gamification:blindguess:update,gamification:blindguess:info",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 3,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    },
+                    {
+                        "name": "查询",
+                        "router": null,
+                        "perms": "gamification:blindguess:page,gamification:blindguess:list,gamification:blindguess:info",
+                        "type": 2,
+                        "icon": null,
+                        "orderNum": 4,
+                        "viewPath": null,
+                        "keepAlive": false,
+                        "isShow": true,
+                        "childMenus": []
+                    }
+                ]
+            }
+        ]
+    }
+]

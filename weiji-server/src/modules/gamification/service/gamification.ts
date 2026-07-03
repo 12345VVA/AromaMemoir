@@ -1,4 +1,4 @@
-import { Provide } from '@midwayjs/core';
+import { Inject, Provide } from '@midwayjs/core';
 import { BaseService, CoolCommException } from '@cool-midway/core';
 import { InjectEntityModel } from '@midwayjs/typeorm';
 import { In, Repository } from 'typeorm';
@@ -6,6 +6,8 @@ import { RecordEntity } from '../../record/entity/record';
 import { AppUserEntity } from '../../account/entity/user';
 import { FamilyMemberEntity } from '../../family/entity/member';
 import { BlindGuessRoundEntity } from '../entity/blind_guess_round';
+import { AchievementService } from '../../achievement/service/achievement';
+import { todayStr, formatDateStr } from '../../../comm/date';
 
 /**
  * 趣味玩法服务
@@ -33,6 +35,9 @@ export class GamificationService extends BaseService {
 
   @InjectEntityModel(FamilyMemberEntity)
   familyMemberEntity: Repository<FamilyMemberEntity>;
+
+  @Inject()
+  achievementService: AchievementService;
 
   // 肉类食材关键词（用于 meat_enthusiast 判定）
   private static readonly MEAT_KEYWORDS = [
@@ -225,7 +230,7 @@ export class GamificationService extends BaseService {
   async personality(userId: number) {
     const now = new Date();
     const thirtyAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const cutoff = thirtyAgo.toISOString().split('T')[0]; // YYYY-MM-DD
+    const cutoff = formatDateStr(thirtyAgo); // YYYY-MM-DD 本地时区
 
     const records = await this.recordEntity
       .createQueryBuilder('r')
@@ -349,7 +354,7 @@ export class GamificationService extends BaseService {
   async timemachine(userId: number) {
     const now = new Date();
     const currentYear = now.getFullYear();
-    const todayDate = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    const todayDate = todayStr(); // YYYY-MM-DD 本地时区
     const todayMonthDay = todayDate.slice(5); // MM-DD
 
     const records = await this.recordEntity.find({
@@ -418,11 +423,14 @@ export class GamificationService extends BaseService {
     // 校验当前用户是该 family 成员
     await this.ensureFamilyMember(Number(body.familyId), userId);
 
-    // 取出记录
+    // 取出记录（按 familyId 过滤，防止跨家庭拉取记录）
     const ids = recordIds.map(v => Number(v)).filter(v => !Number.isNaN(v));
     const picked = ids.length > 0 ? await this.recordEntity.find({
-      where: { id: In(ids) },
+      where: { id: In(ids), familyId: Number(body.familyId) },
     }) : [];
+    if (picked.length !== ids.length) {
+      throw new CoolCommException('部分记录不存在或无权访问', 400);
+    }
     if (picked.length === 0) {
       throw new CoolCommException('未找到对应记录', 404);
     }
@@ -536,9 +544,18 @@ export class GamificationService extends BaseService {
       createdAt: new Date().toISOString(),
     };
 
-    // 重新赋值数组以触发 json 列变更检测
-    round.guesses = [...guesses, guess];
-    await this.blindGuessRoundEntity.save(round);
+    // 用 JSON_ARRAY_APPEND 增量追加，避免 read-modify-write 并发覆盖丢失
+    // COALESCE 兜底 guesses 为 NULL 的情况
+    await this.blindGuessRoundEntity
+      .createQueryBuilder()
+      .update()
+      .set({
+        guesses: () =>
+          `JSON_ARRAY_APPEND(COALESCE(guesses, JSON_ARRAY()), '$', CAST(:guessJson AS JSON))`,
+      })
+      .where('id = :id', { id })
+      .setParameter('guessJson', JSON.stringify(guess))
+      .execute();
 
     return guess;
   }
@@ -565,6 +582,19 @@ export class GamificationService extends BaseService {
     // 持久化状态与排名
     round.rankings = result.ranking;
     await this.blindGuessRoundEntity.save(round);
+
+    // 触发盲猜厨师成就解锁（失败不阻塞揭晓）
+    if (result.chefWinner) {
+      try {
+        const newAchievements = await this.achievementService.checkAndUnlock(
+          result.chefWinner.userId,
+          { type: 'gameplay_blindguess', value: true }
+        );
+        (result as any).newAchievements = newAchievements;
+      } catch (e) {
+        // 成就解锁失败不阻塞揭晓
+      }
+    }
 
     return result;
   }
@@ -607,6 +637,9 @@ export class GamificationService extends BaseService {
       }
       return { ...guess, score, correct };
     });
+
+    // 将计分后的 guesses 回写到 round，使后续 save(round) 持久化 score/correct
+    round.guesses = guesses;
 
     // 按 userId 聚合
     const userMap = new Map<

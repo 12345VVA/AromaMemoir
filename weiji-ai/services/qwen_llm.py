@@ -44,7 +44,9 @@ def _get_client() -> AsyncOpenAI:
     if _client is None:
         api_key = settings.QWEN_API_KEY or settings.OPENAI_API_KEY
         base_url = settings.QWEN_BASE_URL or 'https://dashscope.aliyuncs.com/compatible-mode/v1'
-        _client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+        # 显式设置 timeout=20.0，覆盖 SDK 默认的 600s（10 分钟），
+        # 避免网络抖动时 worker 与内存被长时间占用
+        _client = AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=20.0)
     return _client
 
 
@@ -82,19 +84,26 @@ async def recommend(dish_name: str, recent_records: list = None) -> list:
             model="qwen-turbo",
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
+            timeout=20.0,
         )
-        content = response.choices[0].message.content
-        data = json.loads(content)
     except openai.AuthenticationError:
         raise AiAuthError('qwen', 'API Key 无效')
     except openai.RateLimitError:
         raise AiQuotaError('qwen', '调用频率超限')
     except openai.APIError as e:
         raise AiProviderError('qwen', f'API 错误: {str(e)}')
-    except (json.JSONDecodeError, TypeError):
-        raise AiProviderError('qwen', '响应非 JSON')
     except Exception as e:
         raise AiProviderError('qwen', f'未知错误: {str(e)}')
+
+    try:
+        if not response.choices:
+            raise AiProviderError('qwen', '通义千问返回空 choices')
+        content = response.choices[0].message.content
+        data = json.loads(content)
+    except (IndexError, AttributeError) as e:
+        raise AiProviderError('qwen', f'通义千问响应解析失败: {e}')
+    except (json.JSONDecodeError, TypeError):
+        raise AiProviderError('qwen', '响应非 JSON')
 
     recipes = data.get('recipes') if isinstance(data, dict) else None
     if not isinstance(recipes, list) or len(recipes) < 3:

@@ -32,6 +32,12 @@ export class UserInfoEntity extends BaseEntity {
   @Column({ comment: '密码', nullable: true })
   password: string;
 
+  @Column({
+    comment: '密码版本，注销/改密码后让原 token 失效',
+    default: 1,
+  })
+  passwordV: number;
+
   @Column({ comment: '介绍', type: 'text', nullable: true })
   description: string;
 }

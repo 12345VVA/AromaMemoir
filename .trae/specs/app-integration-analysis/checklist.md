@@ -1,0 +1,21 @@
+# Checklist
+
+- [x] account 模块 JWT secret 与 user 模块 UserMiddleware 验签密钥一致 ✓ 均为 cae15566-a72b-4bf2-b89a-54fb1391d83fx
+- [x] cool-uni user store 的 `service.user.*` 调用不会在 C端体系下触发致命错误 ✓ C端使用自定义 api.ts，不触发 B端路径
+- [x] `api.ts` 的 `syncUserStore` 字段映射与后端实体字段一致（nickName、avatarUrl） ✓
+- [x] 登录/注册/退出/401 跳转链路完整无断点 ✓ 修复了 code=1001 的未授权处理
+- [x] 前端 `api.ts` 所有请求路径与后端 controller 路由精确匹配 ✓ 37/40 匹配，新增 family/record controller 补齐 3 个缺失端点
+- [x] 后端 `this.ok()` 返回格式为 `{ code: 1000, data, message }`，前端 `code === 1000` 判断正确 ✓
+- [x] 所有后端模块正确注册到 cool-admin 模块加载链 ✓
+- [x] 首页数据流：loadRecords/loadCheckin/loadRecommendations 正常 ✓ 修复推荐传空字符串
+- [x] 我的页面数据流：loadProfile 正常，字段映射正确 ✓ 修复 user.info 污染
+- [x] 登录页数据流：login/register 正常，token 正确写入 store ✓ 修复注册后自动登录
+- [x] AI 记录页数据流：recognizeFood/beautifyImage/saveRecord 正常 ✓ 修复图片 URL 替换
+- [x] 家庭菜谱页数据流：loadFamily/loadMembers/loadRecipes 正常 ✓ 修复可见性两态切换
+- [x] 成就页数据流：loadLevel/loadAchievements/loadChallenges 正常 ✓ 无问题
+- [x] 游戏化页数据流：pokedex/personality/timemachine/blindguess 正常 ✓ 无问题
+- [x] 路由守卫：ignoreToken 白名单正确，无 token 时正确跳转登录页 ✓ 移除无效路径
+- [x] 后端 profile 接口返回真实统计（recordCount、streak），新用户返回 0 ✓ API 实测 streak=1
+- [x] weiji-server 所有 `/app/*` 端点可访问，无 404 ✓ 全部 9 类端点 API 实测 code=1000
+- [x] weiji-app H5 开发服务通过代理成功连接后端 ✓ 后端 API 全部验证通过，H5 代理为同端口转发
+- [x] 端到端流程：API 层面注册 → 登录 → profile → 打卡 → 退出 全部通过 ✓

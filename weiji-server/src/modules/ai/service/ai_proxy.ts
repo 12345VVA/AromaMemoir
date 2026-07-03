@@ -53,6 +53,9 @@ export class AiProxyService extends BaseService {
   // AI 服务连通性状态，默认 down，待启动健康检查后更新
   aiStatus: 'up' | 'down' = 'down';
 
+  // 健康检查定时器引用，用于销毁时清理
+  private healthTimer: NodeJS.Timeout | null = null;
+
   /**
    * 启动时立即检查一次健康状态，并启动 60s 轮询
    */
@@ -61,11 +64,21 @@ export class AiProxyService extends BaseService {
     // 立即检查一次
     await this.healthCheck();
     // 启动 60s 轮询
-    setInterval(() => {
+    this.healthTimer = setInterval(() => {
       this.healthCheck().catch(err => {
         this.logger?.error('[ai-proxy] healthCheck loop error', err);
       });
     }, HEALTH_CHECK_INTERVAL);
+  }
+
+  /**
+   * 服务销毁时清理定时器，避免资源泄漏
+   */
+  async onDestroy() {
+    if (this.healthTimer) {
+      clearInterval(this.healthTimer);
+      this.healthTimer = null;
+    }
   }
 
   /**
@@ -90,7 +103,11 @@ export class AiProxyService extends BaseService {
 
   /**
    * 转发请求到 weiji-ai
-   * 失败（网络错误/超时/4xx/5xx）→ 设 aiStatus='down'，抛 CoolCommException
+   * 失败处理策略：
+   *   - 400/413/422（客户端请求问题：图片过大/格式错误/参数校验）→ 不标记 down，抛 CoolCommException
+   *   - 401/403/404（配置/服务问题：鉴权/权限/端点缺失）→ 标记 down，抛 CoolCommException
+   *   - 5xx（服务端错误）→ 标记 down，抛 CoolCommException
+   *   - 网络错误/超时（无 response）→ 标记 down，抛 CoolCommException
    * @param path 转发路径，如 /ai/recognize
    * @param options 请求选项 { method, headers, body }
    */
@@ -111,12 +128,21 @@ export class AiProxyService extends BaseService {
       });
       return response.data;
     } catch (err) {
-      // 转发失败（网络错误/超时/4xx/5xx）标记 AI 服务不可用
-      this.aiStatus = 'down';
+      // 区分 4xx 客户端错误与 5xx/网络错误：
+      // - 400/413/422 视为客户端请求问题（图片过大/格式错误/参数校验），不标记 down
+      // - 401/403/404 视为配置/服务问题，标记 down
+      // - 5xx 视为服务端问题，标记 down
+      // - 网络错误/超时（无 response）标记 down
+      const status = (err as any)?.response?.status;
+      const noMarkDownStatuses = [400, 413, 422];
+      if (!noMarkDownStatuses.includes(status)) {
+        this.aiStatus = 'down';
+      }
       this.logger?.error(
         '[ai-proxy] forward',
         path,
-        err instanceof Error ? err.message : String(err)
+        err instanceof Error ? err.message : String(err),
+        `status=${status ?? 'N/A'}`
       );
       throw new CoolCommException('AI 服务暂时不可用，请稍后重试');
     }
@@ -146,8 +172,11 @@ export class AiProxyService extends BaseService {
 
   /**
    * 菜谱推荐，转发 JSON 到 /ai/recommend
+   * body 透传 dishName / recentRecords / style 到 weiji-ai，供 LLM 参考用户历史
    */
-  async recommend(body: { dishName: string }): Promise<AiServiceResponse> {
+  async recommend(
+    body: { dishName: string; recentRecords?: string[]; style?: string }
+  ): Promise<AiServiceResponse> {
     return this.forward('/ai/recommend', {
       body,
       headers: { 'Content-Type': 'application/json' },
@@ -156,7 +185,8 @@ export class AiProxyService extends BaseService {
 
   /**
    * 语音识别，转发 multipart audio 到 /ai/voice/recognize
-   * 在响应 { text } 基础上注入 intent 字段，回传 { text, intent }
+   * 重组响应：保留 weiji-ai 返回的 data.message（讯飞 ASR 原始 message），
+   * 注入 intent 字段，回传 { text, message, intent }
    */
   async voiceRecognize(file: UploadFile): Promise<AiServiceResponse> {
     const form = this.buildMultipartForm(file, 'audio');
@@ -164,12 +194,13 @@ export class AiProxyService extends BaseService {
       body: form,
       headers: form.getHeaders(),
     });
-    const text = (result?.data as { text?: string } | null)?.text ?? '';
+    const data = result?.data as { text?: string; message?: string } | null;
+    const text = data?.text ?? '';
     const intent = this.detectVoiceIntent(text);
     return {
       code: result.code,
       message: result.message,
-      data: { text, intent },
+      data: { text, message: data?.message ?? '', intent },
     };
   }
 

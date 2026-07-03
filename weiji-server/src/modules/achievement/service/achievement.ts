@@ -138,6 +138,12 @@ export class AchievementService extends BaseService {
         value >= cond.cuisineCount
       ) {
         matched = true;
+      } else if (
+        type === 'recipe_count' &&
+        typeof cond.recipeCount === 'number' &&
+        value >= cond.recipeCount
+      ) {
+        matched = true;
       } else if (type === 'family_created' && cond.familyCreated === true) {
         matched = true;
       } else if (
@@ -149,12 +155,19 @@ export class AchievementService extends BaseService {
 
       if (matched) {
         const earnedAt = new Date().toISOString();
-        await this.userAchievementEntity.save({
-          userId,
-          achievementId: ach.id,
-          earnedAt,
-        });
-        newAchievements.push({ ...ach, unlocked: true, earnedAt });
+        try {
+          await this.userAchievementEntity.save({
+            userId,
+            achievementId: ach.id,
+            earnedAt,
+          });
+          newAchievements.push({ ...ach, unlocked: true, earnedAt });
+        } catch (err: any) {
+          // 并发情况下另一请求已解锁该成就，唯一约束冲突 → 静默跳过（解锁是幂等操作）
+          if (err?.code !== 'ER_DUP_ENTRY') {
+            throw err;
+          }
+        }
       }
     }
     return newAchievements;

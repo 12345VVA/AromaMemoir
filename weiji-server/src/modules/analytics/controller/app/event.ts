@@ -20,7 +20,8 @@ export class AppAnalyticsController extends BaseController {
    */
   @Get('/events', { summary: '查询埋点事件' })
   async events(@Query() query: { type?: string }) {
-    return this.ok(await this.analyticsEventService.list(query));
+    const userId = this.ctx.user?.userId;
+    return this.ok(await this.analyticsEventService.list(userId, query));
   }
 
   /**

@@ -28,7 +28,7 @@ export class TaskInfoController extends BaseController {
   @Post('/once', { summary: '执行一次' })
   async once(@Body('id') id: number) {
     await this.taskInfoService.once(id);
-    this.ok();
+    return this.ok();
   }
 
   /**
@@ -37,7 +37,7 @@ export class TaskInfoController extends BaseController {
   @Post('/stop', { summary: '停止' })
   async stop(@Body('id') id: number) {
     await this.taskInfoService.stop(id);
-    this.ok();
+    return this.ok();
   }
 
   /**
@@ -46,7 +46,7 @@ export class TaskInfoController extends BaseController {
   @Post('/start', { summary: '开始' })
   async start(@Body('id') id: number, @Body('type') type: number) {
     await this.taskInfoService.start(id, type);
-    this.ok();
+    return this.ok();
   }
 
   /**

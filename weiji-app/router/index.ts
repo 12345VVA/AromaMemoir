@@ -1,25 +1,22 @@
 import { router, useStore } from "/@/cool";
 
 const ignoreToken = [
-	"/pages/index/home",
-	"/pages/index/website",
-	"/pages/index/admin",
-	"/pages/index/my",
 	"/pages/user/login",
-	"/pages/user/captcha",
 	"/pages/user/doc",
 ];
 
 router.beforeEach((to, next) => {
 	const { user } = useStore();
 
-	if (ignoreToken.includes(to.path) || to.path.startsWith("/pages/demo")) {
+	if (ignoreToken.includes(to.path)) {
 		next();
 	} else {
 		if (user.token) {
 			next();
 		} else {
-			router.login();
+			// 记录用户原本想去的页面，登录成功后回跳
+			uni.setStorageSync("loginIntent", to.path);
+			router.login({ reLaunch: true });
 		}
 	}
 });

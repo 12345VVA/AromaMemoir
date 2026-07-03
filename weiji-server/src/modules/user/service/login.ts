@@ -1,4 +1,4 @@
-import { Config, Inject, Provide } from '@midwayjs/core';
+import { Config, Inject, Provide, InjectClient } from '@midwayjs/core';
 import { BaseService, CoolCommException } from '@cool-midway/core';
 import { InjectEntityModel } from '@midwayjs/typeorm';
 import { Equal, Repository } from 'typeorm';
@@ -10,6 +10,8 @@ import { BaseSysLoginService } from '../../base/service/sys/login';
 import { UserSmsService } from './sms';
 import { v1 as uuid } from 'uuid';
 import * as md5 from 'md5';
+import * as bcrypt from 'bcryptjs';
+import { CachingFactory, MidwayCache } from '@midwayjs/cache-manager';
 import { PluginService } from '../../plugin/service/info';
 
 /**
@@ -37,6 +39,9 @@ export class UserLoginService extends BaseService {
 
   @Inject()
   userSmsService: UserSmsService;
+
+  @InjectClient(CachingFactory, 'default')
+  midwayCache: MidwayCache;
 
   /**
    * 发送手机验证码
@@ -114,7 +119,8 @@ export class UserLoginService extends BaseService {
         loginType: 2,
         nickName: phone.replace(/^(\d{3})\d{4}(\d{4})$/, '$1****$2'),
       };
-      await this.userInfoEntity.insert(user);
+      // 使用 save 替代 insert，确保自增主键 id 回填到入参对象
+      await this.userInfoEntity.save(user);
     }
     return this.token({ id: user.id });
   }
@@ -231,7 +237,8 @@ export class UserLoginService extends BaseService {
         gender: wxUserInfo.gender,
         loginType: wxUserInfo.type,
       };
-      await this.userInfoEntity.insert(userInfo);
+      // 使用 save 替代 insert，确保自增主键 id 回填到入参对象
+      await this.userInfoEntity.save(userInfo);
     }
     return this.token({ id: userInfo.id });
   }
@@ -241,37 +248,56 @@ export class UserLoginService extends BaseService {
    * @param refreshToken
    */
   async refreshToken(refreshToken) {
+    let info: any;
     try {
-      const info = jwt.verify(refreshToken, this.jwtConfig.secret);
-      if (!info['isRefresh']) {
-        throw new CoolCommException('token类型非refreshToken');
-      }
-      const userInfo = await this.userInfoEntity.findOneBy({
-        id: info['id'],
-      });
-      return this.token({ id: userInfo.id });
+      info = jwt.verify(refreshToken, this.jwtConfig.secret);
     } catch (e) {
-      throw new CoolCommException(
-        '刷新token失败，请检查refreshToken是否正确或过期'
-      );
+      throw new CoolCommException('refreshToken无效或已过期', 401);
     }
+    if (!info || !info['isRefresh']) {
+      throw new CoolCommException('token类型非refreshToken', 401);
+    }
+    const userInfo = await this.userInfoEntity.findOneBy({
+      id: info['userId'],
+    });
+    if (!userInfo) {
+      throw new CoolCommException('用户不存在', 401);
+    }
+    return this.token({ id: userInfo.id });
   }
 
   /**
    * 密码登录
+   * bcrypt 优先，兼容旧 MD5 哈希（命中旧哈希后异步迁移为 bcrypt）
    * @param phone
    * @param password
    */
   async password(phone, password) {
     const user = await this.userInfoEntity.findOneBy({ phone });
-
-    if (user && user.password == md5(password)) {
-      return this.token({
-        id: user.id,
-      });
-    } else {
-      throw new CoolCommException('账号或密码错误');
+    if (!user || !user.password) {
+      throw new CoolCommException('账号或密码错误', 401);
     }
+    let matched = false;
+    // bcrypt 优先（新哈希以 $2 开头）
+    if (user.password.startsWith('$2')) {
+      matched = await bcrypt.compare(password, user.password);
+    } else {
+      // 兼容旧 MD5 哈希
+      matched = user.password === md5(password);
+      // 命中旧哈希则异步迁移为 bcrypt，不阻塞登录流程
+      if (matched) {
+        bcrypt
+          .hash(password, 10)
+          .then(hash =>
+            this.userInfoEntity.update(user.id, { password: hash })
+          )
+          .catch(() => {});
+      }
+    }
+    if (matched) {
+      return this.token({ id: user.id });
+    }
+    throw new CoolCommException('账号或密码错误', 401);
   }
 
   /**
@@ -297,11 +323,16 @@ export class UserLoginService extends BaseService {
   async generateToken(info, isRefresh = false) {
     const { expire, refreshExpire, secret } = this.jwtConfig;
     const user = await this.userInfoEntity.findOneBy({ id: Equal(info.id) });
+    const passwordV = user?.passwordV || 1;
+    // payload 统一使用 userId 字段，与 account 模块保持一致
     const tokenInfo = {
       isRefresh,
-      ...info,
+      userId: info.id,
+      passwordVersion: passwordV,
       tenantId: user?.tenantId,
     };
+    // 缓存密码版本，供中间件校验（注销/改密码后使旧 token 失效）
+    await this.midwayCache.set(`app:passwordVersion:${info.id}`, passwordV);
     return jwt.sign(tokenInfo, secret, {
       expiresIn: isRefresh ? refreshExpire : expire,
     });

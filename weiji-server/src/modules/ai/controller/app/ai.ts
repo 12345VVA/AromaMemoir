@@ -71,7 +71,9 @@ export class AppAiController extends BaseController {
    * JSON { dishName } → 转发 weiji-ai /ai/recommend
    */
   @Post('/recommend', { summary: '菜谱推荐' })
-  async recommend(@Body() body: { dishName: string }) {
+  async recommend(
+    @Body() body: { dishName: string; recentRecords?: string[]; style?: string }
+  ) {
     try {
       return await this.aiProxyService.recommend(body);
     } catch (err) {

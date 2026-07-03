@@ -1,4 +1,5 @@
 @use "sass:math";
+@use "../../theme.scss" as *;
 
 .cl-slider-verify {
 	display: flex;

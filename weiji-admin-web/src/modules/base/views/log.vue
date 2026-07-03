@@ -101,7 +101,7 @@ const Table = useTable({
 			dict: [],
 			dictColor: true,
 			formatter(row) {
-				return row.ip.split(',');
+				return (row.ip || '').split(',').filter(Boolean);
 			}
 		},
 		{

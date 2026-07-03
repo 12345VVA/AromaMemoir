@@ -54,6 +54,9 @@ const useUserStore = defineStore("user", function () {
 		storage.remove("userInfo");
 		storage.remove("token");
 		storage.remove("refreshToken");
+		// 同步清理过期标记，避免残留 deadtime 导致下次 isExpired 误判
+		storage.remove(`token${storage.suffix}`);
+		storage.remove(`refreshToken${storage.suffix}`);
 		token.value = "";
 		info.value = undefined;
 	}
@@ -74,8 +77,10 @@ const useUserStore = defineStore("user", function () {
 				}
 				return res;
 			})
-			.catch(() => {
-				logout();
+			.catch((err) => {
+				if (err?.statusCode === 401 || err?.code === 1001) {
+					logout();
+				}
 			});
 	}
 
@@ -87,6 +92,7 @@ const useUserStore = defineStore("user", function () {
 		get,
 		set,
 		update,
+		clear,
 		logout,
 	};
 });

@@ -1,7 +1,7 @@
-import { Provide } from '@midwayjs/core';
+import { Inject, Provide } from '@midwayjs/core';
 import { BaseService, CoolCommException } from '@cool-midway/core';
 import { InjectEntityModel } from '@midwayjs/typeorm';
-import { Repository, Like, In, MoreThan } from 'typeorm';
+import { Repository, Like, In, MoreThan, Between } from 'typeorm';
 import { FamilyEntity } from '../entity/family';
 import { FamilyMemberEntity } from '../entity/member';
 import { FamilyRecipeEntity } from '../entity/recipe';
@@ -10,6 +10,8 @@ import { WeeklyMenuEntity } from '../entity/menu';
 import { ShoppingItemEntity } from '../entity/shopping';
 import { AppUserEntity } from '../../account/entity/user';
 import { RecordEntity } from '../../record/entity/record';
+import { AchievementService } from '../../achievement/service/achievement';
+import { mondayStr, currentMonthStr } from '../../../comm/date';
 
 /**
  * 家庭组服务
@@ -41,35 +43,59 @@ export class FamilyService extends BaseService {
   @InjectEntityModel(RecordEntity)
   recordEntity: Repository<RecordEntity>;
 
+  @Inject()
+  achievementService: AchievementService;
+
   // ============================================================
   // 辅助方法
   // ============================================================
 
   /**
    * 获取用户在家庭组中的成员关系记录
+   * 传入 familyId 时按指定家庭查询，否则取该用户任意一条成员记录（向后兼容）
    */
-  async getUserMembership(userId: number): Promise<FamilyMemberEntity> {
+  async getUserMembership(
+    userId: number,
+    familyId?: number
+  ): Promise<FamilyMemberEntity> {
+    if (familyId != null) {
+      return this.familyMemberEntity.findOneBy({ userId, familyId });
+    }
     return this.familyMemberEntity.findOneBy({ userId });
   }
 
   /**
-   * 校验当前用户在家庭组中的角色是否在允许列表内
+   * 校验当前用户在指定家庭组中的角色是否在允许列表内
    */
-  async requireRole(userId: number, roles: string[]): Promise<boolean> {
-    const membership = await this.getUserMembership(userId);
+  async requireRole(
+    userId: number,
+    familyId: number,
+    roles: string[]
+  ): Promise<boolean> {
+    const membership = await this.getUserMembership(userId, familyId);
     if (!membership) return false;
     return roles.includes(membership.role);
   }
 
   /**
-   * 返回本周一日期 YYYY-MM-DD
+   * 断言当前用户属于指定家庭组，否则抛 403
+   * 用于跨家庭归属校验，防止越权访问其他家庭的资源
+   */
+  async assertFamilyMembership(
+    userId: number,
+    familyId: number
+  ): Promise<void> {
+    const membership = await this.getUserMembership(userId, familyId);
+    if (!membership) {
+      throw new CoolCommException('无权操作该家庭', 403);
+    }
+  }
+
+  /**
+   * 返回本周一日期 YYYY-MM-DD（本地时区）
    */
   getCurrentMonday(): string {
-    const d = new Date();
-    const day = d.getDay();
-    const diff = day === 0 ? -6 : 1 - day;
-    d.setDate(d.getDate() + diff);
-    return d.toISOString().split('T')[0];
+    return mondayStr();
   }
 
   /**
@@ -111,32 +137,46 @@ export class FamilyService extends BaseService {
 
   /**
    * 创建家庭组，当前用户成为 owner，同步建立 family_members 关系
+   * family.save + member.save 置于同一事务，避免第二步失败留下孤儿 family 记录
    */
   async createFamily(
     userId: number,
     body: { name: string; description?: string }
-  ): Promise<FamilyEntity> {
+  ): Promise<any> {
     const name = body?.name?.trim();
     if (!name) {
       throw new CoolCommException('家庭组名称不能为空');
     }
     const now = new Date().toISOString();
-    // 创建家庭组
-    const family = await this.familyEntity.save({
-      name,
-      ownerId: userId,
-      inviteCode: this.generateInviteCode(),
-      memberCount: 1,
-      description: body.description || '',
+    // 创建家庭组 + 同步创建 owner 成员关系，置于同一事务
+    const family = await this.getOrmManager().transaction(async tx => {
+      const family = await tx.save(FamilyEntity, {
+        name,
+        ownerId: userId,
+        inviteCode: this.generateInviteCode(),
+        memberCount: 1,
+        description: body.description || '',
+      });
+      await tx.save(FamilyMemberEntity, {
+        familyId: family.id,
+        userId,
+        role: 'owner',
+        joinedAt: now,
+      });
+      return family;
     });
-    // 同步创建 owner 成员关系
-    await this.familyMemberEntity.save({
-      familyId: family.id,
-      userId,
-      role: 'owner',
-      joinedAt: now,
-    });
-    return family;
+
+    // 触发成就解锁（失败不阻塞创建）
+    let newAchievements: any[] = [];
+    try {
+      newAchievements = await this.achievementService.checkAndUnlock(userId, {
+        type: 'family_created',
+        value: true,
+      });
+    } catch (e) {
+      // 成就解锁失败不阻塞业务
+    }
+    return { ...family, newAchievements };
   }
 
   // ============================================================
@@ -178,10 +218,19 @@ export class FamilyService extends BaseService {
     memberId: number,
     body: { role: string }
   ): Promise<FamilyMemberEntity> {
-    // 权限校验：当前用户必须是 owner 或 admin
-    const hasPermission = await this.requireRole(userId, ['owner', 'admin']);
+    // 取操作者所属家庭关系
+    const operatorMembership = await this.getUserMembership(userId);
+    if (!operatorMembership) {
+      throw new CoolCommException('无权限操作', 403);
+    }
+    // 权限校验：当前用户在自己家庭内必须是 owner 或 admin
+    const hasPermission = await this.requireRole(
+      userId,
+      operatorMembership.familyId,
+      ['owner', 'admin']
+    );
     if (!hasPermission) {
-      throw new CoolCommException('无权限操作');
+      throw new CoolCommException('无权限操作', 403);
     }
     // 校验新角色合法（仅 admin / member）
     if (body.role !== 'admin' && body.role !== 'member') {
@@ -191,39 +240,61 @@ export class FamilyService extends BaseService {
     if (!target) {
       throw new CoolCommException('成员不存在');
     }
+    // 跨家庭越权校验：目标成员必须属于操作者所在家庭
+    if (target.familyId !== operatorMembership.familyId) {
+      throw new CoolCommException('无权操作该家庭成员', 403);
+    }
     // 不允许把 owner 改为其他角色
     if (target.role === 'owner') {
       throw new CoolCommException('不能修改 owner 角色');
     }
-    await this.familyMemberEntity.update(memberId, { role: body.role });
+    await this.getOrmManager().transaction(async tx => {
+      await tx.update(FamilyMemberEntity, memberId, { role: body.role });
+    });
     return this.familyMemberEntity.findOneBy({ id: memberId });
   }
 
   /**
    * 移除成员（仅 owner，owner 不能移除自己，同步 memberCount-1）
+   * member.delete + family.update 置于同一事务，memberCount 改用原子 SQL 自减
    */
   async removeMember(userId: number, memberId: number): Promise<void> {
-    // 权限校验：当前用户必须是 owner
-    const hasPermission = await this.requireRole(userId, ['owner']);
+    // 取操作者所属家庭关系
+    const operatorMembership = await this.getUserMembership(userId);
+    if (!operatorMembership) {
+      throw new CoolCommException('无权限操作', 403);
+    }
+    // 权限校验：当前用户在自己家庭内必须是 owner
+    const hasPermission = await this.requireRole(
+      userId,
+      operatorMembership.familyId,
+      ['owner']
+    );
     if (!hasPermission) {
-      throw new CoolCommException('无权限操作');
+      throw new CoolCommException('无权限操作', 403);
     }
     const target = await this.familyMemberEntity.findOneBy({ id: memberId });
     if (!target) {
       throw new CoolCommException('成员不存在');
     }
+    // 跨家庭越权校验：目标成员必须属于操作者所在家庭
+    if (target.familyId !== operatorMembership.familyId) {
+      throw new CoolCommException('无权操作该家庭成员', 403);
+    }
     // 不允许 owner 移除自己
     if (target.userId === userId) {
       throw new CoolCommException('owner 不能移除自己');
     }
-    await this.familyMemberEntity.delete(memberId);
-    // 更新家庭组 memberCount - 1
-    const family = await this.familyEntity.findOneBy({ id: target.familyId });
-    if (family) {
-      await this.familyEntity.update(family.id, {
-        memberCount: Math.max(0, family.memberCount - 1),
-      });
-    }
+    await this.getOrmManager().transaction(async tx => {
+      await tx.delete(FamilyMemberEntity, memberId);
+      // 原子自减 memberCount，并用 GREATEST 兜底防止负数
+      await tx
+        .createQueryBuilder()
+        .update(FamilyEntity)
+        .set({ memberCount: () => 'GREATEST(memberCount - 1, 0)' })
+        .where('id = :id', { id: target.familyId })
+        .execute();
+    });
   }
 
   // ============================================================
@@ -237,10 +308,13 @@ export class FamilyService extends BaseService {
     userId: number,
     familyId: number
   ): Promise<{ code: string; expiresAt: string }> {
-    // 权限校验：owner 或 admin
-    const hasPermission = await this.requireRole(userId, ['owner', 'admin']);
+    // 权限校验：owner 或 admin（必须是该 familyId 的成员）
+    const hasPermission = await this.requireRole(userId, familyId, [
+      'owner',
+      'admin',
+    ]);
     if (!hasPermission) {
-      throw new CoolCommException('无权限操作');
+      throw new CoolCommException('无权限操作', 403);
     }
     const now = new Date();
     const expiresAt = new Date(
@@ -264,9 +338,12 @@ export class FamilyService extends BaseService {
     userId: number,
     familyId: number
   ): Promise<FamilyInvitationEntity[]> {
-    const hasPermission = await this.requireRole(userId, ['owner', 'admin']);
+    const hasPermission = await this.requireRole(userId, familyId, [
+      'owner',
+      'admin',
+    ]);
     if (!hasPermission) {
-      throw new CoolCommException('无权限操作');
+      throw new CoolCommException('无权限操作', 403);
     }
     const now = new Date().toISOString();
     return this.familyInvitationEntity.find({
@@ -281,6 +358,7 @@ export class FamilyService extends BaseService {
 
   /**
    * 通过邀请码加入家庭组（角色 member），校验有效性/过期/已用/已加入，同步 memberCount+1
+   * member.save + invitation.update + family.update 置于同一事务，memberCount 改用原子 SQL 自增
    */
   async joinFamily(
     userId: number,
@@ -308,25 +386,221 @@ export class FamilyService extends BaseService {
       throw new CoolCommException('已加入该家庭组');
     }
     const now = new Date().toISOString();
-    // 创建成员关系：role='member'
-    await this.familyMemberEntity.save({
-      familyId: invitation.familyId,
-      userId,
-      role: 'member',
-      joinedAt: now,
-    });
-    // 标记邀请码已使用
-    await this.familyInvitationEntity.update(invitation.id, { used: true });
-    // 更新家庭组 memberCount + 1
-    const family = await this.familyEntity.findOneBy({
-      id: invitation.familyId,
-    });
-    if (family) {
-      await this.familyEntity.update(family.id, {
-        memberCount: family.memberCount + 1,
+    try {
+      await this.getOrmManager().transaction(async tx => {
+        // 创建成员关系：role='member'
+        await tx.save(FamilyMemberEntity, {
+          familyId: invitation.familyId,
+          userId,
+          role: 'member',
+          joinedAt: now,
+        });
+        // 标记邀请码已使用
+        await tx.update(FamilyInvitationEntity, invitation.id, { used: true });
+        // 原子自增 memberCount
+        await tx
+          .createQueryBuilder()
+          .update(FamilyEntity)
+          .set({ memberCount: () => 'memberCount + 1' })
+          .where('id = :id', { id: invitation.familyId })
+          .execute();
       });
+    } catch (err: any) {
+      // 并发情况下另一事务先插入了成员关系，唯一约束冲突 → 友好提示
+      if (err?.code === 'ER_DUP_ENTRY') {
+        throw new CoolCommException('已加入该家庭组');
+      }
+      throw err;
     }
     return this.familyEntity.findOneBy({ id: invitation.familyId });
+  }
+
+  // ============================================================
+  // 退出 / 解散 / 转让
+  // ============================================================
+
+  /**
+   * 退出家庭组
+   * - owner 单独一人时自动解散家庭组
+   * - owner 且仍有其他成员时需先转让或解散，抛 400
+   * - 非 owner：事务内删除成员关系、原子自减 memberCount、清理该用户创建的邀请码
+   */
+  async leaveFamily(userId: number): Promise<{ success: boolean }> {
+    const membership = await this.getUserMembership(userId);
+    if (!membership) {
+      throw new CoolCommException('未加入家庭组');
+    }
+    const familyId = membership.familyId;
+    if (membership.role === 'owner') {
+      // 统计家庭组内其他成员数（排除当前 owner）
+      const otherMembers = await this.familyMemberEntity
+        .createQueryBuilder('m')
+        .where('m.familyId = :familyId', { familyId })
+        .andWhere('m.userId != :userId', { userId })
+        .getCount();
+      if (otherMembers === 0) {
+        // 仅 owner 一人 → 自动解散
+        await this.disbandFamily(userId);
+        return { success: true };
+      }
+      throw new CoolCommException('owner 请先转让或解散家庭组', 400);
+    }
+    // 非 owner：事务内删除成员关系、原子自减 memberCount、清理该用户创建的邀请码
+    await this.getOrmManager().transaction(async tx => {
+      await tx.delete(FamilyMemberEntity, { userId, familyId });
+      await tx
+        .createQueryBuilder()
+        .update(FamilyEntity)
+        .set({ memberCount: () => 'GREATEST(memberCount - 1, 0)' })
+        .where('id = :id', { id: familyId })
+        .execute();
+      await tx.delete(FamilyInvitationEntity, { creatorId: userId });
+    });
+    return { success: true };
+  }
+
+  /**
+   * 解散家庭组
+   * - 非 adminForce：校验调用者为 owner，否则抛 403
+   * - adminForce：跳过 owner 校验，此时 userId 参数视为 familyId（供 Admin 后台调用）
+   * - 事务内删除家庭组全部关联数据；record 表 familyId 不动以保留历史记录
+   */
+  async disbandFamily(
+    userId: number,
+    opts?: { adminForce?: boolean }
+  ): Promise<{ success: boolean }> {
+    let familyId: number;
+    if (opts?.adminForce) {
+      // 后台强制解散：userId 即为 familyId
+      familyId = userId;
+    } else {
+      const membership = await this.getUserMembership(userId);
+      if (!membership) {
+        throw new CoolCommException('未加入家庭组', 403);
+      }
+      if (membership.role !== 'owner') {
+        throw new CoolCommException('仅 owner 可解散家庭组', 403);
+      }
+      familyId = membership.familyId;
+    }
+    await this.getOrmManager().transaction(async tx => {
+      await tx.delete(FamilyMemberEntity, { familyId });
+      await tx.delete(FamilyRecipeEntity, { familyId });
+      await tx.delete(WeeklyMenuEntity, { familyId });
+      await tx.delete(ShoppingItemEntity, { familyId });
+      await tx.delete(FamilyInvitationEntity, { familyId });
+      await tx.delete(FamilyEntity, familyId);
+    });
+    return { success: true };
+  }
+
+  /**
+   * 转让家庭组 owner 给指定成员（仅当前 owner 可操作）
+   * 事务内：旧 owner 降为 admin、目标成员升为 owner、family.ownerId 更新
+   */
+  async transferOwnership(
+    userId: number,
+    targetMemberId: number
+  ): Promise<{ success: boolean }> {
+    const operator = await this.getUserMembership(userId);
+    if (!operator) {
+      throw new CoolCommException('未加入家庭组', 403);
+    }
+    if (operator.role !== 'owner') {
+      throw new CoolCommException('仅 owner 可转让家庭组', 403);
+    }
+    const target = await this.familyMemberEntity.findOneBy({
+      id: targetMemberId,
+    });
+    if (!target) {
+      throw new CoolCommException('目标成员不存在', 400);
+    }
+    // 跨家庭越权校验：目标成员必须属于操作者所在家庭
+    if (target.familyId !== operator.familyId) {
+      throw new CoolCommException('目标成员不在本家庭', 403);
+    }
+    if (target.role === 'owner') {
+      throw new CoolCommException('目标已是 owner', 400);
+    }
+    await this.getOrmManager().transaction(async tx => {
+      // 旧 owner 降级为 admin
+      await tx.update(
+        FamilyMemberEntity,
+        { userId, familyId: operator.familyId },
+        { role: 'admin' }
+      );
+      // 目标成员升级为 owner
+      await tx.update(
+        FamilyMemberEntity,
+        { id: targetMemberId },
+        { role: 'owner' }
+      );
+      // 家庭组 ownerId 同步更新
+      await tx.update(FamilyEntity, operator.familyId, {
+        ownerId: target.userId,
+      });
+    });
+    return { success: true };
+  }
+
+  /**
+   * 用户注销时清理其在所有家庭组的成员关系
+   * - owner 且无其他成员：解散家庭组（复用 disbandFamily，走 owner 校验）
+   * - owner 且有其他成员：转让 owner 给最早的 admin（无 admin 则最早的 member）
+   * - 非 owner：删除成员关系 + 原子 memberCount -1
+   * 每个家庭独立事务，避免单家庭失败影响其他家庭清理
+   * 被 UserService.logoff 调用，FamilyService 不依赖 UserService，无循环依赖
+   */
+  async handleUserLogoff(userId: number): Promise<void> {
+    // 查询该用户在所有家庭的 member 关系
+    const memberships = await this.familyMemberEntity.find({
+      where: { userId },
+    });
+    for (const membership of memberships) {
+      const familyId = membership.familyId;
+      if (membership.role === 'owner') {
+        // 查家庭其他成员（按 joinedAt ASC 排序）
+        const otherMembers = await this.familyMemberEntity
+          .createQueryBuilder('m')
+          .where('m.familyId = :familyId', { familyId })
+          .andWhere('m.userId != :userId', { userId })
+          .orderBy('m.joinedAt', 'ASC')
+          .getMany();
+        if (otherMembers.length === 0) {
+          // 无其他成员 → 解散家庭组（非 adminForce，走 owner 校验）
+          await this.disbandFamily(userId);
+        } else {
+          // 选最早的 admin（无 admin 则最早的 member）作为转让目标
+          const target =
+            otherMembers.find(m => m.role === 'admin') || otherMembers[0];
+          // 事务内转让 owner：旧 owner 降 admin、target 升 owner、family.ownerId 更新
+          await this.getOrmManager().transaction(async tx => {
+            await tx.update(
+              FamilyMemberEntity,
+              { userId, familyId },
+              { role: 'admin' }
+            );
+            await tx.update(FamilyMemberEntity, target.id, {
+              role: 'owner',
+            });
+            await tx.update(FamilyEntity, familyId, {
+              ownerId: target.userId,
+            });
+          });
+        }
+      } else {
+        // 非 owner：事务内删除成员关系 + 原子自减 memberCount
+        await this.getOrmManager().transaction(async tx => {
+          await tx.delete(FamilyMemberEntity, { userId, familyId });
+          await tx
+            .createQueryBuilder()
+            .update(FamilyEntity)
+            .set({ memberCount: () => 'GREATEST(memberCount - 1, 0)' })
+            .where('id = :id', { id: familyId })
+            .execute();
+        });
+      }
+    }
   }
 
   // ============================================================
@@ -354,8 +628,8 @@ export class FamilyService extends BaseService {
       where.visibility = 'private';
       where.authorId = userId;
     }
-    // 作者过滤
-    if (query.authorId) {
+    // 作者过滤（visibility=private 时强制 authorId = userId，不可被 query.authorId 覆盖，避免越权查看他人私有菜谱）
+    if (query.authorId && query.visibility !== 'private') {
       where.authorId = query.authorId;
     }
     // 分类过滤
@@ -388,14 +662,14 @@ export class FamilyService extends BaseService {
       cookTime?: number;
       visibility?: string;
     }
-  ): Promise<FamilyRecipeEntity> {
+  ): Promise<any> {
     if (!body.name || !body.name.trim()) {
       throw new CoolCommException('菜谱名称不能为空');
     }
     if (!Array.isArray(body.ingredients) || body.ingredients.length === 0) {
       throw new CoolCommException('食材清单不能为空');
     }
-    return this.familyRecipeEntity.save({
+    const recipe = await this.familyRecipeEntity.save({
       familyId,
       authorId: userId,
       name: body.name.trim(),
@@ -407,6 +681,21 @@ export class FamilyService extends BaseService {
       cookTime: typeof body.cookTime === 'number' ? body.cookTime : 30,
       visibility: body.visibility || 'family',
     });
+
+    // 触发成就解锁（失败不阻塞创建）
+    let newAchievements: any[] = [];
+    try {
+      const recipeCount = await this.familyRecipeEntity.count({
+        where: { authorId: userId },
+      });
+      newAchievements = await this.achievementService.checkAndUnlock(userId, {
+        type: 'recipe_count',
+        value: recipeCount,
+      });
+    } catch (e) {
+      // 成就解锁失败不阻塞业务
+    }
+    return { ...recipe, newAchievements };
   }
 
   /**
@@ -435,6 +724,7 @@ export class FamilyService extends BaseService {
       difficulty?: string;
       cookTime?: number;
       visibility?: string;
+      version?: number;
     }
   ): Promise<FamilyRecipeEntity> {
     const recipe = await this.familyRecipeEntity.findOneBy({ id });
@@ -456,7 +746,23 @@ export class FamilyService extends BaseService {
     if (body.cookTime !== undefined) patch.cookTime = body.cookTime;
     if (body.visibility !== undefined) patch.visibility = body.visibility;
     if (Object.keys(patch).length > 0) {
-      await this.familyRecipeEntity.update(id, patch);
+      // 乐观锁：前端传入 version 时校验版本匹配并自增，未传则退化为普通更新
+      if (typeof body.version === 'number') {
+        const result = await this.familyRecipeEntity
+          .createQueryBuilder()
+          .update()
+          .set({ ...patch, version: () => 'version + 1' })
+          .where('id = :id AND version = :oldVersion', {
+            id,
+            oldVersion: body.version,
+          })
+          .execute();
+        if (result.affected === 0) {
+          throw new CoolCommException('数据已被修改，请刷新后重试', 409);
+        }
+      } else {
+        await this.familyRecipeEntity.update(id, patch);
+      }
     }
     return this.familyRecipeEntity.findOneBy({ id });
   }
@@ -464,16 +770,34 @@ export class FamilyService extends BaseService {
   /**
    * 删除菜谱（仅作者）
    */
-  async deleteRecipe(userId: number, id: number): Promise<void> {
+  async deleteRecipe(
+    userId: number,
+    id: number,
+    version?: number
+  ): Promise<void> {
     const recipe = await this.familyRecipeEntity.findOneBy({ id });
     if (!recipe) {
       throw new CoolCommException('菜谱不存在');
     }
+    // 校验家庭归属：调用者必须是菜谱所属家庭的成员
+    await this.assertFamilyMembership(userId, recipe.familyId);
     // 权限校验：仅作者可删除
     if (recipe.authorId !== userId) {
       throw new CoolCommException('无权操作');
     }
-    await this.familyRecipeEntity.delete(id);
+    // 乐观锁：传入 version 时校验匹配，影响行数 0 抛 409；未传则普通删除
+    if (typeof version === 'number') {
+      const result = await this.familyRecipeEntity
+        .createQueryBuilder()
+        .delete()
+        .where('id = :id AND version = :version', { id, version })
+        .execute();
+      if (result.affected === 0) {
+        throw new CoolCommException('数据已被修改，请刷新后重试', 409);
+      }
+    } else {
+      await this.familyRecipeEntity.delete(id);
+    }
   }
 
   /**
@@ -488,6 +812,8 @@ export class FamilyService extends BaseService {
     if (!recipe) {
       throw new CoolCommException('菜谱不存在');
     }
+    // 校验家庭归属：调用者必须是菜谱所属家庭的成员
+    await this.assertFamilyMembership(userId, recipe.familyId);
     // 权限校验：仅作者可改可见性
     if (recipe.authorId !== userId) {
       throw new CoolCommException('无权限操作');
@@ -582,6 +908,7 @@ export class FamilyService extends BaseService {
 
   /**
    * 投票（like/dislike），相同撤销、不同切换、未投新增，返回 { likes, dislikes }
+   * 用事务 + 悲观锁（SELECT ... FOR UPDATE）串行化对同一菜单项的并发投票，避免 read-modify-write 丢失
    */
   async voteMenu(
     userId: number,
@@ -591,37 +918,52 @@ export class FamilyService extends BaseService {
     if (body.vote !== 'like' && body.vote !== 'dislike') {
       throw new CoolCommException('vote 参数不合法');
     }
+    // 先读取菜单项用于家庭归属校验
     const item = await this.weeklyMenuEntity.findOneBy({ id: menuId });
     if (!item) {
       throw new CoolCommException('菜单项不存在');
     }
-    let likes: number[] = Array.isArray(item.likes) ? [...item.likes] : [];
-    let dislikes: number[] = Array.isArray(item.dislikes)
-      ? [...item.dislikes]
-      : [];
-    const inLikes = likes.includes(userId);
-    const inDislikes = dislikes.includes(userId);
-    if (body.vote === 'like') {
-      if (inLikes) {
-        // 已投相同 → 撤销
-        likes = likes.filter(id => id !== userId);
-      } else {
-        // 不同则切换：先从 dislikes 移除，再加到 likes
-        dislikes = dislikes.filter(id => id !== userId);
-        likes.push(userId);
+    // 校验家庭归属：调用者必须是菜单项所属家庭的成员
+    await this.assertFamilyMembership(userId, item.familyId);
+    return await this.getOrmManager().transaction(async tx => {
+      // 悲观锁锁定菜单行，防止并发读改写丢失投票
+      const locked = await tx
+        .getRepository(WeeklyMenuEntity)
+        .createQueryBuilder('m')
+        .setLock('pessimistic_write')
+        .where('m.id = :id', { id: menuId })
+        .getOne();
+      if (!locked) {
+        throw new CoolCommException('菜单项不存在');
       }
-    } else {
-      if (inDislikes) {
-        // 已投相同 → 撤销
-        dislikes = dislikes.filter(id => id !== userId);
+      let likes: number[] = Array.isArray(locked.likes) ? [...locked.likes] : [];
+      let dislikes: number[] = Array.isArray(locked.dislikes)
+        ? [...locked.dislikes]
+        : [];
+      const inLikes = likes.includes(userId);
+      const inDislikes = dislikes.includes(userId);
+      if (body.vote === 'like') {
+        if (inLikes) {
+          // 已投相同 → 撤销
+          likes = likes.filter(id => id !== userId);
+        } else {
+          // 不同则切换：先从 dislikes 移除，再加到 likes
+          dislikes = dislikes.filter(id => id !== userId);
+          likes.push(userId);
+        }
       } else {
-        // 不同则切换：先从 likes 移除，再加到 dislikes
-        likes = likes.filter(id => id !== userId);
-        dislikes.push(userId);
+        if (inDislikes) {
+          // 已投相同 → 撤销
+          dislikes = dislikes.filter(id => id !== userId);
+        } else {
+          // 不同则切换：先从 likes 移除，再加到 dislikes
+          likes = likes.filter(id => id !== userId);
+          dislikes.push(userId);
+        }
       }
-    }
-    await this.weeklyMenuEntity.update(menuId, { likes, dislikes });
-    return { likes, dislikes };
+      await tx.update(WeeklyMenuEntity, menuId, { likes, dislikes });
+      return { likes, dislikes };
+    });
   }
 
   // ============================================================
@@ -682,19 +1024,35 @@ export class FamilyService extends BaseService {
     if (!item) {
       throw new CoolCommException('购物项不存在');
     }
-    // checked 缺省则取反当前值
-    const nextChecked =
-      typeof body.checked === 'boolean' ? body.checked : !item.checked;
-    const patch: any = { checked: nextChecked };
-    // 勾选时记录勾选人和时间
-    if (nextChecked) {
-      patch.checkedBy = userId;
-      patch.checkedAt = new Date().toISOString();
+    // 校验家庭归属：调用者必须是购物项所属家庭的成员
+    await this.assertFamilyMembership(userId, item.familyId);
+    // 原子更新：checked 缺省时取反（NOT checked），显式指定时设置为指定值
+    const now = new Date().toISOString();
+    if (typeof body.checked === 'boolean') {
+      await this.shoppingItemEntity
+        .createQueryBuilder()
+        .update()
+        .set({
+          checked: body.checked,
+          checkedBy: body.checked ? userId : null,
+          checkedAt: body.checked ? now : null,
+        })
+        .where('id = :id', { id: shoppingId })
+        .execute();
     } else {
-      patch.checkedBy = null;
-      patch.checkedAt = null;
+      await this.shoppingItemEntity
+        .createQueryBuilder()
+        .update()
+        .set({
+          checked: () => 'NOT checked',
+          checkedBy: () =>
+            'CASE WHEN checked = 0 THEN ' + userId + ' ELSE NULL END',
+          checkedAt: () =>
+            "CASE WHEN checked = 0 THEN '" + now + "' ELSE NULL END",
+        })
+        .where('id = :id', { id: shoppingId })
+        .execute();
     }
-    await this.shoppingItemEntity.update(shoppingId, patch);
     return this.shoppingItemEntity.findOneBy({ id: shoppingId });
   }
 
@@ -706,11 +1064,16 @@ export class FamilyService extends BaseService {
     if (!item) {
       throw new CoolCommException('购物项不存在');
     }
-    await this.shoppingItemEntity.delete(shoppingId);
+    // 校验家庭归属：调用者必须是购物项所属家庭的成员
+    await this.assertFamilyMembership(userId, item.familyId);
+    await this.getOrmManager().transaction(async tx => {
+      await tx.delete(ShoppingItemEntity, shoppingId);
+    });
   }
 
   /**
    * 根据本周菜单聚合食材去重批量生成购物清单，返回 { added, skipped }
+   * 批量插入 + 事务，避免循环逐条 save 在中途失败留下部分数据
    */
   async generateShopping(
     userId: number,
@@ -757,14 +1120,18 @@ export class FamilyService extends BaseService {
     let added = 0;
     let skipped = 0;
     let nextSort = maxSort + 1;
-    const existingNames = new Set(familyItems.map(i => i.name));
+    // 已存在购物项的去重 key 集合（统一用 name|unit）
+    // 注意：shopping_item 表无独立 unit 字段，已存在项 unit 视为空字符串
+    const existingKeys = new Set(familyItems.map(i => `${i.name}|`));
+    const toInsert: any[] = [];
     for (const ing of ingredientMap.values()) {
-      // 检查 shopping_items 中是否已存在相同 name 的条目
-      if (existingNames.has(ing.name)) {
+      const key = `${ing.name}|${ing.unit || ''}`;
+      // 检查 shopping_items 中是否已存在相同 name|unit 的条目
+      if (existingKeys.has(key)) {
         skipped += 1;
         continue;
       }
-      await this.shoppingItemEntity.save({
+      toInsert.push({
         familyId,
         name: ing.name,
         category: '其他',
@@ -772,8 +1139,14 @@ export class FamilyService extends BaseService {
         checked: false,
         sort: nextSort++,
       });
-      existingNames.add(ing.name);
+      existingKeys.add(key);
       added += 1;
+    }
+    // 一次性批量插入，加事务保证原子性
+    if (toInsert.length > 0) {
+      await this.getOrmManager().transaction(async tx => {
+        await tx.save(ShoppingItemEntity, toInsert);
+      });
     }
     return { added, skipped };
   }
@@ -791,7 +1164,7 @@ export class FamilyService extends BaseService {
     month: string
   ): Promise<any> {
     // 默认当月 YYYY-MM
-    const currentMonth = new Date().toISOString().slice(0, 7);
+    const currentMonth = currentMonthStr();
     const targetMonth = month || currentMonth;
     const prevMonth = this.computePrevMonth(targetMonth);
     // 通过 family_members 找出该家庭的所有 userIds
@@ -810,19 +1183,31 @@ export class FamilyService extends BaseService {
         tagDistribution: [],
       };
     }
-    // 过滤当月记录：userId 在家庭组内 + recordDate 月份匹配
+    // 计算当月日期范围 [start, end]（YYYY-MM-DD）
+    const [targetYear, targetMonthNum] = targetMonth
+      .split('-')
+      .map(Number);
+    const targetLastDay = new Date(targetYear, targetMonthNum, 0).getDate();
+    const targetStartDate = `${targetMonth}-01`;
+    const targetEndDate = `${targetMonth}-${String(targetLastDay).padStart(2, '0')}`;
+    // 一次查询所有成员在日期范围内的记录（避免 N+1 循环查询）
     const monthRecords = await this.recordEntity.find({
-      where: memberUserIds.map(uid => ({
-        userId: uid,
-        recordDate: Like(`${targetMonth}%`),
-      })),
+      where: {
+        userId: In(memberUserIds),
+        recordDate: Between(targetStartDate, targetEndDate),
+      },
     });
-    // 过滤上月记录（用于环比）
+    // 计算上月日期范围 [start, end]
+    const [prevYear, prevMonthNum] = prevMonth.split('-').map(Number);
+    const prevLastDay = new Date(prevYear, prevMonthNum, 0).getDate();
+    const prevStartDate = `${prevMonth}-01`;
+    const prevEndDate = `${prevMonth}-${String(prevLastDay).padStart(2, '0')}`;
+    // 一次查询所有成员上月的记录数（用于环比）
     const prevMonthRecords = await this.recordEntity.count({
-      where: memberUserIds.map(uid => ({
-        userId: uid,
-        recordDate: Like(`${prevMonth}%`),
-      })),
+      where: {
+        userId: In(memberUserIds),
+        recordDate: Between(prevStartDate, prevEndDate),
+      },
     });
     // memberContributions：按 userId 分组聚合，关联 users 表取昵称头像，按记录数倒序
     const memberMap = new Map<number, number>();

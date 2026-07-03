@@ -216,7 +216,7 @@ export const appApi = {
 	getBlindGuessRound(roundId: number | string) {
 		return instance.get(`/gamification/blindguess/round/${roundId}`);
 	},
-	submitBlindGuess(roundId: number | string, data: { itemId: number; guessAuthorId: number; guessDishName: string }) {
+	submitBlindGuess(roundId: number | string, data: { itemId: number; guessAuthorId?: number; guessDishName: string }) {
 		return instance.post(`/gamification/blindguess/round/${roundId}/guess`, data);
 	},
 	revealBlindGuessRound(roundId: number | string) {

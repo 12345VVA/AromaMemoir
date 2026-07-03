@@ -44,9 +44,10 @@ export default {
 	 * 是否过期
 	 * @param {string} key 关键字
 	 */
-	isExpired(key: string) {
-		const expiration = this.getExpiration(key) || 0;
-		return expiration - Date.now() <= 2000;
+	isExpired(key: string): boolean {
+		const expiration = this.getExpiration(key);
+		if (!expiration) return false; // 无过期时间，永不过期
+		return expiration - Date.now() <= 0;
 	},
 
 	/**

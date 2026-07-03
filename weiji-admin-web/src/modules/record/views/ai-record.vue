@@ -168,8 +168,10 @@ import { ElMessage } from 'element-plus';
 import { UploadFilled, MagicStick, Brush } from '@element-plus/icons-vue';
 import type { UploadFile } from 'element-plus';
 import { appApi } from '/@/modules/business/utils/app-api';
+import { useUpload } from '/@/plugins/upload/hooks';
 
 const router = useRouter();
+const { toUpload } = useUpload();
 
 const file = ref<File | null>(null);
 // 原图 URL（本地上传后的 blob URL）
@@ -272,6 +274,10 @@ function handleFileChange(uploadFile: UploadFile) {
   const raw = uploadFile.raw;
   if (!raw) return;
   file.value = raw;
+  // 撤销旧的 blob URL，避免内存泄漏
+  if (originalUrl.value && originalUrl.value.startsWith('blob:')) {
+    URL.revokeObjectURL(originalUrl.value);
+  }
   originalUrl.value = URL.createObjectURL(raw);
   beautifiedUrl.value = '';
   imageMode.value = 'original';
@@ -356,6 +362,10 @@ function removeTag(idx: number) {
 function resetForm() {
   recognizeResult.value = null;
   file.value = null;
+  // 撤销 blob URL，避免内存泄漏
+  if (originalUrl.value && originalUrl.value.startsWith('blob:')) {
+    URL.revokeObjectURL(originalUrl.value);
+  }
   originalUrl.value = '';
   beautifiedUrl.value = '';
   imageMode.value = 'original';
@@ -377,6 +387,12 @@ async function handleSave() {
   try {
     // 只包含选中的食材
     const selectedIngs = [...selectedIngredients.value];
+    // 如果原图是本地 blob URL，先上传到服务器获取持久化 URL
+    let imageUrl = originalUrl.value;
+    if (imageUrl.startsWith('blob:') && file.value) {
+      const { url } = await toUpload(file.value);
+      imageUrl = url;
+    }
     await appApi.saveRecord({
       dishName: saveForm.dishName,
       cookingMethod: cookingMethod.value,
@@ -387,7 +403,7 @@ async function handleSave() {
       ingredients: selectedIngs,
       tags: saveForm.tags,
       mealType: saveForm.mealType,
-      imageUrl: originalUrl.value,
+      imageUrl,
       beautifiedUrl: beautifiedUrl.value,
       source: 'ai',
     });

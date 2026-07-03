@@ -1,2 +1,2 @@
-@import "./static/iconfont/index.scss";
-@import "./static/css/index.scss";
+@use "./static/iconfont/index.scss" as iconfont;
+@use "./static/css/index.scss" as clcomponents;

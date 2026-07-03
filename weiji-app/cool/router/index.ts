@@ -288,15 +288,22 @@ const router = {
 
 	// 登录成功后操作
 	nextLogin(type?: string) {
-		const pages = getCurrentPages();
-		const index = pages.findIndex((e) => this.pages.login.includes(e.route!));
-
-		if (index <= 0) {
-			this.home();
+		// 优先回跳到登录前被拦截的页面
+		const loginIntent = storage.get("loginIntent");
+		if (loginIntent) {
+			storage.remove("loginIntent");
+			router.push(loginIntent);
 		} else {
-			router.back({
-				delta: pages.length - index,
-			});
+			const pages = getCurrentPages();
+			const index = pages.findIndex((e) => this.pages.login.includes(e.route!));
+
+			if (index <= 0) {
+				this.home();
+			} else {
+				router.back({
+					delta: pages.length - index,
+				});
+			}
 		}
 
 		// 登录方式

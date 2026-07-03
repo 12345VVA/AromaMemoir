@@ -79,8 +79,8 @@ export class BaseAuthorityMiddleware
           if (passwordV != ctx.admin.passwordVersion) {
             throw new CoolCommException('登录失效~', 401);
           }
-          // 超管拥有所有权限
-          if (ctx.admin.username == 'admin' && !ctx.admin.isRefresh) {
+          // 超管拥有所有权限（基于 JWT 中的 role 字段判定，不依赖 username 字符串）
+          if (ctx.admin.role === 'super' && !ctx.admin.isRefresh) {
             if (rToken !== token && this.jwtConfig.jwt.sso) {
               throw new CoolCommException('登录失效~', 401);
             } else {

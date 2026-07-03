@@ -46,7 +46,9 @@ export const storage = {
 	 * @param {*} key 关键字
 	 */
 	isExpired(key: string): boolean {
-		return uni.getStorageSync(`${key}${this.suffix}`) - Date.parse(String(new Date())) <= 0;
+		const expiration = uni.getStorageSync(`${key}${this.suffix}`);
+		if (!expiration) return false;
+		return expiration - Date.parse(String(new Date())) <= 0;
 	},
 
 	/**

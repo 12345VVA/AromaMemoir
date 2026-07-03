@@ -169,10 +169,12 @@ async def recognize_food(image: UploadFile = File(...)):
         image_bytes = await image.read()
 
         # 百度识别用 try/except 包裹单独捕获，失败时返回 None 触发 GPT 兜底
+        # 捕获 Exception 而非仅 AiProviderError，防止 httpx 原生异常破坏 asyncio.gather 降级链路
         async def _safe_baidu():
             try:
                 return await baidu_recognize(image_bytes)
-            except AiProviderError:
+            except Exception:
+                logger.exception("baidu recognize failed, fallback to GPT-4o")
                 return None
 
         # 并行：腾讯云审核 + 百度识别
@@ -186,7 +188,7 @@ async def recognize_food(image: UploadFile = File(...)):
             return fail("图片内容不合规，请更换图片后重试")
 
         # 百度高置信度直接返回
-        if baidu_result and baidu_result.get('confidence', 0) >= 0.8:
+        if baidu_result and (baidu_result.get('confidence') or 0) >= 0.8:
             return ok({
                 **baidu_result,
                 'imageUrl': '',

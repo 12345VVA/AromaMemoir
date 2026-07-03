@@ -2,6 +2,7 @@ import { Get, Inject, Provide, Query } from '@midwayjs/core';
 import { CoolController, BaseController } from '@cool-midway/core';
 import { Context } from '@midwayjs/koa';
 import { FamilyService } from '../../service/family';
+import { currentMonthStr } from '../../../../comm/date';
 
 /**
  * C端家庭饮食月度报告
@@ -24,7 +25,7 @@ export class AppFamilyReportController extends BaseController {
     const family = await this.familyService.getMyFamily(userId);
     if (!family) {
       // 未加入家庭组 → 返回空报告
-      const currentMonth = new Date().toISOString().slice(0, 7);
+      const currentMonth = currentMonthStr();
       return this.ok({
         month: month || currentMonth,
         totalRecords: 0,

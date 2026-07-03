@@ -248,7 +248,7 @@
                 <el-checkbox
                   v-for="r in recipes"
                   :key="r.id"
-                  :value="String(r.id)"
+                  :value="r.id"
                 >
                   {{ r.dishName || r.name || '未命名菜谱' }}
                 </el-checkbox>
@@ -422,7 +422,7 @@ const blindguessLoading = ref(false);
 const blindguessLoaded = ref(false);
 
 const newRoundName = ref('');
-const selectedRecipeIds = ref<string[]>([]);
+const selectedRecipeIds = ref<number[]>([]);
 const createRoundLoading = ref(false);
 
 const historyRounds = ref<any[]>([]);
@@ -506,9 +506,9 @@ async function handleCreateRound() {
   createRoundLoading.value = true;
   try {
     const data: any = await appApi.createBlindGuessRound({
-      familyId: familyId.value as unknown as number,
+      familyId: Number(familyId.value),
       roundName: name,
-      recordIds: selectedRecipeIds.value as unknown as number[],
+      recordIds: selectedRecipeIds.value.map(Number),
     });
     const roundId = data?.id || data?.roundId;
     if (roundId) saveRoundId(String(roundId));
@@ -559,7 +559,6 @@ async function handleSubmitGuess(recordId: string) {
   try {
     await appApi.submitBlindGuess(round.id, {
       itemId: item.recordId,
-      guessAuthorId: '' as unknown as number,
       guessDishName: dishName,
     });
     ElMessage.success('已提交猜测');

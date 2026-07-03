@@ -27,7 +27,7 @@ export class AppFamilyMemberController extends BaseController {
     const userId = this.ctx.user?.userId;
     const family = await this.familyService.getMyFamily(userId);
     if (!family) {
-      throw new CoolCommException('未加入家庭组');
+      return this.ok({ list: [], total: 0 });
     }
     return this.ok(await this.familyService.listMembers(userId, family.id));
   }

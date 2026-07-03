@@ -4,7 +4,7 @@
         "router": null,
         "perms": null,
         "type": 0,
-        "icon": "icon-challenge",
+        "icon": "icon-hot",
         "orderNum": 60,
         "viewPath": null,
         "keepAlive": true,

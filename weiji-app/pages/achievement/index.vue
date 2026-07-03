@@ -38,18 +38,18 @@
 				<view v-for="c in challenges" :key="c.id" class="wj-card challenge-card">
 					<view class="challenge-header">
 						<text class="challenge-name">{{ c.name }}</text>
-						<text class="challenge-status" :class="{ done: isChallengeDone(c) }">
-							{{ isChallengeDone(c) ? "已完成" : "进行中" }}
-						</text>
+						<text v-if="c.userCompleted" class="challenge-status done">已完成 ✓</text>
+						<text v-else-if="c.userJoined" class="challenge-status">进行中</text>
 					</view>
 					<text class="challenge-desc">{{ c.description || "" }}</text>
-					<view class="challenge-progress">
-					<view class="progress-bar">
-						<view class="progress-inner" :style="{ width: challengePercent(c) + '%' }"></view>
+					<view v-if="c.userJoined && !c.userCompleted" class="challenge-progress">
+						<view class="progress-bar">
+							<view class="progress-inner" :style="{ width: challengePercent(c) + '%' }"></view>
+						</view>
+						<text class="progress-text">进度: {{ c.userProgress || 0 }}/{{ c.userTarget || 0 }}</text>
 					</view>
-					<text class="progress-text">{{ c.progress || 0 }} / {{ c.target || 0 }}</text>
+					<button v-if="!c.userJoined" class="wj-btn join-btn" @click="joinChallenge(c)">参与</button>
 				</view>
-			</view>
 			</view>
 			<view v-else class="empty-tip">暂无挑战</view>
 		</view>
@@ -77,13 +77,10 @@ const expRemaining = computed(() => {
 	return Math.max(0, total - cur);
 });
 
-function isChallengeDone(c: any) {
-	return Number(c.progress || 0) >= Number(c.target || 0);
-}
 function challengePercent(c: any) {
-	const target = Number(c.target || 0);
+	const target = Number(c.userTarget || c.target || 0);
 	if (!target) return 0;
-	return Math.min(100, Math.round((Number(c.progress || 0) / target) * 100));
+	return Math.min(100, Math.round((Number(c.userProgress || c.progress || 0) / target) * 100));
 }
 
 async function loadLevel() {
@@ -106,10 +103,54 @@ async function loadAchievements() {
 
 async function loadChallenges() {
 	try {
-		const data: any = await api.getChallenges();
-		challenges.value = Array.isArray(data) ? data : data?.list || data?.challenges || [];
+		const [list, progressList] = await Promise.all([
+			api.getChallenges(),
+			api.getChallengeProgress().catch(() => [] as any[]),
+		]);
+		const listArr: any[] = Array.isArray(list) ? list : list?.list || list?.challenges || [];
+		const progressArr: any[] = Array.isArray(progressList) ? progressList : [];
+		// 以 challengeId 为键建立进度索引
+		const progressMap = new Map<number, any>();
+		progressArr.forEach((p: any) => {
+			const ch = p?.challenge || {};
+			const id = ch.id ?? p.challengeId;
+			if (id !== undefined && id !== null) {
+				progressMap.set(Number(id), p);
+			}
+		});
+		// 合并：找到进度记录则标记已参与，否则为未参与
+		challenges.value = listArr.map((c: any) => {
+			const p = progressMap.get(Number(c.id));
+			if (p) {
+				return {
+					...c,
+					userJoined: true,
+					userProgress: Number(p.progress || 0),
+					userTarget: Number(p.target || c.target || 0),
+					userCompleted: !!p.completed,
+				};
+			}
+			return {
+				...c,
+				userJoined: false,
+				userProgress: 0,
+				userTarget: Number(c.target || 0),
+				userCompleted: false,
+			};
+		});
 	} catch {
 		challenges.value = [];
+	}
+}
+
+async function joinChallenge(c: any) {
+	try {
+		await api.joinChallenge(c.id);
+		c.userJoined = true;
+		c.userProgress = 0;
+		uni.showToast({ title: "参与成功", icon: "success" });
+	} catch {
+		// 错误已由 api 层 toast
 	}
 }
 

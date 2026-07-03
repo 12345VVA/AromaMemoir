@@ -3,7 +3,8 @@ import { BaseService, CoolCommException } from '@cool-midway/core';
 import { LoginDTO } from '../../dto/login';
 import { v1 as uuid } from 'uuid';
 import { BaseSysUserEntity } from '../../entity/sys/user';
-import { Repository } from 'typeorm';
+import { BaseSysRoleEntity } from '../../entity/sys/role';
+import { Repository, In } from 'typeorm';
 import { InjectEntityModel } from '@midwayjs/typeorm';
 import * as md5 from 'md5';
 import { BaseSysRoleService } from './role';
@@ -26,6 +27,9 @@ export class BaseSysLoginService extends BaseService {
 
   @InjectEntityModel(BaseSysUserEntity)
   baseSysUserEntity: Repository<BaseSysUserEntity>;
+
+  @InjectEntityModel(BaseSysRoleEntity)
+  baseSysRoleEntity: Repository<BaseSysRoleEntity>;
 
   @Inject()
   baseSysRoleService: BaseSysRoleService;
@@ -70,17 +74,24 @@ export class BaseSysLoginService extends BaseService {
         throw new CoolCommException('该用户未设置任何角色，无法登录~');
       }
 
+      // 判定超管：用户拥有 label='admin' 的角色即为超管，不依赖 username 字符串
+      const roles = await this.baseSysRoleEntity.find({
+        where: { id: In(roleIds) },
+      });
+      const isSuperAdmin = roles.some(r => r.label === 'admin');
+
       // 生成token
       const { expire, refreshExpire } = this.coolConfig.jwt.token;
       const result = {
         expire,
-        token: await this.generateToken(user, roleIds, expire),
+        token: await this.generateToken(user, roleIds, expire, false, isSuperAdmin),
         refreshExpire,
         refreshToken: await this.generateToken(
           user,
           roleIds,
           refreshExpire,
-          true
+          true,
+          isSuperAdmin
         ),
       };
 
@@ -88,7 +99,7 @@ export class BaseSysLoginService extends BaseService {
       const perms = await this.baseSysMenuService.getPerms(roleIds);
       const departments = await this.baseSysDepartmentService.getByRoleIds(
         roleIds,
-        user.username === 'admin'
+        isSuperAdmin
       );
       await this.midwayCache.set(`admin:department:${user.id}`, departments);
       await this.midwayCache.set(`admin:perms:${user.id}`, perms);
@@ -183,8 +194,9 @@ export class BaseSysLoginService extends BaseService {
    * @param roleIds 角色集合
    * @param expire 过期
    * @param isRefresh 是否是刷新
+   * @param isSuperAdmin 是否超管（拥有 label='admin' 的角色）
    */
-  async generateToken(user, roleIds, expire, isRefresh?) {
+  async generateToken(user, roleIds, expire, isRefresh?, isSuperAdmin?) {
     await this.midwayCache.set(
       `admin:passwordVersion:${user.id}`,
       user.passwordV
@@ -196,6 +208,7 @@ export class BaseSysLoginService extends BaseService {
       userId: user.id,
       passwordVersion: user.passwordV,
       tenantId: user['tenantId'],
+      role: isSuperAdmin ? 'super' : 'user',
     };
     if (isRefresh) {
       tokenInfo.isRefresh = true;

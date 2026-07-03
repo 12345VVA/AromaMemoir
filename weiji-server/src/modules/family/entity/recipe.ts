@@ -48,4 +48,7 @@ export class FamilyRecipeEntity extends BaseEntity {
 
   @Column({ comment: '可见性 family/private', default: 'family' })
   visibility: string;
+
+  @Column({ comment: '乐观锁版本号', default: 1 })
+  version: number;
 }

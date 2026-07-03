@@ -1,4 +1,4 @@
-import { Provide } from '@midwayjs/core';
+import { Inject, Provide } from '@midwayjs/core';
 import { BaseService, CoolCommException } from '@cool-midway/core';
 import { InjectEntityModel } from '@midwayjs/typeorm';
 import { In, Repository } from 'typeorm';
@@ -7,15 +7,17 @@ import { RecordEntity } from '../entity/record';
 import { RecordLikeEntity } from '../entity/like';
 import { RecordCommentEntity } from '../entity/comment';
 import { AppUserEntity } from '../../account/entity/user';
+import { FamilyMemberEntity } from '../../family/entity/member';
+import { ChallengeService } from '../../challenge/service/challenge';
+import { AchievementService } from '../../achievement/service/achievement';
+import { todayStr } from '../../../comm/date';
 
 /**
  * 美食记录服务
  * 提供记录的增删查、家庭动态、点赞、评论能力
  *
- * 注意：list / delete 与 BaseService 的同名 CRUD 方法存在签名冲突
- *   - C 端调用：list(userId, query) / delete(userId, id)，首参为 number
- *   - B 端 cl-crud 调用：list(query, option, connectionName) / delete(ids)，首参为对象/数组
- * 通过判断首参类型分发，保证 B 端 CRUD 与 C 端业务互不影响
+ * B 端 cl-crud 直接调用 list / delete（委托 BaseService，走回收站）；
+ * C 端请调用 appList / appDelete / save 等专用方法，避免与 B 端 CRUD 签名冲突。
  */
 @Provide()
 export class RecordService extends BaseService {
@@ -31,29 +33,28 @@ export class RecordService extends BaseService {
   @InjectEntityModel(AppUserEntity)
   appUserEntity: Repository<AppUserEntity>;
 
+  @InjectEntityModel(FamilyMemberEntity)
+  familyMemberEntity: Repository<FamilyMemberEntity>;
+
+  @Inject()
+  challengeService: ChallengeService;
+
+  @Inject()
+  achievementService: AchievementService;
+
   /**
-   * 分页查询（B/C 端复用）
-   * - C 端：list(userId, query)，userId 为 number
-   * - B 端 cl-crud：list(query, option, connectionName)
+   * 分页查询（B 端 cl-crud）
+   * C 端请直接调用 appList(userId, query)
    */
   async list(a: any, b?: any, c?: any) {
-    if (typeof a === 'number') {
-      return this.appList(a, b || {});
-    }
     return super.list(a, b, c);
   }
 
   /**
-   * 删除（B/C 端复用）
-   * - C 端：delete(userId, id)，首参为 number
-   * - B 端 cl-crud：delete(ids)，首参为数组或字符串
+   * 删除（B 端 cl-crud，走回收站）
+   * C 端请直接调用 appDelete(userId, id)
    */
   async delete(...args: any[]) {
-    if (typeof args[0] === 'number') {
-      const id = args[1];
-      await this.recordEntity.delete(id);
-      return;
-    }
     return super.delete(args[0]);
   }
 
@@ -62,7 +63,7 @@ export class RecordService extends BaseService {
    * 支持 tag（tags JSON 包含）/ rating（相等）/ keyword（dishName LIKE）筛选
    * 按 createTime 降序
    */
-  private async appList(userId: number, query: any) {
+  async appList(userId: number, query: any) {
     const page = Math.max(1, Number(query.page) || 1);
     const pageSize = Math.max(1, Number(query.pageSize) || 20);
 
@@ -112,6 +113,14 @@ export class RecordService extends BaseService {
   }
 
   /**
+   * 删除记录（C 端）
+   * 直接物理删除，不走 B 端回收站
+   */
+  async appDelete(userId: number, id: number) {
+    await this.recordEntity.delete(id);
+  }
+
+  /**
    * 创建记录（C 端）
    * 自动填充 userId / recordDate（缺省取今天）
    * newAchievements 占位，由 achievement 模块注入
@@ -120,7 +129,17 @@ export class RecordService extends BaseService {
     if (!body || !body.dishName || !String(body.dishName).trim()) {
       throw new CoolCommException('菜品名称不能为空');
     }
-    const today = new Date().toISOString().split('T')[0];
+    // 校验家庭归属：若指定 familyId，当前用户必须是该家庭成员
+    if (body.familyId != null) {
+      const membership = await this.familyMemberEntity.findOneBy({
+        familyId: body.familyId,
+        userId,
+      });
+      if (!membership) {
+        throw new CoolCommException('无权操作该家庭', 403);
+      }
+    }
+    const today = todayStr();
     const record = await this.recordEntity.save({
       userId,
       dishName: String(body.dishName).trim(),
@@ -137,7 +156,49 @@ export class RecordService extends BaseService {
       source: body.source || 'manual',
       familyId: body.familyId,
     });
-    return { record, newAchievements: [] };
+
+    // 触发挑战进度更新（失败不阻塞记录保存）
+    let newRecordCount = 0;
+    try {
+      newRecordCount = await this.recordEntity.count({
+        where: { userId },
+      });
+      await this.challengeService.checkAndComplete(
+        userId,
+        'record_count',
+        newRecordCount
+      );
+    } catch (e) {
+      // 挑战更新失败不阻塞记录保存
+    }
+
+    // 触发成就解锁（失败不阻塞记录保存）
+    let newAchievements: any[] = [];
+    try {
+      const recordAchievements = await this.achievementService.checkAndUnlock(
+        userId,
+        { type: 'record_count', value: newRecordCount }
+      );
+      newAchievements.push(...recordAchievements);
+
+      // 菜系多样性：统计用户不同烹饪方式数量
+      const cuisineResult = await this.recordEntity
+        .createQueryBuilder('r')
+        .select('COUNT(DISTINCT r.cookingMethod)', 'count')
+        .where('r.userId = :userId', { userId })
+        .andWhere('r.cookingMethod IS NOT NULL')
+        .getRawOne();
+      const cuisineCount = Number(cuisineResult?.count) || 0;
+      const cuisineAchievements = await this.achievementService.checkAndUnlock(
+        userId,
+        { type: 'cuisine_count', value: cuisineCount }
+      );
+      newAchievements.push(...cuisineAchievements);
+    } catch (e) {
+      // 成就解锁失败不阻塞记录保存
+    }
+
+    return { record, newAchievements };
   }
 
   /**
@@ -227,6 +288,16 @@ export class RecordService extends BaseService {
     if (!record) {
       throw new CoolCommException('记录不存在', 404);
     }
+    // 校验家庭归属：若记录属于某家庭，当前用户必须是该家庭成员
+    if (record.familyId != null) {
+      const membership = await this.familyMemberEntity.findOneBy({
+        familyId: record.familyId,
+        userId,
+      });
+      if (!membership) {
+        throw new CoolCommException('无权操作该家庭', 403);
+      }
+    }
     const existing = await this.recordLikeEntity.findOneBy({
       recordId,
       userId,
@@ -256,6 +327,16 @@ export class RecordService extends BaseService {
     const record = await this.recordEntity.findOneBy({ id: recordId });
     if (!record) {
       throw new CoolCommException('记录不存在', 404);
+    }
+    // 校验家庭归属：若记录属于某家庭，当前用户必须是该家庭成员
+    if (record.familyId != null) {
+      const membership = await this.familyMemberEntity.findOneBy({
+        familyId: record.familyId,
+        userId,
+      });
+      if (!membership) {
+        throw new CoolCommException('无权操作该家庭', 403);
+      }
     }
     const user = await this.appUserEntity.findOneBy({ id: userId });
     const saved = await this.recordCommentEntity.save({

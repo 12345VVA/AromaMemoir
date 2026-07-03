@@ -4,8 +4,8 @@
 	"description": "味记 cool-uni 移动端",
 	"license": "MIT",
 	"scripts": {
-		"dev:h5": "UNI_INPUT_DIR=. uni",
-		"build:h5": "UNI_INPUT_DIR=. uni build"
+		"dev:h5": "cross-env UNI_INPUT_DIR=. uni",
+		"build:h5": "cross-env UNI_INPUT_DIR=. uni build"
 	},
 	"dependencies": {
 		"@dcloudio/uni-app": "3.0.0-3081220230817001",
@@ -14,8 +14,8 @@
 		"js-pinyin": "^0.2.5",
 		"lodash-es": "^4.17.21",
 		"md5": "^2.3.0",
-		"pinia": "^2.1.7",
-		"vue": "^3.5.13",
+		"pinia": "2.0.36",
+		"vue": "3.2.47",
 		"vue-i18n": "9.1.9",
 		"weixin-js-sdk": "^1.6.5"
 	},
@@ -33,8 +33,9 @@
 		"@types/md5": "^2.3.2",
 		"@types/node": "^20.11.26",
 		"@vue/tsconfig": "^0.5.1",
+		"cross-env": "^7.0.3",
 		"sass-embedded": "^1.100.0",
 		"typescript": "~5.5.4",
-		"vite": "^5.4.14"
+		"vite": "~4.4.0"
 	}
 }

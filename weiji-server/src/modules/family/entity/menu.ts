@@ -38,4 +38,7 @@ export class WeeklyMenuEntity extends BaseEntity {
     transformer: transformerJson,
   })
   dislikes: number[];
+
+  @Column({ comment: '乐观锁版本号', default: 1 })
+  version: number;
 }

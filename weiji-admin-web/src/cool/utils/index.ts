@@ -71,7 +71,7 @@ export function getBrowser() {
 	const ua = navigator.userAgent.toLowerCase();
 
 	// 浏览器类型
-	let type = (ua.match(/firefox|chrome|safari|opera/g) || 'other')[0];
+	let type = (ua.match(/firefox|chrome|safari|opera/g) || ['other'])[0];
 
 	if ((ua.match(/msie|trident/g) || [])[0]) {
 		type = 'msie';

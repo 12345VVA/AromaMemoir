@@ -26,6 +26,6 @@ onHide(() => {
 </script>
 
 <style lang="scss">
-@import "/$/cool-ui/index.scss";
-@import "/@/static/css/index.scss";
+@use "/$/cool-ui/index.scss" as coolui;
+@use "/@/static/css/index.scss" as appcss;
 </style>

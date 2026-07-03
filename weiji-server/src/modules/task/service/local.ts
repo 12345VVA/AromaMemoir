@@ -114,8 +114,9 @@ export class TaskLocalService extends BaseService {
       // cron 类型
       cronTime = task.cron;
     } else {
-      // 间隔类型
-      cronTime = `*/${task.every / 1000} * * * * *`;
+      // 间隔类型：将毫秒转换为秒并向上取整，避免产生非整数秒导致 cron 表达式越界
+      const seconds = Math.max(1, Math.ceil(task.every / 1000));
+      cronTime = `*/${seconds} * * * * *`;
     }
 
     const job = new CronJob.CronJob(
@@ -310,6 +311,7 @@ export class TaskLocalService extends BaseService {
     if (task.startDate && moment(task.startDate).isAfter(moment())) {
       return;
     }
+    let acquiredLock = false;
     try {
       const currentTime = moment().toDate();
       const lockExpireTime = moment().add(5, 'minutes').toDate();
@@ -331,16 +333,21 @@ export class TaskLocalService extends BaseService {
         return;
       }
 
+      // 抢锁成功，标记以便 finally 中只释放自己持有的锁
+      acquiredLock = true;
+
       const serviceResult = await this.invokeService(task.service);
       await this.record(task, 1, JSON.stringify(serviceResult));
     } catch (error) {
       await this.record(task, 0, error.message);
     } finally {
-      // 释放锁
-      await this.taskInfoEntity.update(
-        { id: task.id },
-        { lockExpireTime: null }
-      );
+      // 只有抢到锁才释放，避免误清其他实例的锁
+      if (acquiredLock) {
+        await this.taskInfoEntity.update(
+          { id: task.id },
+          { lockExpireTime: null }
+        );
+      }
     }
 
     if (!task.isOnce) {

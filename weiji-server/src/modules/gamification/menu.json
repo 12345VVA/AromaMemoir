@@ -4,7 +4,7 @@
         "router": null,
         "perms": null,
         "type": 0,
-        "icon": "icon-game",
+        "icon": "icon-emoji",
         "orderNum": 70,
         "viewPath": null,
         "keepAlive": true,

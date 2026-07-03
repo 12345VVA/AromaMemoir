@@ -35,7 +35,9 @@ def _get_client() -> AsyncOpenAI:
     """懒加载 AsyncOpenAI 客户端单例。调用前需确保 settings.openai_ready。"""
     global _client
     if _client is None:
-        _client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        # 显式设置 timeout=20.0，覆盖 SDK 默认的 600s（10 分钟），
+        # 避免网络抖动时 worker 与内存被长时间占用
+        _client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY, timeout=20.0)
     return _client
 
 
@@ -73,6 +75,7 @@ async def recognize_dish(image_bytes: bytes) -> dict:
                 ],
             }],
             response_format={"type": "json_object"},
+            timeout=20.0,
         )
     except openai.AuthenticationError:
         raise AiAuthError('openai', 'API Key 无效')
@@ -83,7 +86,14 @@ async def recognize_dish(image_bytes: bytes) -> dict:
     except Exception as e:
         raise AiProviderError('openai', f'未知错误: {str(e)}')
 
-    content = response.choices[0].message.content
+    try:
+        if not response.choices:
+            raise AiProviderError('openai', 'OpenAI vision 返回空 choices')
+        message = response.choices[0].message
+        content = message.content
+    except (IndexError, AttributeError) as e:
+        raise AiProviderError('openai', f'OpenAI vision 响应解析失败: {e}')
+
     try:
         result = json.loads(content)
     except (json.JSONDecodeError, TypeError) as e:

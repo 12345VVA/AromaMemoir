@@ -4,7 +4,7 @@
         "router": null,
         "perms": null,
         "type": 0,
-        "icon": "icon-checkin",
+        "icon": "icon-time",
         "orderNum": 50,
         "viewPath": null,
         "keepAlive": true,

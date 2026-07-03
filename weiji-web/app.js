@@ -8,6 +8,7 @@ let currentOriginalUrl = null;
 let selectedImageVersion = 'original';
 let currentRecommendations = [];
 let currentRecipeVisibility = null;
+let familyPollTimer = null;
 
 /* ===== 图片压缩工具（F1增强） ===== */
 function compressImage(file, maxSize) {
@@ -155,6 +156,8 @@ function showToast(message) {
 
 /* ===== 路由 ===== */
 function navigateTo(page) {
+  // 切换页面前清理家庭轮询定时器（loadFamilyData 会在进入 family 页时重启）
+  if (familyPollTimer) { clearInterval(familyPollTimer); familyPollTimer = null; }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.querySelectorAll('.sidebar-nav-item').forEach(n => n.classList.remove('active'));
@@ -224,12 +227,24 @@ async function loadFamilyData() {
         createFamilyBtn.style.display = 'none';
       }
     }
+    if (!familyInfo) {
+      // 轮询发现家庭已不存在：清空显示并停止轮询
+      renderRecipes([]);
+      renderMembers([]);
+      hideLoading(gridEl);
+      hideLoading(membersEl);
+      if (familyPollTimer) { clearInterval(familyPollTimer); familyPollTimer = null; }
+      return;
+    }
     const [recipes, members] = await Promise.all([
       api.getFamilyRecipes(),
       api.getFamilyMembers()
     ]);
     renderRecipes(recipes || []);
     renderMembers(members || []);
+    // 启动/重启 30s 轮询
+    if (familyPollTimer) clearInterval(familyPollTimer);
+    familyPollTimer = setInterval(loadFamilyData, 30000);
   } catch (err) {
     hideLoading(gridEl);
     hideLoading(membersEl);
@@ -2156,6 +2171,28 @@ async function handleLogout() {
   showToast('已退出登录');
   showLoginPage();
 }
+
+// 跨标签同步：监听 weiji_token / weiji_user 变化
+window.addEventListener('storage', function(e) {
+  if (e.key === 'weiji_token') {
+    if (!e.newValue) {
+      // token 被清除：回到登录页
+      if (familyPollTimer) { clearInterval(familyPollTimer); familyPollTimer = null; }
+      showLoginPage();
+    } else {
+      // token 更新：刷新用户信息
+      if (api.isLoggedIn()) loadProfileData();
+    }
+  } else if (e.key === 'weiji_user') {
+    // 用户信息变更：同步刷新 profile 展示
+    if (api.isLoggedIn()) loadProfileData();
+  }
+});
+
+// 页面卸载前清理轮询定时器，避免内存泄漏
+window.addEventListener('beforeunload', function() {
+  if (familyPollTimer) { clearInterval(familyPollTimer); familyPollTimer = null; }
+});
 
 function init() {
   if (typeof lucide !== 'undefined') lucide.createIcons();

@@ -42,12 +42,6 @@
 					}
 				},
 				{
-					"path": "captcha",
-					"style": {
-						"navigationStyle": "custom"
-					}
-				},
-				{
 					"path": "about",
 					"style": {
 						"navigationBarTitleText": "%page.关于我们%"
@@ -62,6 +56,12 @@
 					"path": "ai-record",
 					"style": {
 						"navigationBarTitleText": "AI 记录"
+					}
+				},
+				{
+					"path": "detail",
+					"style": {
+						"navigationBarTitleText": "记录详情"
 					}
 				}
 			]

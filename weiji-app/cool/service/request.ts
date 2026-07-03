@@ -27,7 +27,7 @@ export default function request(options: any) {
 		console.log(`[${options.method || "GET"}] ${options.url}`);
 	}
 
-	return new Promise(async (resolve, reject) => {
+	return new Promise((resolve, reject) => {
 		// 继续请求
 		function next() {
 			uni.request({
@@ -52,6 +52,7 @@ export default function request(options: any) {
 							return reject({ message });
 						} else {
 							user.logout();
+							return reject({ message });
 						}
 					}
 
@@ -96,8 +97,9 @@ export default function request(options: any) {
 				if (storage.isExpired("token")) {
 					// 判断 refreshToken 是否过期
 					if (storage.isExpired("refreshToken")) {
-						// 退出登录
-						return user.logout();
+						// 退出登录并拒绝，避免 Promise 永久 pending
+						user.logout();
+						return reject({ message: t("登录已过期") });
 					}
 
 					// 是否在刷新中
@@ -111,19 +113,24 @@ export default function request(options: any) {
 							})
 							.catch((err) => {
 								user.logout();
+								// 通知所有排队请求失败并清空队列
+								requests.forEach((cb) => cb(null, err));
+								requests = [];
+								isRefreshing = false;
 								reject(err);
 							});
 					}
 
-					return new Promise((resolve) => {
-						// 继续请求
-						requests.push((token: string) => {
-							// 重新设置 token
-							Authorization = token;
-							next();
-							resolve();
-						});
+					// 排入队列，等待 token 刷新完成后用新 token 重新发起请求
+					requests.push((token: string | null, err?: any) => {
+						if (err) {
+							return reject(err);
+						}
+						// 重新设置 token
+						Authorization = token || "";
+						next();
 					});
+					return;
 				}
 			}
 		}

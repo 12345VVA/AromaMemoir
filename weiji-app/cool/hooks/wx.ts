@@ -206,45 +206,18 @@ export function useWx() {
 	}
 
 	// 微信小程序登录
+	// 注意：wx.getUserProfile / wx.getUserInfo 已在基础库 2.27.1+ 废弃，
+	// 头像请使用 <button open-type="chooseAvatar"> + @chooseavatar 事件，
+	// 昵称请使用 <input type="nickname"> + @blur 事件。
+	// miniLogin 仅返回 wx.login 的 code，供后端换取 openid/sessionKey。
 	async function miniLogin(): Promise<{ code: string; [key: string]: any }> {
-		return new Promise((resolve, reject) => {
-			// 兼容 Mac
-			const k = platform === "mac" ? "getUserInfo" : "getUserProfile";
-
-			uni[k]({
-				lang: "zh_CN",
-				desc: t("授权信息仅用于用户登录"),
-				success({ iv, encryptedData, signature, rawData }) {
-					function next() {
-						resolve({
-							iv,
-							encryptedData,
-							signature,
-							rawData,
-							code: code.value,
-						});
-					}
-
-					// 检查登录状态是否过期
-					uni.checkSession({
-						success() {
-							next();
-						},
-						fail() {
-							getCode().then(next);
-						},
-					});
-				},
-				fail(err) {
-					console.error(err);
-					getCode();
-
-					reject({
-						message: t("登录授权失败"),
-					});
-				},
-			});
-		});
+		console.warn(
+			'[useWx] getUserProfile/getUserInfo 已废弃（基础库 2.27.1+），' +
+				'请改用 <button open-type="chooseAvatar"> 获取头像、' +
+				'<input type="nickname"> 获取昵称。miniLogin 仅返回 wx.login 的 code。'
+		);
+		const loginCode = await getCode();
+		return { code: loginCode };
 	}
 
 	// 微信小程序支付

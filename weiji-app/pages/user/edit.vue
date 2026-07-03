@@ -66,7 +66,20 @@ async function save() {
 	loading.value = false;
 }
 
-onReady(() => {
+onReady(async () => {
+	// 先拉取最新用户资料，避免回显过期数据
+	try {
+		const data: any = await api.getUserProfile();
+		if (data) {
+			user.set({
+				...user.info,
+				nickName: data.nickName || data.nickname || user.info?.nickName,
+				avatarUrl: data.avatarUrl || data.avatar || user.info?.avatarUrl,
+			});
+		}
+	} catch {
+		// 静默，回退到 store 现有数据
+	}
 	form.nickName = user.info?.nickName || user.info?.nickname || "";
 });
 </script>

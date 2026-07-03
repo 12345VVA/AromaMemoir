@@ -94,29 +94,41 @@ const { t } = useI18n();
 
 // 上传头像（对接 C 端 /app/user/profile，avatar 字段）
 function uploadAvatar(e?: { detail: { avatarUrl: string } }) {
-	function next(path: string) {
-		api.updateProfile({ avatar: path } as any)
-			.then(() => {
+	// 先将临时文件上传到服务器持久化，再用返回的 URL 更新用户资料
+	function uploadAndSave(tempPath: string) {
+		uni.showLoading({ title: t("上传中..."), mask: true });
+		api.uploadFile(tempPath)
+			.then((url: string) => {
+				if (!url) {
+					throw new Error(t("上传失败"));
+				}
+				return api.updateProfile({ avatarUrl: url }).then(() => url);
+			})
+			.then((url: string) => {
+				uni.hideLoading();
 				ui.showToast(t("头像更新成功"));
 				user.set({
 					...user.info,
-					avatarUrl: path,
-					avatar: path,
+					avatarUrl: url,
+					avatar: url,
 				});
 			})
 			.catch((err: any) => {
+				uni.hideLoading();
+				// 上传或更新失败，保留旧头像
 				ui.showToast(err?.message || t("更新失败"));
 			});
 	}
 
 	if (e) {
-		next(e.detail.avatarUrl);
+		// MP-WEIXIN @chooseavatar 返回的 e.detail.avatarUrl 同样是临时路径，需先上传
+		uploadAndSave(e.detail.avatarUrl);
 	} else {
 		uni.chooseImage({
 			count: 1,
 			success(res) {
 				// @ts-ignore
-				next(res.tempFiles[0].path);
+				uploadAndSave(res.tempFiles[0].path);
 			},
 		});
 	}
@@ -129,9 +141,9 @@ async function loadProfile() {
 		if (data) {
 			user.set({
 				...user.info,
-				...data,
 				nickName: data.nickName || data.nickname || user.info?.nickName,
 				avatarUrl: data.avatarUrl || data.avatar || user.info?.avatarUrl,
+				username: data.username || user.info?.username,
 			});
 		}
 	} catch {
@@ -139,9 +151,10 @@ async function loadProfile() {
 	}
 }
 
-// 切换账号
+// 切换账号（先清除本地登录态，再跳转登录页，避免残留状态）
 function switchAccount() {
-	router.push("/pages/user/login");
+	user.clear();
+	uni.reLaunch({ url: "/pages/user/login" });
 }
 
 // 退出登录（调用后端 logout 并清理本地）

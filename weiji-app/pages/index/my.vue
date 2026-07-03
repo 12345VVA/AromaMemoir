@@ -94,12 +94,12 @@ async function loadProfile() {
 	try {
 		const data: any = await api.getUserProfile();
 		if (data) {
-			// 把后端字段映射到 cool-uni user store，供 edit/set 等页面复用
+			// 只同步用户资料字段到 cool store，不混入统计字段
 			user.set({
 				...user.info,
-				...data,
 				nickName: data.nickName || data.nickname || user.info?.nickName,
 				avatarUrl: data.avatarUrl || data.avatar || user.info?.avatarUrl,
+				username: data.username || user.info?.username,
 			});
 		}
 		stats.records = data?.recordCount || data?.stats?.records || 0;

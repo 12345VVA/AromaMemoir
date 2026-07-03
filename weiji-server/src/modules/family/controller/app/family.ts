@@ -34,4 +34,28 @@ export class AppFamilyController extends BaseController {
     const family = await this.familyService.createFamily(userId, body);
     return this.ok(family);
   }
+
+  @Post('/leave', { summary: '退出家庭组' })
+  async leave() {
+    const userId = this.ctx.user?.userId;
+    const result = await this.familyService.leaveFamily(userId);
+    return this.ok(result);
+  }
+
+  @Post('/disband', { summary: '解散家庭组' })
+  async disband() {
+    const userId = this.ctx.user?.userId;
+    const result = await this.familyService.disbandFamily(userId);
+    return this.ok(result);
+  }
+
+  @Post('/transfer', { summary: '转让家庭组' })
+  async transfer(@Body() body: { targetMemberId: number }) {
+    const userId = this.ctx.user?.userId;
+    const result = await this.familyService.transferOwnership(
+      userId,
+      body.targetMemberId
+    );
+    return this.ok(result);
+  }
 }

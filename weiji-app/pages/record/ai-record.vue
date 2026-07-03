@@ -163,6 +163,10 @@ async function handleRecognize() {
 		recognizeResult.value = data;
 		// 预填菜品名
 		form.dishName = data.dishName || data.name || data.dish || form.dishName;
+		// 如果后端返回了上传后的图片 URL，则替换本地临时路径
+		if (data.imageUrl || data.url) {
+			imageUrl.value = data.imageUrl || data.url;
+		}
 		uni.showToast({ title: '识别成功', icon: 'success' });
 	} catch {
 		// api.ts 已统一 toast
@@ -207,6 +211,8 @@ async function handleSave() {
 			nutrition: nutrition.value,
 		});
 		uni.showToast({ title: '保存成功', icon: 'success' });
+		// 通知首页刷新记录（双保险：配合首页 onShow 自动刷新）
+		uni.$emit('recordSaved');
 		// 重置并返回上一页
 		setTimeout(() => {
 			imageUrl.value = '';

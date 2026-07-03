@@ -3,29 +3,64 @@
 		<cl-topbar title="家庭菜谱" />
 
 		<view class="page-content">
-			<!-- 家庭信息 + 邀请 -->
-			<view class="wj-card family-header">
+			<!-- 已有家庭：家庭信息 + 邀请/加入入口 -->
+			<view v-if="loading" class="wj-card family-loading">
+				<text>加载中...</text>
+			</view>
+			<view v-else-if="error" class="wj-card family-error">
+				<text class="error-text">{{ error }}</text>
+				<button class="wj-btn wj-btn-ghost" @click="refreshAll">重试</button>
+			</view>
+			<view v-else-if="hasFamily" class="wj-card family-header">
 				<view class="family-meta">
-					<text class="family-name">{{ familyInfo.name || "我的家庭" }}</text>
+					<text class="family-name">{{ familyInfo.name || '未命名家庭' }}</text>
 					<text class="family-desc">{{ members.length }} 位成员</text>
 				</view>
-				<button class="wj-btn wj-btn-ghost invite-btn" @click="handleInvite">邀请家人</button>
+				<view class="family-actions">
+					<button class="wj-btn wj-btn-ghost invite-btn" @click="handleInvite">邀请家人</button>
+					<button class="wj-btn wj-btn-ghost join-btn" @click="handleJoinFamily">加入家庭</button>
+				</view>
+				<view class="family-danger-actions">
+					<button v-if="!isOwner" class="wj-btn wj-btn-ghost leave-btn" @click="handleLeaveFamily">退出家庭组</button>
+					<template v-else>
+						<button class="wj-btn wj-btn-ghost transfer-btn" @click="handleTransferOwner">转让家庭组</button>
+						<button class="wj-btn wj-btn-danger disband-btn" @click="handleDisbandFamily">解散家庭组</button>
+					</template>
+				</view>
+			</view>
+
+			<!-- 无家庭：突出显示 创建/加入 家庭 CTA -->
+			<view v-else class="wj-card family-empty">
+				<text class="empty-title">还没有加入家庭</text>
+				<text class="empty-desc">创建家庭或输入邀请码加入家庭，与家人共享美食菜谱</text>
+				<view class="empty-actions">
+					<button class="wj-btn create-family-btn" @click="handleCreateFamily">创建家庭</button>
+					<button class="wj-btn wj-btn-ghost join-family-btn" @click="handleJoinFamily">加入家庭</button>
+				</view>
+				<view class="family-danger-actions">
+					<button v-if="!isOwner" class="wj-btn wj-btn-ghost leave-btn" @click="handleLeaveFamily">退出家庭组</button>
+					<template v-else>
+						<button class="wj-btn wj-btn-ghost transfer-btn" @click="handleTransferOwner">转让家庭组</button>
+						<button class="wj-btn wj-btn-danger disband-btn" @click="handleDisbandFamily">解散家庭组</button>
+					</template>
+				</view>
 			</view>
 
 			<!-- 家庭成员横向列表 -->
-			<view class="section-title">家庭成员</view>
-			<scroll-view class="member-list no-scrollbar" scroll-x>
+			<view v-if="hasFamily" class="section-title">家庭成员</view>
+			<scroll-view v-if="hasFamily" class="member-list no-scrollbar" scroll-x>
 				<view v-for="m in members" :key="m.userId || m.id" class="member-item">
 					<view class="member-avatar">{{ (m.nickname || m.username || "?").charAt(0) }}</view>
 					<text class="member-name">{{ m.nickname || m.username || "成员" }}</text>
 					<text class="member-role">{{ roleText(m.role) }}</text>
+					<button v-if="isTransferable(m)" class="wj-btn wj-btn-ghost member-transfer-btn" @click="handleTransferOwnership(m)">转让给TA</button>
 				</view>
 				<view v-if="!members.length" class="empty-tip">还没有家庭成员</view>
 			</scroll-view>
 
 			<!-- 分类筛选 -->
-			<view class="section-title">家庭菜谱</view>
-			<scroll-view class="category-bar no-scrollbar" scroll-x>
+			<view v-if="hasFamily" class="section-title">家庭菜谱</view>
+			<scroll-view v-if="hasFamily" class="category-bar no-scrollbar" scroll-x>
 				<view
 					v-for="c in categories"
 					:key="c.value"
@@ -38,26 +73,28 @@
 			</scroll-view>
 
 			<!-- 菜谱网格 -->
-			<view v-if="recipesLoading" class="empty-tip">加载中...</view>
-			<view v-else-if="recipes.length" class="recipe-grid">
-				<view v-for="r in recipes" :key="r.id" class="recipe-card" @click="goDetail(r.id)">
-					<view class="recipe-cover">
-						<image v-if="r.coverUrl" class="cover-img" :src="r.coverUrl" mode="aspectFill" />
-						<view v-else class="cover-placeholder">🍽️</view>
-					</view>
-					<view class="recipe-info">
-						<text class="recipe-name">{{ r.name }}</text>
-						<view class="recipe-meta">
-							<text class="recipe-cat">{{ r.category || "其他" }}</text>
-							<text class="recipe-vis" @click.stop="toggleVisibility(r)">{{ visibilityText(r.visibility) }}</text>
+			<template v-if="hasFamily">
+				<view v-if="recipesLoading" class="empty-tip">加载中...</view>
+				<view v-else-if="recipes.length" class="recipe-grid">
+					<view v-for="r in recipes" :key="r.id" class="recipe-card" @click="goDetail(r.id)">
+						<view class="recipe-cover">
+							<image v-if="r.coverUrl" class="cover-img" :src="r.coverUrl" mode="aspectFill" />
+							<view v-else class="cover-placeholder">🍽️</view>
+						</view>
+						<view class="recipe-info">
+							<text class="recipe-name">{{ r.name }}</text>
+							<view class="recipe-meta">
+								<text class="recipe-cat">{{ r.category || "其他" }}</text>
+								<text class="recipe-vis" @click.stop="toggleVisibility(r)">{{ visibilityText(r.visibility) }}</text>
+							</view>
 						</view>
 					</view>
 				</view>
-			</view>
-			<view v-else class="empty-tip">暂无菜谱，快去添加吧～</view>
+				<view v-else class="empty-tip">暂无菜谱，快去添加吧～</view>
 
-			<!-- 新增菜谱入口 -->
-			<button class="wj-btn add-btn" @click="goCreate">+ 新建菜谱</button>
+				<!-- 新增菜谱入口 -->
+				<button class="wj-btn add-btn" @click="goCreate">+ 新建菜谱</button>
+			</template>
 
 			<!-- 邀请码弹窗 -->
 			<view v-if="inviteVisible" class="modal-mask" @click="inviteVisible = false">
@@ -76,7 +113,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "/@/utils/api";
 
@@ -86,6 +123,19 @@ const recipes = ref<any[]>([]);
 const recipesLoading = ref(false);
 const inviteVisible = ref(false);
 const inviteCode = ref("");
+const loading = ref(false);
+const error = ref("");
+
+// 是否已加入家庭（用于切换空状态 CTA）
+const hasFamily = computed(() => !!familyInfo.value?.id);
+
+// 当前用户是否为家庭 owner（基于 familyInfo.role）
+const isOwner = computed(() => familyInfo.value?.role === "owner");
+
+// 是否可将家庭组转让给该成员（owner 且目标非 owner）
+function isTransferable(m: any) {
+	return isOwner.value && m.role !== "owner";
+}
 
 const categories = [
 	{ value: "", label: "全部" },
@@ -109,8 +159,8 @@ async function loadFamily() {
 	try {
 		const data: any = await api.getFamilyInfo();
 		familyInfo.value = data || {};
-	} catch {
-		// 静默
+	} catch (err: any) {
+		error.value = err?.message || "加载失败";
 	}
 }
 
@@ -118,7 +168,8 @@ async function loadMembers() {
 	try {
 		const data: any = await api.getFamilyMembers();
 		members.value = Array.isArray(data) ? data : data?.list || data?.members || [];
-	} catch {
+	} catch (err: any) {
+		error.value = err?.message || "加载失败";
 		members.value = [];
 	}
 }
@@ -129,7 +180,8 @@ async function loadRecipes() {
 		const params = currentCategory.value ? { category: currentCategory.value } : undefined;
 		const data: any = await api.getFamilyRecipes(params);
 		recipes.value = Array.isArray(data) ? data : data?.list || data?.recipes || [];
-	} catch {
+	} catch (err: any) {
+		error.value = err?.message || "加载失败";
 		recipes.value = [];
 	} finally {
 		recipesLoading.value = false;
@@ -147,9 +199,57 @@ async function handleInvite() {
 		const data: any = await api.createInvitation();
 		inviteCode.value = data.code || data.invitationCode || "";
 		inviteVisible.value = true;
-	} catch {
-		// api.ts 已统一 toast
+	} catch (err: any) {
+		error.value = err?.message || "加载失败";
 	}
+}
+
+// 加入家庭（通过邀请码）
+function handleJoinFamily() {
+	uni.showModal({
+		title: "加入家庭",
+		editable: true,
+		placeholderText: "请输入邀请码",
+		success: async (res) => {
+			if (!res.confirm) return;
+			const code = (res.content || "").trim();
+			if (!code) {
+				uni.showToast({ title: "邀请码不能为空", icon: "none" });
+				return;
+			}
+			try {
+				await api.joinFamily(code);
+				uni.showToast({ title: "加入成功", icon: "success" });
+				uni.$emit("familyChanged");
+			} catch (err: any) {
+				error.value = err?.message || "加载失败";
+			}
+		},
+	});
+}
+
+// 创建家庭
+function handleCreateFamily() {
+	uni.showModal({
+		title: "创建家庭",
+		editable: true,
+		placeholderText: "请输入家庭名称",
+		success: async (res) => {
+			if (!res.confirm) return;
+			const name = (res.content || "").trim();
+			if (!name) {
+				uni.showToast({ title: "家庭名称不能为空", icon: "none" });
+				return;
+			}
+			try {
+				await api.createFamily(name);
+				uni.showToast({ title: "创建成功", icon: "success" });
+				uni.$emit("familyChanged");
+			} catch (err: any) {
+				error.value = err?.message || "加载失败";
+			}
+		},
+	});
 }
 
 // 复制邀请码（小程序适配）
@@ -165,7 +265,7 @@ function copyInviteCode() {
 
 // 可见性切换
 async function toggleVisibility(r: any) {
-	const next = r.visibility === "private" ? "family" : r.visibility === "family" ? "public" : "private";
+	const next = r.visibility === "private" ? "family" : "private";
 	try {
 		await api.updateRecipeVisibility(r.id, next);
 		r.visibility = next;
@@ -182,20 +282,149 @@ function goCreate() {
 	uni.navigateTo({ url: "/pages/family/recipe-form" });
 }
 
+// 刷新全部家庭相关数据（EventBus 触发）
+async function refreshAll() {
+	error.value = "";
+	loading.value = true;
+	try {
+		await Promise.all([loadFamily(), loadMembers(), loadRecipes()]);
+	} finally {
+		loading.value = false;
+	}
+}
+
+// 退出家庭组（非 owner）
+function handleLeaveFamily() {
+	uni.showModal({
+		title: "退出家庭组",
+		content: "退出后将无法访问该家庭的菜谱，确认退出？",
+		confirmText: "确认退出",
+		confirmColor: "#e54d42",
+		success: async (res) => {
+			if (!res.confirm) return;
+			try {
+				await api.leaveFamily();
+				uni.showToast({ title: "已退出家庭组", icon: "success" });
+				familyInfo.value = {};
+				members.value = [];
+				recipes.value = [];
+				uni.$emit("familyChanged");
+			} catch (err: any) {
+				error.value = err?.message || "加载失败";
+			}
+		},
+	});
+}
+
+// 解散家庭组（owner 专用，需输入家庭名称匹配）
+function handleDisbandFamily() {
+	const familyName = familyInfo.value?.name || "";
+	if (!familyName) {
+		uni.showToast({ title: "家庭信息异常", icon: "none" });
+		return;
+	}
+	uni.showModal({
+		title: "解散家庭组",
+		editable: true,
+		placeholderText: `请输入家庭名称 "${familyName}" 以确认`,
+		confirmText: "确认解散",
+		confirmColor: "#e54d42",
+		success: async (res) => {
+			if (!res.confirm) return;
+			const input = (res.content || "").trim();
+			if (input !== familyName) {
+				uni.showToast({ title: "家庭名称不匹配", icon: "none" });
+				return;
+			}
+			try {
+				await api.disbandFamily();
+				uni.showToast({ title: "已解散家庭组", icon: "success" });
+				familyInfo.value = {};
+				members.value = [];
+				recipes.value = [];
+				uni.$emit("familyChanged");
+			} catch (err: any) {
+				error.value = err?.message || "加载失败";
+			}
+		},
+	});
+}
+
+// 转让家庭组入口（owner 专用，提示选择成员）
+function handleTransferOwner() {
+	const candidates = members.value.filter((m: any) => m.role !== "owner");
+	if (!candidates.length) {
+		uni.showToast({ title: "没有可转让的成员", icon: "none" });
+		return;
+	}
+	const names = candidates
+		.map((m: any) => m.nickname || m.username || "成员")
+		.join("、");
+	uni.showModal({
+		title: "转让家庭组",
+		content: `请点击成员列表中的"转让给TA"按钮完成转让。可转让成员：${names}`,
+		showCancel: false,
+		confirmText: "知道了",
+	});
+}
+
+// 转让家庭组给指定成员（owner 专用）
+function handleTransferOwnership(m: any) {
+	const targetName = m.nickname || m.username || "该成员";
+	uni.showModal({
+		title: "转让家庭组",
+		content: `确认将家庭组转让给"${targetName}"？转让后你将变为普通成员。`,
+		confirmText: "确认转让",
+		confirmColor: "#e54d42",
+		success: async (res) => {
+			if (!res.confirm) return;
+			const targetId = m.userId || m.id;
+			if (!targetId) {
+				uni.showToast({ title: "成员信息异常", icon: "none" });
+				return;
+			}
+			try {
+				await api.transferOwnership(targetId);
+				uni.showToast({ title: "已转让家庭组", icon: "success" });
+				uni.$emit("familyChanged");
+			} catch (err: any) {
+				error.value = err?.message || "加载失败";
+			}
+		},
+	});
+}
+
 onMounted(() => {
-	loadFamily();
-	loadMembers();
-	loadRecipes();
+	refreshAll();
+	uni.$on("familyChanged", refreshAll);
+});
+
+onUnmounted(() => {
+	uni.$off("familyChanged", refreshAll);
 });
 
 onShow(() => {
-	loadRecipes();
+	refreshAll();
 });
 </script>
 
 <style scoped>
+.family-loading {
+	text-align: center;
+	padding: 40rpx;
+}
+.family-error {
+	text-align: center;
+	padding: 40rpx;
+}
+.error-text {
+	color: #e54d42;
+	display: block;
+	margin-bottom: 20rpx;
+}
 .family-header {
 	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
 	justify-content: space-between;
 }
@@ -217,6 +446,55 @@ onShow(() => {
 	padding: 0 24rpx;
 	font-size: 26rpx;
 	border-radius: 32rpx;
+}
+.family-actions {
+	display: flex;
+	align-items: center;
+	gap: 16rpx;
+}
+.join-btn {
+	height: 64rpx;
+	line-height: 64rpx;
+	padding: 0 24rpx;
+	font-size: 26rpx;
+	border-radius: 32rpx;
+}
+
+/* 无家庭空状态 CTA */
+.family-empty {
+	text-align: center;
+	padding: 64rpx 32rpx;
+}
+.empty-title {
+	display: block;
+	font-size: 34rpx;
+	font-weight: 600;
+	color: var(--wj-text);
+	margin-bottom: 12rpx;
+}
+.empty-desc {
+	display: block;
+	font-size: 26rpx;
+	color: var(--wj-text-muted);
+	line-height: 1.6;
+	margin-bottom: 40rpx;
+}
+.empty-actions {
+	display: flex;
+	flex-direction: column;
+	gap: 20rpx;
+}
+.create-family-btn {
+	height: 88rpx;
+	line-height: 88rpx;
+	font-size: 30rpx;
+	border-radius: 16rpx;
+}
+.join-family-btn {
+	height: 88rpx;
+	line-height: 88rpx;
+	font-size: 30rpx;
+	border-radius: 16rpx;
 }
 
 .member-list {
@@ -397,5 +675,52 @@ onShow(() => {
 	margin-top: 24rpx;
 	font-size: 26rpx;
 	color: var(--wj-text-muted);
+}
+
+/* danger actions */
+.family-danger-actions {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 16rpx;
+	width: 100%;
+	margin-top: 24rpx;
+	padding-top: 24rpx;
+	border-top: 2rpx solid var(--wj-border);
+}
+.leave-btn {
+	height: 64rpx;
+	line-height: 64rpx;
+	padding: 0 24rpx;
+	font-size: 26rpx;
+	border-radius: 32rpx;
+	color: var(--wj-text);
+}
+.transfer-btn {
+	height: 64rpx;
+	line-height: 64rpx;
+	padding: 0 24rpx;
+	font-size: 26rpx;
+	border-radius: 32rpx;
+}
+.wj-btn-danger {
+	background: #ee0a24;
+	color: #fff;
+	border: none;
+}
+.disband-btn {
+	height: 64rpx;
+	line-height: 64rpx;
+	padding: 0 24rpx;
+	font-size: 26rpx;
+	border-radius: 32rpx;
+}
+.member-transfer-btn {
+	height: 48rpx;
+	line-height: 48rpx;
+	padding: 0 16rpx;
+	margin-top: 8rpx;
+	font-size: 22rpx;
+	border-radius: 24rpx;
 }
 </style>

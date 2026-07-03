@@ -21,7 +21,7 @@ export class AppRecordController extends BaseController {
    */
   @Get('/list', { summary: '分页查询记录' })
   async listRecords(@Query() query) {
-    return this.ok(await this.recordService.list(this.ctx.user?.userId, query));
+    return this.ok(await this.recordService.appList(this.ctx.user?.userId, query));
   }
 
   /**
@@ -46,7 +46,7 @@ export class AppRecordController extends BaseController {
    */
   @Post('/delete/:id', { summary: '删除记录' })
   async deleteRecord(@Param('id') id) {
-    await this.recordService.delete(this.ctx.user?.userId, id);
+    await this.recordService.appDelete(this.ctx.user?.userId, id);
     return this.ok();
   }
 }

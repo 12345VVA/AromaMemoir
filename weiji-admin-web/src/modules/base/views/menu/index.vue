@@ -88,7 +88,7 @@ defineOptions({
 import { useCrud, useTable, useUpsert } from '@cool-vue/crud';
 import { useCool } from '/@/cool';
 import { useStore } from '/$/base/store';
-import { reactive } from 'vue';
+import { reactive, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Plugins } from '/#/crud';
 import MenuImp from './components/imp.vue';
@@ -126,7 +126,7 @@ const Table = useTable({
 		row => {
 			return {
 				label: t('新增'),
-				hidden: !(row.type != 2 && service.base.sys.user._permission.add),
+				hidden: !(row.type != 2 && service.base.sys.menu._permission.add),
 				callback(done) {
 					append(row);
 					done();
@@ -138,7 +138,7 @@ const Table = useTable({
 		row => {
 			return {
 				label: t('权限'),
-				hidden: !(row.type != 2 && service.base.sys.user._permission.add),
+				hidden: !(row.type != 2 && service.base.sys.menu._permission.add),
 				callback(done) {
 					addPermission(row);
 					done();
@@ -401,4 +401,5 @@ function addPermission({ id }: Eps.BaseSysMenuEntity) {
 }
 
 mitt.on('helper.createMenu', refresh);
+onUnmounted(() => mitt.off('helper.createMenu', refresh));
 </script>

@@ -117,10 +117,13 @@ async function handleSubmit() {
 	loading.value = true;
 	try {
 		if (isRegister.value) {
-			// api.register(username, password, nickName) —— api.ts 已自动写入 cool user store
+			// api.register 返回 { token, user } 并自动写入 cool user store，注册即登录
 			await api.register(form.username.trim(), form.password, form.nickName.trim());
-			uni.showToast({ title: t("注册成功，请登录"), icon: "success" });
-			isRegister.value = false;
+			uni.showToast({ title: t("注册成功"), icon: "success" });
+			setTimeout(() => {
+				uni.switchTab({ url: "/pages/index/home" });
+			}, 400);
+			return;
 		} else {
 			// api.login 成功后由 api.ts 内部 syncUserStore 写入 token + user
 			await api.login(form.username.trim(), form.password);

@@ -6,7 +6,7 @@ import { Column, Index, Entity } from 'typeorm';
  */
 @Entity('weiji_family')
 export class FamilyEntity extends BaseEntity {
-  @Column({ comment: '家庭组名称' })
+  @Column({ comment: '家庭组名称', default: '未命名家庭' })
   name: string;
 
   @Index()
@@ -21,4 +21,7 @@ export class FamilyEntity extends BaseEntity {
 
   @Column({ comment: '描述', nullable: true })
   description: string;
+
+  @Column({ comment: '乐观锁版本号', default: 1 })
+  version: number;
 }

@@ -37,13 +37,24 @@ async def _get_access_token() -> str:
         'client_id': settings.BAIDU_API_KEY,
         'client_secret': settings.BAIDU_SECRET_KEY,
     }
-    resp = await httpx.AsyncClient().post(url, params=params)
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(url, params=params)
+        resp.raise_for_status()
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.HTTPError) as e:
+        raise AiProviderError('baidu', f'OAuth 失败: {e}')
+
     if resp.status_code != 200:
         raise AiProviderError('baidu', f'获取 access_token 失败: {resp.status_code}')
 
-    data = resp.json()
+    try:
+        data = resp.json()
+    except Exception as e:
+        raise AiProviderError('baidu', f'OAuth 响应解析失败: {e}')
     token = data.get('access_token')
     expires_in = data.get('expires_in', 0)
+    if not token:
+        raise AiProviderError('baidu', 'OAuth 响应未返回 access_token')
     _token_cache['token'] = token
     # 提前 5 分钟刷新，避免临界过期
     _token_cache['expires_at'] = time.time() + expires_in - 300

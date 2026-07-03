@@ -1,10 +1,12 @@
 import { BaseService, CoolCommException } from '@cool-midway/core';
-import { Inject, Provide } from '@midwayjs/core';
+import { Inject, Provide, InjectClient } from '@midwayjs/core';
 import { InjectEntityModel } from '@midwayjs/typeorm';
-import * as md5 from 'md5';
+import * as bcrypt from 'bcryptjs';
+import { CachingFactory, MidwayCache } from '@midwayjs/cache-manager';
 import { Equal, Repository } from 'typeorm';
 import { v1 as uuid } from 'uuid';
 import { PluginService } from '../../plugin/service/info';
+import { FamilyService } from '../../family/service/family';
 import { UserInfoEntity } from '../entity/info';
 import { UserSmsService } from './sms';
 import { UserWxService } from './wx';
@@ -26,6 +28,12 @@ export class UserInfoService extends BaseService {
   @Inject()
   userWxService: UserWxService;
 
+  @Inject()
+  familyService: FamilyService;
+
+  @InjectClient(CachingFactory, 'default')
+  midwayCache: MidwayCache;
+
   /**
    * 绑定小程序手机号
    * @param userId
@@ -45,16 +53,28 @@ export class UserInfoService extends BaseService {
    * @returns
    */
   async person(id) {
+    if (!id) {
+      throw new CoolCommException('用户ID不能为空', 400);
+    }
     const info = await this.userInfoEntity.findOneBy({ id: Equal(id) });
+    if (!info) {
+      throw new CoolCommException('用户不存在', 404);
+    }
     delete info.password;
     return info;
   }
 
   /**
    * 注销
+   * 递增 passwordV 使现有 token 立即失效，软删除（status=2 已注销）
    * @param userId
    */
   async logoff(userId: number) {
+    const user = await this.userInfoEntity.findOneBy({ id: userId });
+    if (!user) {
+      throw new CoolCommException('用户不存在', 404);
+    }
+    const newPasswordV = (user.passwordV || 1) + 1;
     await this.userInfoEntity.update(
       { id: userId },
       {
@@ -63,8 +83,17 @@ export class UserInfoService extends BaseService {
         unionid: null,
         nickName: `已注销-00${userId}`,
         avatarUrl: null,
+        passwordV: newPasswordV,
       }
     );
+    // 清除密码版本缓存，使现有 token 立即失效
+    await this.midwayCache.del(`app:passwordVersion:${userId}`);
+    // 清理用户在所有家庭组的成员关系（失败不阻塞注销，仅记录日志）
+    try {
+      await this.familyService.handleUserLogoff(userId);
+    } catch (err) {
+      console.error('handleUserLogoff failed:', err);
+    }
   }
 
   /**
@@ -95,17 +124,27 @@ export class UserInfoService extends BaseService {
 
   /**
    * 更新密码
+   * 改用 bcrypt 哈希，递增 passwordV 使旧 token 失效
    * @param userId
    * @param password
    * @param 验证码
    */
   async updatePassword(userId, password, code) {
     const user = await this.userInfoEntity.findOneBy({ id: userId });
+    if (!user) {
+      throw new CoolCommException('用户不存在', 404);
+    }
     const check = await this.userSmsService.checkCode(user.phone, code);
     if (!check) {
       throw new CoolCommException('验证码错误');
     }
-    await this.userInfoEntity.update(user.id, { password: md5(password) });
+    const hash = await bcrypt.hash(password, 10);
+    const newPasswordV = (user.passwordV || 1) + 1;
+    await this.userInfoEntity.update(user.id, {
+      password: hash,
+      passwordV: newPasswordV,
+    });
+    await this.midwayCache.set(`app:passwordVersion:${user.id}`, newPasswordV);
   }
 
   /**

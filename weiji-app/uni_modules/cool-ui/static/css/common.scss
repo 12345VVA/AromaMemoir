@@ -1,3 +1,4 @@
+@use "../../theme.scss" as *;
 :export {
 	primaryColor: $cl-color-primary;
 	successColor: $cl-color-success;

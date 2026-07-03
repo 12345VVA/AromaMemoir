@@ -2,18 +2,25 @@
 味记 AI 服务 - 腾讯云图片内容审核
 
 调用腾讯云内容安全 ImageModeration 接口审核图片合规性。
-容错优先：key 缺失或任何接口异常均视为合规（返回 True），仅当接口明确返回 Block 时返回 False。
-不阻塞主流程是 spec 的核心要求。
+容错与安全平衡：
+- key 缺失或网络瞬时异常 → 降级视为合规（返回 True），不阻塞主流程
+- 鉴权失败（密钥/签名问题）→ 记录 error 并返回 False，避免静默放行
+- 仅当接口明确返回 Suggestion=Pass/Review 时视为合规，Block 时拒绝
 """
 import base64
 import hashlib
 import hmac
 import json
+import logging
+import os
 import time
 import datetime
 import httpx
 from config import settings
+from exceptions import AiAuthError
 
+
+logger = logging.getLogger(__name__)
 
 # 腾讯云内容安全 ImageModeration 接口配置
 _TENCENT_MODERATION_HOST = "ims.tencentcloudapi.com"
@@ -22,6 +29,15 @@ _TENCENT_SERVICE = "ims"
 _TENCENT_ACTION = "ImageModeration"
 _TENCENT_VERSION = "2020-12-29"
 _TENCENT_REGION = ""  # 全局服务，留空
+
+# BizType 从环境变量读取；缺失或为 'default' 时记录 WARNING（'default' 通常非有效策略 ID）
+_BIZ_TYPE = os.getenv('TENCENT_MODERATION_BIZ_TYPE', 'default')
+if _BIZ_TYPE == 'default':
+    logger.warning(
+        "[AI 配置] TENCENT_MODERATION_BIZ_TYPE 未配置或为 'default'，"
+        "请在腾讯云内容安全控制台创建审核策略后将其 BizType 写入环境变量。"
+        "使用 'default' 可能导致审核接口调用失败。"
+    )
 
 
 def _build_signed_headers(payload: dict) -> dict:
@@ -34,7 +50,7 @@ def _build_signed_headers(payload: dict) -> dict:
     secret_id = settings.TENCENT_SECRET_ID
     secret_key = settings.TENCENT_SECRET_KEY
     if not secret_id or not secret_key:
-        raise ValueError("tencent secret id/key missing")
+        raise AiAuthError('tencent', 'TENCENT_SECRET_ID/SECRET_KEY 缺失')
 
     host = _TENCENT_MODERATION_HOST
     service = _TENCENT_SERVICE
@@ -117,41 +133,85 @@ async def check_image(image_bytes: bytes) -> bool:
     审核图片内容合规性。
 
     返回值：
-        True  = 合规（或审核不可用时降级视为合规，不阻塞主流程）
-        False = 违规（接口明确返回 Block）
+        True  = 合规（Suggestion=Pass/Review；或审核不可用/网络异常时降级视为合规）
+        False = 违规（Suggestion=Block；或鉴权失败时拒绝，避免静默放行）
 
-    容错优先原则：
-        - key 缺失（not settings.tencent_ready）→ 直接返回 True
-        - 任何接口异常 → 返回 True（避免误伤用户）
-        - 只有接口明确返回 Block 时才返回 False
-        - Pass / Review / 字段缺失 / 异常 → True
+    容错与安全平衡：
+        - key 缺失（not settings.tencent_ready）→ 直接返回 True（不阻塞主流程）
+        - 鉴权异常（AiAuthError / API 返回 AuthFailure.*）→ 记录 error，返回 False
+        - 网络瞬时异常（ConnectError/Timeout/NetworkError）→ 重试一次，仍失败返回 True
+        - 其他异常 / Suggestion 字段缺失或未知 → 记录 warning，返回 True（容错优先）
+        - 仅 Suggestion=Pass/Review 视为明确合规
     """
     if not settings.tencent_ready:
         return True
 
+    file_content = base64.b64encode(image_bytes).decode("utf-8")
+    payload = {
+        "BizType": _BIZ_TYPE,
+        "FileUrl": None,
+        "FileContent": file_content,
+    }
+
     try:
-        file_content = base64.b64encode(image_bytes).decode("utf-8")
-        payload = {
-            "BizType": "default",
-            "FileUrl": None,
-            "FileContent": file_content,
-        }
         headers = _build_signed_headers(payload)
-        # body 序列化方式与签名时一致（json.dumps 默认行为）
-        body = json.dumps(payload)
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(
-                _TENCENT_MODERATION_ENDPOINT,
-                content=body,
-                headers=headers,
+    except AiAuthError as e:
+        logger.error("tencent moderation auth error: %s", e)
+        return False
+
+    # body 序列化方式与签名时一致（json.dumps 默认行为）
+    body = json.dumps(payload)
+
+    data = None
+    for attempt in range(2):
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(
+                    _TENCENT_MODERATION_ENDPOINT,
+                    content=body,
+                    headers=headers,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+            break
+        except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as e:
+            if attempt == 0:
+                logger.warning("tencent moderation network error, retrying: %s", e)
+                continue
+            logger.warning(
+                "tencent moderation network error after retry, fail-open: %s", e
             )
-            resp.raise_for_status()
-            data = resp.json()
-        suggestion = (data.get("Response") or {}).get("Suggestion")
-        if suggestion == "Block":
+            return True
+        except Exception as e:
+            logger.warning("tencent moderation request error, fail-open: %s", e)
+            return True
+
+    if data is None:
+        return True
+
+    response_data = data.get("Response") or {}
+    error_info = response_data.get("Error")
+    if error_info:
+        error_code = error_info.get("Code", "")
+        error_message = error_info.get("Message", "")
+        if error_code.startswith("AuthFailure"):
+            logger.error(
+                "tencent moderation auth failure: code=%s message=%s",
+                error_code, error_message,
+            )
             return False
-        # Pass / Review / 字段缺失 → 视为合规
+        logger.warning(
+            "tencent moderation API error: code=%s message=%s, fail-open",
+            error_code, error_message,
+        )
         return True
-    except Exception:
-        # 任何异常（网络、鉴权、解析等）均视为合规，不阻塞主流程
+
+    suggestion = response_data.get("Suggestion")
+    if suggestion == "Block":
+        return False
+    if suggestion in ("Pass", "Review"):
         return True
+    logger.warning(
+        "tencent moderation unknown Suggestion: %s, fail-open", suggestion
+    )
+    return True

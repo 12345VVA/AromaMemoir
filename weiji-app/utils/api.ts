@@ -53,19 +53,39 @@ function clearAuthStorage(): void {
 	}
 }
 
-/** 401 未授权处理：清除 token 并跳转登录页 */
-function handleUnauthorized(): void {
-	clearAuthStorage();
-	// 避免在登录页重复跳转
+/**
+ * 401 未授权共享处理：清空鉴权存储 + 跳转登录页。
+ * 委托 cool-uni user store 的 logout（统一清理 token/refreshToken/userInfo 及其 deadtime
+ * 过期标记 + 重置内存态 token.value/info.value + reLaunch 登录页），与 cool/service/request.ts
+ * 走同一套逻辑，消除原先 api.ts 与 cool request 的认证清理双轨制。
+ *
+ * @param message 可选提示信息（保留签名以兼容调用方；toast 由调用方按 showError 控制，不在此自动弹出）
+ */
+export function handleUnauthorized(message?: string): void {
+	// 避免在登录页重复 reLaunch：仅清理存储与内存态，不跳转
 	try {
 		const pages = getCurrentPages();
 		const current = pages.length ? pages[pages.length - 1] : null;
 		const route = current ? `/${(current as any).route || ""}` : "";
-		if (route === LOGIN_PAGE) return;
+		if (route === LOGIN_PAGE) {
+			try {
+				useUserStore().clear();
+			} catch {
+				clearAuthStorage();
+			}
+			return;
+		}
 	} catch {
 		// ignore
 	}
-	uni.reLaunch({ url: LOGIN_PAGE });
+	// 委托 cool user store 统一清理 + 跳转登录页（single source of truth）
+	try {
+		useUserStore().logout();
+	} catch {
+		// store 未初始化兜底：直接清存储 + reLaunch
+		clearAuthStorage();
+		uni.reLaunch({ url: LOGIN_PAGE });
+	}
 }
 
 /** 展示错误提示 */
@@ -125,7 +145,7 @@ function request<T = any>(options: RequestOptions): Promise<T> {
 			method,
 			data,
 			header,
-			timeout: 30000,
+			timeout: 15000,
 			success: (res) => {
 				const statusCode = (res as any).statusCode || 200;
 				const body = res.data as ApiResult<T> | undefined;
@@ -133,7 +153,7 @@ function request<T = any>(options: RequestOptions): Promise<T> {
 				// 401 未授权
 				if (statusCode === 401) {
 					if (redirectOn401) handleUnauthorized();
-					const msg = "登录已过期，请重新登录";
+					const msg = "登录已失效，请重新登录";
 					if (showErr) showError(msg);
 					reject(new Error(msg));
 					return;
@@ -148,16 +168,23 @@ function request<T = any>(options: RequestOptions): Promise<T> {
 				}
 
 				// 统一响应体 { code, data, message }，code === 1000 成功
-				if (body && typeof body === "object" && "code" in body) {
-					if (body.code === 1000) {
-						resolve(body.data as T);
-						return;
-					}
-					const msg = body.message || "请求失败";
-					if (showErr) showError(msg);
-					reject(new Error(msg));
+			if (body && typeof body === "object" && "code" in body) {
+				if (body.code === 1000) {
+					resolve(body.data as T);
 					return;
 				}
+				// code === 1001 为未授权（token 无效/过期）
+				if (body.code === 1001) {
+					if (redirectOn401) handleUnauthorized();
+					if (showErr) showError(body.message || "登录已失效，请重新登录");
+					reject(new Error(body.message || "登录已失效"));
+					return;
+				}
+				const msg = body.message || "请求失败";
+				if (showErr) showError(msg);
+				reject(new Error(msg));
+				return;
+			}
 
 				// 兜底：直接返回 data
 				resolve(body as unknown as T);
@@ -212,7 +239,7 @@ function upload<T = any>(options: UploadOptions): Promise<T> {
 				const statusCode = res.statusCode || 200;
 				if (statusCode === 401) {
 					if (redirectOn401) handleUnauthorized();
-					const msg = "登录已过期，请重新登录";
+					const msg = "登录已失效，请重新登录";
 					if (showErr) showError(msg);
 					reject(new Error(msg));
 					return;
@@ -241,10 +268,10 @@ function upload<T = any>(options: UploadOptions): Promise<T> {
 				reject(new Error(msg));
 			},
 			fail: (err) => {
-				const msg = err.errMsg || "上传失败";
-				if (showErr) showError(msg);
-				reject(new Error(msg));
-			},
+			const msg = err.errMsg || "网络异常，请稍后重试";
+			if (showErr) showError(msg);
+			reject(new Error(msg));
+		},
 		});
 	});
 }
@@ -346,6 +373,16 @@ export const api = {
 		return request<any>({ url: "/app/user/profile", method: "PATCH", data });
 	},
 
+	// 上传文件到服务器（multipart/form-data），返回持久化后的 URL
+	// filePath 为 uni.chooseImage / @chooseavatar 返回的临时路径
+	uploadFile(filePath: string, name?: string) {
+		return upload<string>({
+			url: "/app/base/comm/upload",
+			filePath,
+			name: name || "file",
+		});
+	},
+
 	// ===== record 个人美食记录（list/save/:id/delete） =====
 	getRecords(params?: Record<string, any>) {
 		return request<any>({ url: "/app/record/list", method: "GET", params });
@@ -375,6 +412,22 @@ export const api = {
 
 	joinFamily(code: string) {
 		return request<any>({ url: "/app/family/join", method: "POST", data: { code } });
+	},
+
+	leaveFamily() {
+		return request<any>({ url: "/app/family/leave", method: "POST" });
+	},
+
+	disbandFamily() {
+		return request<any>({ url: "/app/family/disband", method: "POST" });
+	},
+
+	transferOwnership(targetMemberId: number) {
+		return request<any>({
+			url: "/app/family/transfer",
+			method: "POST",
+			data: { targetMemberId },
+		});
 	},
 
 	// ===== family/member 成员（单数 + /list） =====
@@ -494,9 +547,17 @@ export const api = {
 		return request<any>({ url: "/app/achievement/level", method: "GET" });
 	},
 
-	// ===== challenge 挑战（server 仅提供列表查询，无 join 端点） =====
+	// ===== challenge 挑战 =====
 	getChallenges() {
 		return request<any>({ url: "/app/challenge/list", method: "GET" });
+	},
+
+	joinChallenge(id: number) {
+		return request<any>({ url: `/app/challenge/${id}/join`, method: "POST" });
+	},
+
+	getChallengeProgress() {
+		return request<any[]>({ url: "/app/challenge/progress", method: "GET" });
 	},
 
 	// ===== checkin 打卡 =====
@@ -590,6 +651,9 @@ export const api = {
 	},
 
 	// ===== ai（文件走 multipart；voice 字段名为 audio，其余为 image） =====
+	// 【架构约定】所有 AI 请求必须经由后端 /app/ai/* 代理转发至 weiji-ai 服务，
+	// 前端不得直接请求 weiji-ai 服务地址或任何第三方 AI API（如百度/腾讯/讯飞/通义千问）。
+	// AI 服务的 Key 配置、降级策略、健康检查均由后端统一管理。
 	recognizeFood(filePath: string) {
 		return upload<any>({ url: "/app/ai/recognize", filePath, name: "image" });
 	},

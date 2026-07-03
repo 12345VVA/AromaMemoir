@@ -63,9 +63,10 @@ export class TaskInfoService extends BaseService {
    * @param id
    */
   async stop(id) {
-    this.type === 'bull'
-      ? await this.taskBullService.stop(id)
-      : await this.taskLocalService.stop(id);
+    if (this.type === 'bull') {
+      return await this.taskBullService.stop(id);
+    }
+    return await this.taskLocalService.stop(id);
   }
 
   /**
@@ -74,45 +75,50 @@ export class TaskInfoService extends BaseService {
    * @param type
    */
   async start(id, type?) {
-    this.type === 'bull'
-      ? await this.taskBullService.start(id)
-      : await this.taskLocalService.start(id, type);
+    if (this.type === 'bull') {
+      return await this.taskBullService.start(id);
+    }
+    return await this.taskLocalService.start(id, type);
   }
   /**
    * 手动执行一次
    * @param id
    */
   async once(id) {
-    this.type === 'bull'
-      ? this.taskBullService.once(id)
-      : this.taskLocalService.once(id);
+    if (this.type === 'bull') {
+      return await this.taskBullService.once(id);
+    }
+    return await this.taskLocalService.once(id);
   }
   /**
    * 检查任务是否存在
    * @param jobId
    */
   async exist(jobId) {
-    this.type === 'bull'
-      ? this.taskBullService.exist(jobId)
-      : this.taskLocalService.exist(jobId);
+    if (this.type === 'bull') {
+      return await this.taskBullService.exist(jobId);
+    }
+    return await this.taskLocalService.exist(jobId);
   }
   /**
    * 新增或修改
    * @param params
    */
   async addOrUpdate(params) {
-    this.type === 'bull'
-      ? this.taskBullService.addOrUpdate(params)
-      : this.taskLocalService.addOrUpdate(params);
+    if (this.type === 'bull') {
+      return await this.taskBullService.addOrUpdate(params);
+    }
+    return await this.taskLocalService.addOrUpdate(params);
   }
   /**
    * 删除
    * @param ids
    */
   async delete(ids) {
-    this.type === 'bull'
-      ? this.taskBullService.delete(ids)
-      : this.taskLocalService.delete(ids);
+    if (this.type === 'bull') {
+      return await this.taskBullService.delete(ids);
+    }
+    return await this.taskLocalService.delete(ids);
   }
   /**
    * 任务日志
@@ -135,9 +141,10 @@ export class TaskInfoService extends BaseService {
    * 初始化任务
    */
   async initTask() {
-    this.type === 'bull'
-      ? this.taskBullService.initTask()
-      : this.taskLocalService.initTask();
+    if (this.type === 'bull') {
+      return await this.taskBullService.initTask();
+    }
+    return await this.taskLocalService.initTask();
   }
 
   /**
@@ -146,8 +153,9 @@ export class TaskInfoService extends BaseService {
    * @returns
    */
   async info(id: any): Promise<any> {
-    this.type === 'bull'
-      ? this.taskBullService.info(id)
-      : this.taskLocalService.info(id);
+    if (this.type === 'bull') {
+      return await this.taskBullService.info(id);
+    }
+    return await this.taskLocalService.info(id);
   }
 }

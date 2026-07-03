@@ -83,14 +83,17 @@ export function createModule(app: App) {
 			e.install?.(app, e.options);
 
 			// 注册组件
-			e.components?.forEach(async (c: any) => {
-				const v = await (isFunction(c) ? c() : c);
-				const n = v.default || v;
+			e.components &&
+				(async () => {
+					for (const c of e.components) {
+						const v = await (isFunction(c) ? c() : c);
+						const n = v.default || v;
 
-				if (n.name) {
-					app.component(n.name, n);
-				}
-			});
+						if (n.name) {
+							app.component(n.name, n);
+						}
+					}
+				})();
 
 			// 注册指令
 			e.directives?.forEach(v => {
@@ -118,7 +121,11 @@ export function createModule(app: App) {
 
 			for (let i = 0; i < list.length; i++) {
 				if (list[i].onLoad) {
-					assign(events, await list[i]?.onLoad?.(events));
+					try {
+						assign(events, await list[i]?.onLoad?.(events));
+					} catch (e) {
+						console.error('Module onLoad failed:', e);
+					}
 				}
 			}
 		}

@@ -64,7 +64,7 @@
 			<view class="section-title">美食日记</view>
 			<view v-if="recordsLoading" class="empty-tip">加载中...</view>
 			<view v-else-if="records.length" class="record-list">
-				<view v-for="item in records" :key="item.id" class="wj-card record-card" @click="goAiRecord">
+				<view v-for="item in records" :key="item.id" class="wj-card record-card" @click="goDetail(item.id)">
 					<view class="record-header">
 						<text class="record-name">{{ item.dishName || item.title || "未命名" }}</text>
 						<text class="record-time">{{ formatTime(item.createdAt || item.time) }}</text>
@@ -103,7 +103,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, reactive, onMounted } from "vue";
+import { ref, reactive, onMounted, onUnmounted } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "/@/utils/api";
 import Tabbar from "./components/tabbar.vue";
@@ -158,17 +158,32 @@ async function handleCheckin() {
 	}
 }
 
-// 加载推荐
+// 加载推荐（基于最近一条记录的菜名，无记录则跳过）
 async function loadRecommendations() {
+	const lastDish = records.value[0]?.dishName;
+	if (!lastDish) {
+		recommendations.value = [];
+		return;
+	}
 	try {
-		const data: any = await api.getRecommendations("");
+		const data: any = await api.getRecommendations(lastDish);
 		recommendations.value = Array.isArray(data) ? data : data?.list || [];
 	} catch {
 		recommendations.value = [];
 	}
 }
 
+// 刷新美食记录与推荐（onShow + recordSaved 事件双保险）
+async function refreshRecords() {
+	await loadRecords();
+	loadRecommendations();
+}
+
 // 跳转 AI 记录页（子包页面）
+function goDetail(id: number) {
+	uni.navigateTo({ url: `/pages/record/detail?id=${id}` });
+}
+
 function goAiRecord() {
 	uni.navigateTo({ url: "/pages/record/ai-record" });
 }
@@ -195,15 +210,23 @@ function formatTime(t: string) {
 	return String(t).replace("T", " ").slice(0, 16);
 }
 
-onMounted(() => {
-	loadRecords();
+onMounted(async () => {
+	await loadRecords();
 	loadCheckin();
 	loadRecommendations();
+	// 监听 recordSaved 事件：记录保存后自动刷新（双保险）
+	uni.$on("recordSaved", refreshRecords);
 });
 
-// tabBar 页每次显示时刷新打卡状态
+// tabBar 页每次显示时刷新打卡状态 + 美食记录
 onShow(() => {
 	loadCheckin();
+	refreshRecords();
+});
+
+onUnmounted(() => {
+	// 避免内存泄漏：组件卸载时移除事件监听
+	uni.$off("recordSaved", refreshRecords);
 });
 </script>
 

@@ -214,20 +214,69 @@
 				<view class="section-title">发起新轮次</view>
 				<view class="wj-card create-form">
 					<view class="form-item">
-						<text class="form-label">家庭组 ID</text>
-						<input class="form-input" v-model="createForm.familyId" placeholder="familyId" placeholder-class="ph" />
+						<text class="form-label">家庭组</text>
+						<view v-if="createForm.familyId" class="form-input readonly">
+							{{ familyInfo.name || `家庭组 #${createForm.familyId}` }}
+						</view>
+						<view v-else class="form-tip empty-family">
+							<text>请先加入或创建家庭</text>
+							<button class="wj-btn wj-btn-ghost go-create-btn" @click="goCreateFamily">去创建</button>
+						</view>
 					</view>
 					<view class="form-item">
 						<text class="form-label">轮次名称</text>
 						<input class="form-input" v-model="createForm.roundName" placeholder="如：周末盲猜" placeholder-class="ph" />
 					</view>
 					<view class="form-item">
-						<text class="form-label">记录 ID（3-10 个，逗号分隔）</text>
-						<input class="form-input" v-model="createForm.recordIdsStr" placeholder="1,2,3" placeholder-class="ph" />
+						<text class="form-label">参与记录（3-10 条）</text>
+						<button class="wj-btn wj-btn-ghost pick-btn" @click="openRecordPicker">
+							{{
+								createForm.recordIds.length
+									? `已选 ${createForm.recordIds.length} 条，点击修改`
+									: "选择记录"
+							}}
+						</button>
 					</view>
 					<button class="wj-btn create-btn" :disabled="creating" :loading="creating" @click="handleCreate">
 						发起轮次
 					</button>
+				</view>
+
+				<!-- 记录选择器弹窗 -->
+				<view v-if="recordPickerVisible" class="modal-mask" @click="recordPickerVisible = false">
+					<view class="record-picker" @click.stop>
+						<view class="picker-header">
+							<text class="picker-title">选择记录</text>
+							<text class="picker-close" @click="recordPickerVisible = false">×</text>
+						</view>
+						<scroll-view scroll-y class="picker-list">
+							<view v-if="recordPickerLoading" class="picker-empty">加载中...</view>
+							<view v-else-if="familyRecords.length">
+								<view
+									v-for="r in familyRecords"
+									:key="r.id"
+									class="picker-item"
+									:class="{ selected: isSelected(r.id) }"
+									@click="toggleRecord(r.id)"
+								>
+									<view class="picker-checkbox">
+										<text v-if="isSelected(r.id)" class="check-mark">✓</text>
+									</view>
+									<view class="picker-info">
+										<text class="picker-dish">{{ r.dishName || "未知菜品" }}</text>
+										<text class="picker-author">
+											{{ r.userNickname || "未知" }}{{ r.recordDate ? " · " + r.recordDate : "" }}
+										</text>
+									</view>
+								</view>
+							</view>
+							<view v-else class="picker-empty">暂无家庭动态记录</view>
+						</scroll-view>
+						<view class="picker-footer">
+							<text class="picker-count">已选 {{ createForm.recordIds.length }} / 10 条</text>
+							<button class="wj-btn picker-confirm" @click="confirmRecords">确认</button>
+						</view>
+					</view>
 				</view>
 			</view>
 		</view>
@@ -265,10 +314,16 @@ const guessForms = reactive<Record<string, { dish: string; authorId: string }>>(
 const guessLoading = ref<any>("");
 const roundRanking = ref<any[]>([]);
 const revealing = ref(false);
+// 家庭组信息（用于自动填充 familyId 与展示名称）
+const familyInfo = ref<any>({});
+// 记录选择器
+const recordPickerVisible = ref(false);
+const familyRecords = ref<any[]>([]);
+const recordPickerLoading = ref(false);
 const createForm = reactive({
-	familyId: "",
+	familyId: "" as string | number,
 	roundName: "",
-	recordIdsStr: "",
+	recordIds: [] as number[],
 });
 const creating = ref(false);
 
@@ -325,12 +380,88 @@ async function loadTab() {
 	}
 }
 
+// 自动获取当前家庭组信息，填充 familyId
+async function loadFamilyInfo() {
+	try {
+		const data: any = await api.getFamilyInfo();
+		familyInfo.value = data || {};
+		if (data && (data.id || data.familyId)) {
+			createForm.familyId = data.id || data.familyId;
+		}
+	} catch {
+		// api.ts 已统一 toast
+	}
+}
+
+// 主动拉取用户资料，确保 user.info 可用（gamification 依赖 userId 等字段）
+async function loadUserProfile() {
+	try {
+		const data: any = await api.getUserProfile();
+		if (data) {
+			user.set(data);
+		}
+	} catch (e) {
+		console.warn("[gamification] getUserProfile failed:", e);
+	}
+}
+
+// 跳转到家庭组页面创建/加入家庭
+function goCreateFamily() {
+	uni.navigateTo({ url: "/pages/family/index" });
+}
+
+function isSelected(id: number | string) {
+	return createForm.recordIds.includes(Number(id));
+}
+
+async function openRecordPicker() {
+	if (!createForm.familyId) {
+		uni.showToast({ title: "请先创建或加入家庭组", icon: "none" });
+		return;
+	}
+	recordPickerVisible.value = true;
+	recordPickerLoading.value = true;
+	try {
+		const data: any = await api.getFamilyFeed({ pageSize: 50 });
+		const list = Array.isArray(data) ? data : data?.list || [];
+		familyRecords.value = list;
+	} catch {
+		familyRecords.value = [];
+	} finally {
+		recordPickerLoading.value = false;
+	}
+}
+
+function toggleRecord(id: number | string) {
+	const numId = Number(id);
+	const idx = createForm.recordIds.indexOf(numId);
+	if (idx >= 0) {
+		createForm.recordIds.splice(idx, 1);
+	} else {
+		if (createForm.recordIds.length >= 10) {
+			uni.showToast({ title: "最多选择 10 条", icon: "none" });
+			return;
+		}
+		createForm.recordIds.push(numId);
+	}
+}
+
+function confirmRecords() {
+	if (createForm.recordIds.length < 3) {
+		uni.showToast({ title: "至少选择 3 条", icon: "none" });
+		return;
+	}
+	recordPickerVisible.value = false;
+}
+
 async function loadRound() {
 	const id = roundIdInput.value.trim();
 	if (!id) {
 		uni.showToast({ title: "请输入轮次 ID", icon: "none" });
 		return;
 	}
+	// 切换轮次前清空旧的猜测表单，避免上一轮残留数据污染本轮
+	Object.keys(guessForms).forEach((k) => delete guessForms[k]);
 	roundLoading.value = true;
 	try {
 		const data: any = await api.getBlindGuessRoundDetail(id);
@@ -404,26 +535,25 @@ async function handleReveal() {
 }
 
 async function handleCreate() {
-	const familyId = createForm.familyId.trim();
-	const roundName = createForm.roundName.trim();
-	const recordIds = createForm.recordIdsStr
-		.split(/[,，\s]+/)
-		.map(s => s.trim())
-		.filter(Boolean);
-	if (!familyId || !roundName) {
-		uni.showToast({ title: "请填写家庭组 ID 与轮次名称", icon: "none" });
+	if (!createForm.familyId) {
+		uni.showToast({ title: "请先创建或加入家庭组", icon: "none" });
 		return;
 	}
-	if (recordIds.length < 3 || recordIds.length > 10) {
-		uni.showToast({ title: "记录 ID 需 3-10 个", icon: "none" });
+	const roundName = createForm.roundName.trim();
+	if (!roundName) {
+		uni.showToast({ title: "请填写轮次名称", icon: "none" });
+		return;
+	}
+	if (createForm.recordIds.length < 3 || createForm.recordIds.length > 10) {
+		uni.showToast({ title: "记录需 3-10 条", icon: "none" });
 		return;
 	}
 	creating.value = true;
 	try {
 		const data: any = await api.createBlindGuessRound({
-			familyId,
+			familyId: createForm.familyId,
 			roundName,
-			recordIds,
+			recordIds: createForm.recordIds,
 		});
 		uni.showToast({ title: "已发起轮次", icon: "success" });
 		// 跳转到新轮次详情
@@ -431,9 +561,8 @@ async function handleCreate() {
 			roundIdInput.value = String(data.id || data.roundId);
 			await loadRound();
 		}
-		createForm.familyId = "";
 		createForm.roundName = "";
-		createForm.recordIdsStr = "";
+		createForm.recordIds = [];
 	} catch {
 		// api.ts 已统一 toast
 	} finally {
@@ -443,6 +572,8 @@ async function handleCreate() {
 
 onMounted(() => {
 	loadTab();
+	loadFamilyInfo();
+	loadUserProfile();
 });
 
 onShow(() => {
@@ -820,6 +951,40 @@ onShow(() => {
 	background: #fff;
 	color: var(--wj-text);
 }
+.form-input.readonly {
+	display: flex;
+	align-items: center;
+	background: var(--wj-bg);
+	color: var(--wj-text);
+	border-color: transparent;
+	font-weight: 500;
+}
+.form-tip {
+	font-size: 26rpx;
+	color: var(--wj-text-muted);
+	padding: 12rpx 4rpx;
+}
+.form-tip.empty-family {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16rpx;
+}
+.go-create-btn {
+	flex-shrink: 0;
+	height: 64rpx;
+	line-height: 64rpx;
+	padding: 0 28rpx;
+	font-size: 26rpx;
+	border-radius: 12rpx;
+}
+.pick-btn {
+	width: 100%;
+	height: 72rpx;
+	line-height: 72rpx;
+	font-size: 28rpx;
+	border-radius: 12rpx;
+}
 .ph {
 	color: var(--wj-text-muted);
 }
@@ -830,6 +995,119 @@ onShow(() => {
 	font-size: 28rpx;
 	border-radius: 12rpx;
 	margin-top: 8rpx;
+}
+
+/* 记录选择器弹窗 */
+.modal-mask {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.5);
+	z-index: 999;
+	display: flex;
+	align-items: flex-end;
+}
+.record-picker {
+	width: 100%;
+	background: #fff;
+	border-radius: 24rpx 24rpx 0 0;
+	max-height: 80vh;
+	display: flex;
+	flex-direction: column;
+}
+.picker-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 24rpx 28rpx;
+	border-bottom: 1rpx solid var(--wj-bg);
+}
+.picker-title {
+	font-size: 30rpx;
+	font-weight: 600;
+	color: var(--wj-text);
+}
+.picker-close {
+	font-size: 40rpx;
+	color: var(--wj-text-muted);
+	padding: 0 12rpx;
+	line-height: 1;
+}
+.picker-list {
+	max-height: 60vh;
+}
+.picker-item {
+	display: flex;
+	align-items: center;
+	gap: 20rpx;
+	padding: 24rpx 28rpx;
+	border-bottom: 1rpx solid var(--wj-bg);
+}
+.picker-item.selected {
+	background: rgba(255, 107, 53, 0.04);
+}
+.picker-checkbox {
+	width: 40rpx;
+	height: 40rpx;
+	border: 2rpx solid var(--wj-border);
+	border-radius: 8rpx;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	background: #fff;
+}
+.picker-item.selected .picker-checkbox {
+	background: var(--wj-primary);
+	border-color: var(--wj-primary);
+}
+.check-mark {
+	color: #fff;
+	font-size: 28rpx;
+	font-weight: 700;
+	line-height: 1;
+}
+.picker-info {
+	flex: 1;
+	min-width: 0;
+}
+.picker-dish {
+	display: block;
+	font-size: 28rpx;
+	color: var(--wj-text);
+	font-weight: 500;
+	margin-bottom: 4rpx;
+}
+.picker-author {
+	display: block;
+	font-size: 24rpx;
+	color: var(--wj-text-muted);
+}
+.picker-empty {
+	text-align: center;
+	color: var(--wj-text-muted);
+	font-size: 26rpx;
+	padding: 60rpx 0;
+}
+.picker-footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 20rpx 28rpx;
+	border-top: 1rpx solid var(--wj-bg);
+}
+.picker-count {
+	font-size: 26rpx;
+	color: var(--wj-text-muted);
+}
+.picker-confirm {
+	height: 72rpx;
+	line-height: 72rpx;
+	padding: 0 48rpx;
+	font-size: 28rpx;
+	border-radius: 12rpx;
 }
 
 .empty-tip {

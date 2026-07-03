@@ -17,15 +17,15 @@ const module = {
 	req: Promise.resolve(),
 
 	// 根据名称获取模块
-	get(name: string): Module {
+	get(name: string): Module | undefined {
 		// 使用 find 方法查找模块，假设模块名称是唯一的
-		return this.list.find(e => e.name == name)!;
+		return this.list.find(e => e.name == name);
 	},
 
 	// 获取模块的配置选项
 	config(name: string) {
 		// 如果模块存在，返回其配置选项，否则返回空对象
-		return this.get(name).options || {};
+		return this.get(name)?.options || {};
 	},
 
 	// 添加新模块到列表中

@@ -1,16 +1,14 @@
 <template>
-	<cl-page status-bar-background="transparent">
-		<!-- #ifdef MP -->
-		<cl-sticky>
-			<cl-topbar :show-back="false" :border="false" background-color="transparent" />
-		</cl-sticky>
-		<!-- #endif -->
-
+	<cl-page>
 		<view class="page-content">
+			<view class="page-header">
+				<text class="page-title">我的</text>
+			</view>
+
 			<!-- 用户信息卡片 -->
 			<view class="wj-card profile-card">
 				<view class="avatar-wrap" @click="toSet">
-					<image v-if="avatar" class="avatar-img" :src="avatar" mode="aspectFill" />
+					<image v-if="avatar" class="avatar-img" :src="resolveImg(avatar)" mode="aspectFill" />
 					<view v-else class="avatar-placeholder">{{ nickName.charAt(0) || "?" }}</view>
 					<view class="avatar-edit">📷</view>
 				</view>
@@ -79,7 +77,7 @@
 import { reactive, computed } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { useStore } from "/@/cool";
-import { api } from "/@/utils/api";
+import { api, resolveImg } from "/@/utils/api";
 import Tabbar from "./components/tabbar.vue";
 
 const { user } = useStore();
@@ -148,6 +146,21 @@ onShow(() => {
 </script>
 
 <style scoped>
+.page-content {
+	padding: 16rpx 28rpx 140rpx;
+}
+
+.page-header {
+	padding: 16rpx 4rpx 12rpx;
+}
+
+.page-title {
+	display: block;
+	font-size: 44rpx;
+	font-weight: 700;
+	color: var(--wj-text);
+}
+
 .profile-card {
 	display: flex;
 	align-items: center;

@@ -37,21 +37,17 @@
 					<button class="wj-btn create-family-btn" @click="handleCreateFamily">创建家庭</button>
 					<button class="wj-btn wj-btn-ghost join-family-btn" @click="handleJoinFamily">加入家庭</button>
 				</view>
-				<view class="family-danger-actions">
-					<button v-if="!isOwner" class="wj-btn wj-btn-ghost leave-btn" @click="handleLeaveFamily">退出家庭组</button>
-					<template v-else>
-						<button class="wj-btn wj-btn-ghost transfer-btn" @click="handleTransferOwner">转让家庭组</button>
-						<button class="wj-btn wj-btn-danger disband-btn" @click="handleDisbandFamily">解散家庭组</button>
-					</template>
-				</view>
 			</view>
 
 			<!-- 家庭成员横向列表 -->
 			<view v-if="hasFamily" class="section-title">家庭成员</view>
 			<scroll-view v-if="hasFamily" class="member-list no-scrollbar" scroll-x>
 				<view v-for="m in members" :key="m.userId || m.id" class="member-item">
-					<view class="member-avatar">{{ (m.nickname || m.username || "?").charAt(0) }}</view>
-					<text class="member-name">{{ m.nickname || m.username || "成员" }}</text>
+					<view class="member-avatar">
+						<image v-if="m.avatarUrl" :src="resolveImg(m.avatarUrl)" mode="aspectFill" class="avatar-img" />
+						<text v-else>{{ (m.nickName || m.nickname || m.username || "?").charAt(0) }}</text>
+					</view>
+					<text class="member-name">{{ m.nickName || m.nickname || m.username || "成员" }}</text>
 					<text class="member-role">{{ roleText(m.role) }}</text>
 					<button v-if="isTransferable(m)" class="wj-btn wj-btn-ghost member-transfer-btn" @click="handleTransferOwnership(m)">转让给TA</button>
 				</view>
@@ -78,7 +74,7 @@
 				<view v-else-if="recipes.length" class="recipe-grid">
 					<view v-for="r in recipes" :key="r.id" class="recipe-card" @click="goDetail(r.id)">
 						<view class="recipe-cover">
-							<image v-if="r.coverUrl" class="cover-img" :src="r.coverUrl" mode="aspectFill" />
+							<image v-if="r.coverUrl" class="cover-img" :src="resolveImg(r.coverUrl)" mode="aspectFill" />
 							<view v-else class="cover-placeholder">🍽️</view>
 						</view>
 						<view class="recipe-info">
@@ -115,7 +111,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { onShow } from "@dcloudio/uni-app";
-import { api } from "/@/utils/api";
+import { api, resolveImg } from "/@/utils/api";
 
 const familyInfo = ref<any>({});
 const members = ref<any[]>([]);
@@ -358,7 +354,7 @@ function handleTransferOwner() {
 		return;
 	}
 	const names = candidates
-		.map((m: any) => m.nickname || m.username || "成员")
+		.map((m: any) => m.nickName || m.nickname || m.username || "成员")
 		.join("、");
 	uni.showModal({
 		title: "转让家庭组",
@@ -370,7 +366,7 @@ function handleTransferOwner() {
 
 // 转让家庭组给指定成员（owner 专用）
 function handleTransferOwnership(m: any) {
-	const targetName = m.nickname || m.username || "该成员";
+	const targetName = m.nickName || m.nickname || m.username || "该成员";
 	uni.showModal({
 		title: "转让家庭组",
 		content: `确认将家庭组转让给"${targetName}"？转让后你将变为普通成员。`,
@@ -394,9 +390,11 @@ function handleTransferOwnership(m: any) {
 	});
 }
 
+const familyLoadedOnce = ref(false);
 onMounted(() => {
 	refreshAll();
 	uni.$on("familyChanged", refreshAll);
+	familyLoadedOnce.value = true;
 });
 
 onUnmounted(() => {
@@ -404,7 +402,7 @@ onUnmounted(() => {
 });
 
 onShow(() => {
-	refreshAll();
+	if (familyLoadedOnce.value) refreshAll();
 });
 </script>
 
@@ -518,6 +516,12 @@ onShow(() => {
 	font-size: 40rpx;
 	line-height: 96rpx;
 	margin: 0 auto 12rpx;
+	overflow: hidden;
+}
+.avatar-img {
+	width: 100%;
+	height: 100%;
+	display: block;
 }
 .member-name {
 	display: block;

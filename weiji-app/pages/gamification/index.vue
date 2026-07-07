@@ -87,7 +87,7 @@
 						<image
 							v-if="m.coverImage"
 							class="memory-cover"
-							:src="m.coverImage"
+							:src="resolveImg(m.coverImage)"
 							mode="aspectFill"
 						/>
 						<view v-else class="memory-cover placeholder">
@@ -137,7 +137,7 @@
 							<image
 								v-if="item.coverUrl"
 								class="round-thumb"
-								:src="item.coverUrl"
+								:src="resolveImg(item.coverUrl)"
 								mode="aspectFill"
 							/>
 							<view v-else class="round-thumb placeholder">
@@ -156,7 +156,7 @@
 								</text>
 
 								<!-- 进行中：提交猜测 -->
-								<view v-if="round.status === 'active'" class="guess-form">
+								<view v-if="round.status === 'active' && guessForms[item.recordId]" class="guess-form">
 									<input
 										class="guess-input"
 										v-model="guessForms[item.recordId].dish"
@@ -285,9 +285,9 @@
 
 <script setup lang="ts">
 import { ref, computed, reactive, onMounted } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { onShow, onLoad } from "@dcloudio/uni-app";
 import { useStore } from "/@/cool";
-import { api } from "/@/utils/api";
+import { api, resolveImg } from "/@/utils/api";
 
 const { user } = useStore();
 
@@ -329,7 +329,10 @@ const creating = ref(false);
 
 const pokedexCompletion = computed(() => {
 	const r = Number(pokedex.value.completionRate || 0);
-	return Math.round(r * 100);
+	// 后端返回 0~1（unlockedSlots/totalSlots），×100 转百分比；
+	// 若误返 0~100 则视为已转好；min/max 兜底到 0~100 防溢出
+	const pct = r > 1 ? r : Math.round(r * 100);
+	return Math.min(100, Math.max(0, pct));
 });
 
 const personalityEmoji = computed(() => {
@@ -570,14 +573,24 @@ async function handleCreate() {
 	}
 }
 
+const tabLoadedOnce = ref(false);
 onMounted(() => {
 	loadTab();
 	loadFamilyInfo();
 	loadUserProfile();
+	tabLoadedOnce.value = true;
+});
+
+onLoad((options: any) => {
+	const tab = options?.tab;
+	const validTabs = ["pokedex", "personality", "timemachine", "blindguess"] as const;
+	if (tab && validTabs.includes(tab)) {
+		activeTab.value = tab;
+	}
 });
 
 onShow(() => {
-	if (activeTab.value !== "blindguess") loadTab();
+	if (tabLoadedOnce.value && activeTab.value !== "blindguess") loadTab();
 });
 </script>
 

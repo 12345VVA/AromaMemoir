@@ -23,10 +23,8 @@
 <script lang="ts" setup>
 import { computed } from "vue";
 import { useCool } from "/@/cool";
-import { useI18n } from "vue-i18n";
 
 const { router } = useCool();
-const { t } = useI18n();
 
 // 当前页面路径
 const pagePath = router.path;
@@ -42,7 +40,7 @@ const list = computed(() => {
 			icon: "/" + (active ? e.selectedIconPath : e.iconPath),
 			active,
 			number: 0,
-			text: t((e.text || "")?.replace(/%/g, "")!),
+			text: (e.text || "")?.replace(/%/g, ""),
 		};
 	});
 });
@@ -128,7 +126,7 @@ $icon-size: 56rpx;
 
 		&.is-active {
 			.label {
-				color: $cl-color-primary;
+				color: var(--wj-primary);
 			}
 		}
 	}

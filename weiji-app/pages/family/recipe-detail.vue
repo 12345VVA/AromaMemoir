@@ -39,7 +39,10 @@
 				<view class="wj-card">
 					<view v-for="(step, idx) in steps" :key="idx" class="step-item">
 						<view class="step-num">{{ idx + 1 }}</view>
-						<text class="step-text">{{ typeof step === "string" ? step : step.text || step.description }}</text>
+						<view class="step-body">
+							<text class="step-text">{{ typeof step === "string" ? step : step.text || step.description }}</text>
+							<image v-if="step.imageUrl" class="step-img" :src="step.imageUrl" mode="aspectFill" />
+						</view>
 					</view>
 					<view v-if="!steps.length" class="empty-tip">暂无步骤信息</view>
 				</view>
@@ -293,11 +296,20 @@ onLoad((options: any) => {
 	margin-right: 20rpx;
 	flex-shrink: 0;
 }
-.step-text {
+.step-body {
 	flex: 1;
+}
+.step-text {
+	display: block;
 	font-size: 28rpx;
 	color: var(--wj-text);
 	line-height: 1.6;
+}
+.step-img {
+	width: 100%;
+	height: 320rpx;
+	margin-top: 16rpx;
+	border-radius: var(--wj-radius);
 }
 
 .action-row {

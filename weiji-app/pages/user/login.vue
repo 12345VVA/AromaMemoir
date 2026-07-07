@@ -24,31 +24,39 @@
 					</cl-form-item>
 
 					<cl-form-item :label="t('用户名')">
-						<cl-input
-							v-model="form.username"
-							:height="90"
-							:border-radius="16"
-							:placeholder="t('请输入用户名')"
-						/>
-					</cl-form-item>
+					<cl-input
+						v-model="form.username"
+						:height="90"
+						:border-radius="16"
+						:placeholder="t('请输入用户名')"
+					/>
+				</cl-form-item>
 
-					<cl-form-item :label="t('密码')">
-						<cl-input
-							v-model="form.password"
-							password
-							:height="90"
-							:border-radius="16"
-							:placeholder="t('请输入密码')"
-							@confirm="handleSubmit"
-						/>
-						<cl-text
-							v-if="isRegister"
-							:size="22"
-							color="info"
-							:margin="[12, 0, 0, 0]"
-							:value="t('至少 8 字符，需含字母与数字')"
-						/>
-					</cl-form-item>
+				<cl-text
+					v-if="isRegister"
+					:size="22"
+					color="info"
+					:margin="[0, 0, 12, 0]"
+					:value="t('用户名不可使用 admin、root 等系统保留词')"
+				/>
+
+				<cl-form-item :label="t('密码')">
+					<cl-input
+						v-model="form.password"
+						password
+						:height="90"
+						:border-radius="16"
+						:placeholder="t('请输入密码')"
+						@confirm="handleSubmit"
+					/>
+					<cl-text
+						v-if="isRegister"
+						:size="22"
+						color="info"
+						:margin="[12, 0, 0, 0]"
+						:value="t('至少 8 字符，需含字母与数字')"
+					/>
+				</cl-form-item>
 				</cl-form>
 
 				<cl-button
@@ -62,6 +70,12 @@
 				>
 					{{ isRegister ? t("注册") : t("登录") }}
 				</cl-button>
+
+				<!-- 演示账号：仅登录模式，点击自动填充 -->
+				<view class="demo-account" v-if="!isRegister" @tap="fillDemo">
+					<cl-text :size="24" color="info" :value="t('演示账号')" />
+					<cl-text :size="24" color="primary" bold :value="'demo / 123456'" />
+				</view>
 
 				<view class="switch">
 					<cl-text :size="28" color="info" :value="isRegister ? '已有账号？' : '还没有账号？'" />
@@ -82,6 +96,7 @@
 import { reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { api } from "/@/utils/api";
+import { isReservedUsername } from "/@/utils/reserved-words";
 
 const { t } = useI18n();
 
@@ -98,6 +113,12 @@ function toggleMode() {
 	isRegister.value = !isRegister.value;
 }
 
+function fillDemo() {
+	form.username = "demo";
+	form.password = "123456";
+	uni.showToast({ title: t("已填充演示账号"), icon: "none" });
+}
+
 function validate(): string | null {
 	if (!form.username.trim()) return t("请输入用户名");
 	if (!form.password) return t("请输入密码");
@@ -109,6 +130,16 @@ function validate(): string | null {
 }
 
 async function handleSubmit() {
+	// 注册模式：本地保留词预校验，命中则提示并阻止提交
+	if (isRegister.value) {
+		if (isReservedUsername(form.username)) {
+			uni.showToast({
+				title: t("该用户名不可用，请更换"),
+				icon: "none",
+			});
+			return;
+		}
+	}
 	const err = validate();
 	if (err) {
 		uni.showToast({ title: err, icon: "none" });
@@ -176,6 +207,18 @@ async function handleSubmit() {
 
 	.container {
 		padding: 64rpx 48rpx 48rpx;
+
+		.demo-account {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 8rpx;
+			margin-top: 40rpx;
+			padding: 16rpx 24rpx;
+			background-color: #fff5f0;
+			border: 1rpx dashed #ffd4c2;
+			border-radius: 12rpx;
+		}
 
 		.switch {
 			text-align: center;

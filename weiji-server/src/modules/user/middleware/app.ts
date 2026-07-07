@@ -42,6 +42,15 @@ export class UserMiddleware implements IMiddleware<Context, NextFunction> {
       let { url } = ctx;
       url = url.replace(this.prefix, '').split('?')[0];
       if (_.startsWith(url, '/app/')) {
+        // 先判免登录：公共接口（如 eps、字典）未登录也直接放行，
+        // 避免对空 token 做 jwt 校验而产生无意义的 WARN 日志
+        const isIgnored = this.ignoreUrls.some(pattern =>
+          this.utils.matchUrl(pattern, url)
+        );
+        if (isIgnored) {
+          await next();
+          return;
+        }
         const token = ctx.get('Authorization');
         try {
           const payload: any = jwt.verify(token, this.jwtConfig.secret);
@@ -70,18 +79,9 @@ export class UserMiddleware implements IMiddleware<Context, NextFunction> {
         if (ctx.user && ctx.user.isRefresh) {
           ctx.user = undefined;
         }
-        // 使用matchUrl方法来检查URL是否应该被忽略
-        const isIgnored = this.ignoreUrls.some(pattern =>
-          this.utils.matchUrl(pattern, url)
-        );
-        if (isIgnored) {
-          await next();
-          return;
-        } else {
-          if (!ctx.user) {
-            ctx.status = 401;
-            throw new CoolCommException('登录失效~');
-          }
+        if (!ctx.user) {
+          ctx.status = 401;
+          throw new CoolCommException('登录失效~');
         }
       }
       await next();

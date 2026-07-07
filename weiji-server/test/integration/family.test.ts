@@ -12,7 +12,7 @@
 // 2. 成功 code 0 → 1000；未鉴权 HTTP 401 → HTTP 200 + code:1001
 // 3. C 端 token 不带 Bearer 前缀
 // 4. 旧工程家庭 ownerId='user-demo-0001'（demo 是 owner）；
-//    新工程种子家庭 id=1 name=王家厨房 ownerId=2（王妈妈），demo(userId=1) 角色 admin
+//    新工程种子家庭 id=1 name=王家厨房 ownerId=2（妈妈），demo(userId=1) 角色 admin
 // 5. 旧工程成员 role='owner'；新工程 demo 角色 admin，owner 是 userId=2
 // 6. 旧工程菜谱 familyId='family-0001'；新工程为数字 familyId=1
 // 7. SKIP 端点：/app/family/record/list（家庭动态）与 /app/family/record/:id/comment
@@ -41,7 +41,7 @@ describe('Family 端点', () => {
     expect(res.body.data).toBeTruthy();
     expect(res.body.data.id).toBe(1);
     expect(res.body.data.name).toBe('王家厨房');
-    // 新工程种子家庭 ownerId=2（王妈妈），demo 是 admin
+    // 新工程种子家庭 ownerId=2（妈妈），demo 是 admin
     expect(res.body.data.ownerId).toBe(2);
     expect(res.body.data.memberCount).toBe(4);
   });
@@ -60,7 +60,7 @@ describe('Family 端点', () => {
     for (const m of res.body.data) {
       expect(['owner', 'admin', 'member']).toContain(m.role);
     }
-    // 应包含 owner 角色（userId=2 王妈妈）
+    // 应包含 owner 角色（userId=2 妈妈）
     const owner = res.body.data.find((m: any) => m.role === 'owner');
     expect(owner).toBeTruthy();
     expect(owner.userId).toBe(2);

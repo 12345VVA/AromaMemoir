@@ -3,7 +3,7 @@ import { Rule, RuleType } from '@midwayjs/validate';
 /**
  * 登录参数校验
  */
-export class LoginDTO {
+export class AppLoginDTO {
   // 用户名
   @Rule(RuleType.string().required().max(50))
   username: string;

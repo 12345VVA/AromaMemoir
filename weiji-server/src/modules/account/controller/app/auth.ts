@@ -6,7 +6,7 @@ import {
   CoolTag,
   TagTypes,
 } from '@cool-midway/core';
-import { LoginDTO } from '../../dto/login';
+import { AppLoginDTO } from '../../dto/login';
 import { RegisterDTO } from '../../dto/register';
 import { AppAuthService } from '../../service/auth';
 import { Context } from '@midwayjs/koa';
@@ -32,7 +32,7 @@ export class AppAccountAuthController extends BaseController {
   @CoolTag(TagTypes.IGNORE_TOKEN)
   @Post('/login', { summary: '登录' })
   @Validate()
-  async login(@Body() dto: LoginDTO) {
+  async login(@Body() dto: AppLoginDTO) {
     return this.ok(await this.appAuthService.login(dto));
   }
 

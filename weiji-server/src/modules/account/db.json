@@ -5,34 +5,34 @@
       "username": "demo",
       "password": "$2a$10$8A.mfPmXTioco4pWMmdznujyl/ajcGKlDKgg4HOAa6EK0p2cHgAV2",
       "nickName": "演示账号",
-      "avatarUrl": "",
+      "avatarUrl": "/upload/avatar/avatar-me.jpg",
       "status": 1,
       "passwordV": 1
     },
     {
       "id": 2,
-      "username": "wang_mama",
+      "username": "mom",
       "password": "$2a$10$8A.mfPmXTioco4pWMmdznujyl/ajcGKlDKgg4HOAa6EK0p2cHgAV2",
-      "nickName": "王妈妈",
-      "avatarUrl": "",
+      "nickName": "妈妈",
+      "avatarUrl": "/upload/avatar/avatar-mom.jpg",
       "status": 1,
       "passwordV": 1
     },
     {
       "id": 3,
-      "username": "wang_baba",
+      "username": "dad",
       "password": "$2a$10$8A.mfPmXTioco4pWMmdznujyl/ajcGKlDKgg4HOAa6EK0p2cHgAV2",
-      "nickName": "王爸爸",
-      "avatarUrl": "",
+      "nickName": "爸爸",
+      "avatarUrl": "/upload/avatar/avatar-dad.jpg",
       "status": 1,
       "passwordV": 1
     },
     {
       "id": 4,
-      "username": "wang_kid",
+      "username": "grandma",
       "password": "$2a$10$8A.mfPmXTioco4pWMmdznujyl/ajcGKlDKgg4HOAa6EK0p2cHgAV2",
-      "nickName": "王小宝",
-      "avatarUrl": "",
+      "nickName": "奶奶",
+      "avatarUrl": "/upload/avatar/avatar-grandma.jpg",
       "status": 1,
       "passwordV": 1
     }

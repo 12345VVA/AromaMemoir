@@ -88,9 +88,9 @@ npm run dev:h5
 | 用户名 | 昵称 | 家庭组角色 |
 |--------|------|------------|
 | demo | 演示账号 | admin |
-| wang_mama | 王妈妈 | owner |
-| wang_baba | 王爸爸 | member |
-| wang_kid | 王小宝 | member |
+| mom | 妈妈 | owner |
+| dad | 爸爸 | member |
+| grandma | 奶奶 | member |
 
 家庭组：王家厨房（inviteCode: `WJ1234`），含 4 道菜谱、3 条记录、7 条打卡。
 

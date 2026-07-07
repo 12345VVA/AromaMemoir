@@ -1,6 +1,6 @@
 import { Inject, Provide, Config, InjectClient } from '@midwayjs/core';
 import { BaseService, CoolCommException } from '@cool-midway/core';
-import { LoginDTO } from '../dto/login';
+import { AppLoginDTO } from '../dto/login';
 import { RegisterDTO } from '../dto/register';
 import { AppUserEntity } from '../entity/user';
 import { Repository } from 'typeorm';
@@ -9,6 +9,7 @@ import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
 import { Context } from '@midwayjs/koa';
 import { CachingFactory, MidwayCache } from '@midwayjs/cache-manager';
+import { validateUsername } from '../util/username-policy';
 
 /**
  * C端认证服务
@@ -34,10 +35,15 @@ export class AppAuthService extends BaseService {
    */
   async register(dto: RegisterDTO) {
     const { username, password, nickName } = dto;
+    // 用户名保留词 + 敏感词校验
+    const validation = validateUsername(username);
+    if (!validation.ok) {
+      throw new CoolCommException('注册失败，请检查输入或更换用户名');
+    }
     // 用户名查重
     const existed = await this.appUserEntity.findOneBy({ username });
     if (existed) {
-      throw new CoolCommException('用户名已存在');
+      throw new CoolCommException('注册失败，请检查输入或更换用户名');
     }
     // bcrypt 哈希密码（10 轮 salt）
     const passwordHash = bcrypt.hashSync(password, 10);
@@ -55,6 +61,8 @@ export class AppAuthService extends BaseService {
     const token = await this.generateToken(user, expire);
     // 缓存 token
     await this.midwayCache.set(`app:token:${user.id}`, token);
+    // 缓存密码版本，供 UserMiddleware 校验（与 user 模块 login 一致）
+    await this.midwayCache.set(`app:passwordVersion:${user.id}`, user.passwordV);
     return {
       token,
       user: this.safeUser(user),
@@ -66,7 +74,7 @@ export class AppAuthService extends BaseService {
    * 校验账号密码后签发 token，并缓存
    * @param dto 登录参数
    */
-  async login(dto: LoginDTO) {
+  async login(dto: AppLoginDTO) {
     const { username, password } = dto;
     const user = await this.appUserEntity.findOneBy({ username });
     // 用户不存在 / 状态禁用 / 密码不匹配 均抛同一异常，避免泄露用户是否存在
@@ -81,6 +89,8 @@ export class AppAuthService extends BaseService {
     const { expire } = this.coolConfig.jwt.token;
     const token = await this.generateToken(user, expire);
     await this.midwayCache.set(`app:token:${user.id}`, token);
+    // 缓存密码版本，供 UserMiddleware 校验（与 user 模块 login 一致）
+    await this.midwayCache.set(`app:passwordVersion:${user.id}`, user.passwordV);
     return {
       token,
       user: this.safeUser(user),

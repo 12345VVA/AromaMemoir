@@ -36,7 +36,8 @@ echo ""
 # ------------------------------------------------
 echo "[2/3] weiji-ai 测试..."
 cd "$ROOT_DIR/weiji-ai"
-if pytest; then
+uv sync --frozen
+if uv run pytest; then
   echo "✓ weiji-ai 测试通过"
   PASS=$((PASS + 1))
 else

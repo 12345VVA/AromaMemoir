@@ -18,8 +18,8 @@ weiji-admin-web (:5173)  →  weiji-server (:8001)  →  weiji-ai (:8002)
 
 ```bash
 cd weiji-ai
-pip install -r requirements.txt
-uvicorn main:app --host 0.0.0.0 --port 8002
+uv sync
+uv run uvicorn main:app --host 0.0.0.0 --port 8002
 ```
 
 启动后会打印各 AI 厂商配置状态。**未配置任何 key 也能正常启动**，5 个端点会降级返回 mock 数据。
@@ -54,7 +54,7 @@ export BAIDU_API_KEY="your_baidu_api_key"
 export BAIDU_SECRET_KEY="your_baidu_secret_key"
 export OPENAI_API_KEY="your_openai_api_key"
 # ... 其他按需配置
-uvicorn main:app --port 8002
+uv run uvicorn main:app --port 8002
 ```
 
 ## API 端点
@@ -83,7 +83,8 @@ weiji-ai/
 ├── main.py              # FastAPI 应用 + 5 个 AI 端点
 ├── config.py            # 环境变量配置（Settings 单例）
 ├── exceptions.py        # AI 异常类型
-├── requirements.txt     # Python 依赖
+├── pyproject.toml       # uv 管理的项目元数据与依赖声明
+├── uv.lock              # uv 锁定的精确依赖版本（可复现）
 ├── services/            # AI 厂商集成模块
 │   ├── baidu_vision.py      # 百度AI 菜品识别
 │   ├── openai_vision.py     # GPT-4o Vision 兜底

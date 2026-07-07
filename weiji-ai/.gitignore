@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
+.venv/
 
 # 运行时生成的美化图片（beautify 端点落盘产物）
 static/

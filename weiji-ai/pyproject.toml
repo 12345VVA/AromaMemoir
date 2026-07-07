@@ -1,0 +1,23 @@
+[project]
+name = "weiji-ai"
+version = "0.1.0"
+description = "味记 AI 服务 - FastAPI 纯 AI 服务层"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.138.0",
+    "uvicorn>=0.49.0",
+    "python-multipart>=0.0.32",
+    "openai>=1.40.0",
+    "httpx>=0.27.0",
+    "python-dotenv>=1.0.0",
+    "websockets>=12.0",          # services/xfyun_asr.py 直接 import，是直接依赖
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",    # 修掉 pytest.ini=auto 但依赖缺失的隐患
+]
+
+[tool.uv]
+package = false

@@ -735,8 +735,8 @@ cp .env.example .env
 
 ```bash
 cd weiji-ai
-pip install -r requirements.txt
-uvicorn main:app --host 0.0.0.0 --port 8002
+uv sync
+uv run uvicorn main:app --host 0.0.0.0 --port 8002
 ```
 
 无需配置任何 AI Key 即可启动：5 个端点会降级返回 mock 数据。完整环境变量与降级策略见 `weiji-ai/README.md`。
@@ -747,7 +747,7 @@ uvicorn main:app --host 0.0.0.0 --port 8002
 
 ```bash
 # 终端1：AI 服务
-cd weiji-ai && uvicorn main:app --host 0.0.0.0 --port 8002
+cd weiji-ai && uv run uvicorn main:app --host 0.0.0.0 --port 8002
 
 # 终端2：业务后端（cool-admin-midway）
 cd weiji-server && NODE_ENV=local node bootstrap-local.js   # → http://localhost:8001

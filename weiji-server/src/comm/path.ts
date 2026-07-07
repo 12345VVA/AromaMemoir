@@ -28,10 +28,12 @@ export const pDataPath = () => {
 
 /**
  * 上传目录
+ * 位于项目内 weiji-server/public/upload（不进 git，见 .gitignore），
+ * 由 koa 静态托管 prefix=/upload 暴露（config.default.ts staticFile.dirs.static）。
  * @returns
  */
 export const pUploadPath = () => {
-  const uploadPath = path.join(pDataPath(), 'upload');
+  const uploadPath = path.join(process.cwd(), 'public', 'upload');
   if (!fs.existsSync(uploadPath)) {
     fs.mkdirSync(uploadPath, { recursive: true });
   }

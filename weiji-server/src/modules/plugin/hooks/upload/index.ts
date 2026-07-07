@@ -80,7 +80,6 @@ export class CoolPlugin extends BasePluginHook implements BaseUpload {
    * @param fileName
    */
   async downAndUpload(url: string, fileName?: string) {
-    const { domain } = this.pluginInfo.config;
     const basePath = pUploadPath();
     const dateDir = moment().format('YYYYMMDD');
 
@@ -114,7 +113,7 @@ export class CoolPlugin extends BasePluginHook implements BaseUpload {
     this.validateTargetPath(targetPath, basePath);
 
     fs.writeFileSync(targetPath, data);
-    return `${domain}/upload/${dateDir}/${safeFileName}`;
+    return `/upload/${dateDir}/${safeFileName}`;
   }
 
   /**
@@ -123,7 +122,6 @@ export class CoolPlugin extends BasePluginHook implements BaseUpload {
    * @param key 路径一致会覆盖源文件
    */
   async uploadWithKey(filePath: any, key: any) {
-    const { domain } = this.pluginInfo.config;
     const basePath = pUploadPath();
     const dateDir = moment().format('YYYYMMDD');
 
@@ -145,7 +143,7 @@ export class CoolPlugin extends BasePluginHook implements BaseUpload {
     }
 
     fs.writeFileSync(targetPath, data);
-    return `${domain}/upload/${dateDir}/${safeKey}`;
+    return `/upload/${dateDir}/${safeKey}`;
   }
 
   /**
@@ -154,7 +152,6 @@ export class CoolPlugin extends BasePluginHook implements BaseUpload {
    * @param key 文件路径
    */
   async upload(ctx: any) {
-    const { domain } = this.pluginInfo.config;
     try {
       const { key } = ctx.fields;
       const basePath = pUploadPath();
@@ -189,7 +186,7 @@ export class CoolPlugin extends BasePluginHook implements BaseUpload {
 
       const data = fs.readFileSync(file.data);
       fs.writeFileSync(target, data);
-      return domain + '/upload/' + name;
+      return '/upload/' + name;
     } catch (err) {
       console.error(err);
       if (err instanceof CoolCommException) {

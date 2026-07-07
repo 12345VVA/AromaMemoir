@@ -48,7 +48,7 @@ export class GamificationService extends BaseService {
 
   // 图鉴静态目录（与 db.json weiji_pokedex_catalog 一致）
   private static readonly POKEDEX_CATALOG = [
-    { dishName: '番茄炒蛋', category: '家常菜', rarity: 'common' },
+    { dishName: '西红柿鸡蛋面', category: '面食', rarity: 'common' },
     { dishName: '红烧肉', category: '家常菜', rarity: 'common' },
     { dishName: '清炒西兰花', category: '家常菜', rarity: 'common' },
     { dishName: '蒸蛋羹', category: '家常菜', rarity: 'common' },

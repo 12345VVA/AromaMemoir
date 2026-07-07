@@ -22,6 +22,17 @@ const HOST = "";
 const HOST = "http://localhost:8001";
 // #endif
 
+/**
+ * 解析后端图片 URL 为可访问地址
+ * 后端图片统一存相对 /upload/...（见图片托管架构）。H5 走 vite 代理（HOST 为空），
+ * 小程序/App 端 image 标签需完整域名，故拼接 HOST。完整 URL / data URI 原样返回。
+ */
+export function resolveImg(url?: string): string {
+	if (!url) return "";
+	if (/^https?:\/\//i.test(url) || url.startsWith("data:")) return url;
+	return HOST + url;
+}
+
 const LOGIN_PAGE = "/pages/user/login";
 const TOKEN_EXPIRE = 30 * 24 * 3600; // 30 天（秒），写入 cool store 时使用
 
@@ -667,6 +678,7 @@ export const api = {
 			url: "/app/ai/recommend",
 			method: "POST",
 			data: { dishName },
+			showError: false,
 		});
 	},
 

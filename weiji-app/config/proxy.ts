@@ -30,6 +30,12 @@ const proxy = {
 		changeOrigin: true,
 	},
 
+	// 后端上传文件静态资源代理（koa 托管 /upload/**，图片存 weiji-server/public/upload）
+	"/upload": {
+		target: DEV_SERVER,
+		changeOrigin: true,
+	},
+
 	// H5 生产构建使用 /api 前缀，本地预览/调试时由 vite 代理转发到 weiji-server
 	"/api": {
 		target: DEV_SERVER,

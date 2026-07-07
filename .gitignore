@@ -53,6 +53,7 @@ logs/
 .workbuddy/
 deliverables/
 .gstack/
+.trae/
 .idea/
 .claude/
 *.swp

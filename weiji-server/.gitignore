@@ -23,3 +23,6 @@ public/upload/*
 # 背景图为应用静态资产，需入库（区别于运行时用户上传图）
 !public/upload/bg/
 !public/upload/bg/*
+# 卡片背景图（双比例主题底图）同为应用静态资产，需入库
+!public/upload/card-bg/
+!public/upload/card-bg/*

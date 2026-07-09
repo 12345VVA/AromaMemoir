@@ -242,6 +242,15 @@ const BG_IMAGES = [
 	"/upload/bg/bg-kitchen.jpg",
 	"/upload/bg/bg-harvest.jpg",
 	"/upload/bg/bg-ricefield.jpg",
+	// 卡片背景图（双比例中的 16:9 版本，与上方页面氛围图混合随机轮换）
+	"/upload/card-bg/card-breakfast-16x9.jpg",
+	"/upload/card-bg/card-dimsum-16x9.jpg",
+	"/upload/card-bg/card-healthy-16x9.jpg",
+	"/upload/card-bg/card-kids-16x9.jpg",
+	"/upload/card-bg/card-dumpling-16x9.jpg",
+	"/upload/card-bg/card-summer-16x9.jpg",
+	"/upload/card-bg/card-sichuan-16x9.jpg",
+	"/upload/card-bg/card-midnight-16x9.jpg",
 ];
 // 当前主角卡片背景图
 const heroBg = ref<string>(BG_IMAGES[0]);

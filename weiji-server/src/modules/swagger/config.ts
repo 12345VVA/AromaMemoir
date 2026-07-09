@@ -30,7 +30,7 @@ export default ({ app }) => {
       // 请求地址
       servers: [
         {
-          url: `http://127.0.0.1:${app?.getConfig('koa.port') || 8001}`,
+          url: `http://127.0.0.1:${app?.getConfig('koa.port') || 17801}`,
           description: '本地后台地址',
         },
       ],

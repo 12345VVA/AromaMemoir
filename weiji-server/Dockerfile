@@ -28,6 +28,6 @@ RUN rm -rf node_modules && rm package-lock.json
 RUN npm install                        
 
 # 如果端口更换，这边可以更新一下
-EXPOSE 8001
+EXPOSE 17801
 
 CMD ["npm", "run", "start"]

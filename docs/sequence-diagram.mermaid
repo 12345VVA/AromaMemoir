@@ -1,8 +1,8 @@
 sequenceDiagram
     actor U as C端用户
     participant FE as cool-uni (App前端)
-    participant BE as weiji-server (:8001)
-    participant AI as weiji-ai (:8002)
+    participant BE as weiji-server (:17801)
+    participant AI as weiji-ai (:17802)
     participant DB as MySQL
 
     %% ===== 场景1：C端登录 → AI识别 → 保存记录 → 打卡 → 成就 =====
@@ -124,7 +124,7 @@ sequenceDiagram
 
     rect rgb(248, 248, 255)
         Note over AD,DB: B端登录 + 后台管理 (cool-admin 内置)
-        AD->>FE: 访问后台 :9000
+        AD->>FE: 访问后台 :17901
         FE->>BE: POST /admin/base/open/login {username:"admin", password:"123456", captchaId, verifyCode}
         BE->>BE: cool-admin 内置 token + RBAC 校验
         BE-->>FE: {code:0, data:{token, user:{...}, menus:[...], permissions:[...]}}
@@ -161,7 +161,7 @@ sequenceDiagram
         participant MON as 监控系统
         MON->>BE: GET /open/health
         BE->>DB: SELECT 1
-        BE->>AI: GET /health (weiji-ai :8002)
+        BE->>AI: GET /health (weiji-ai :17802)
         AI-->>BE: {status:"ok"}
         BE-->>MON: {code:0, data:{db:"ok", ai:"ok", uptime:12345}}
     end

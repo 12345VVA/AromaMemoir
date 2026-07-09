@@ -6,7 +6,7 @@
 //    AI 服务不可用降级 → code:503 + message 含"不可用"
 // 3. C 端 token 不带 Bearer 前缀
 // 4. 旧工程通过 monkeypatch AiProxyService.forwardJson/forwardMultipart 强制降级；
-//    新工程测试改为对真实 :8001 服务发起请求，进程内 monkeypatch 不影响已运行的
+//    新工程测试改为对真实 :17801 服务发起请求，进程内 monkeypatch 不影响已运行的
 //    服务进程，故降级用例改为：当前测试环境 weiji-ai 未启动（aiStatus=down），
 //    所有 /app/ai/* 端点天然返回 code:503，直接断言降级行为
 // 5. 旧工程 GET /health 反映 aiStatus；新工程 GET /open/health（无鉴权）反映 aiStatus，

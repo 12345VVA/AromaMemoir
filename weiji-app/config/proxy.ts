@@ -1,5 +1,5 @@
-// weiji-server 本地监听端口（参考 weiji-server/src/config/config.default.ts availablePort(8001)）
-const DEV_SERVER = "http://localhost:8001";
+// weiji-server 本地监听端口（参考 weiji-server/src/config/config.default.ts availablePort(17801)）
+const DEV_SERVER = "http://localhost:17801";
 
 // 生产 API 地址占位符，部署时请替换为实际域名
 // 注意：此文件被 vite.config.ts（Node 环境）导入，不可使用 import.meta.env

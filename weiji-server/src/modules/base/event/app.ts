@@ -15,7 +15,7 @@ export class BaseAppEvent {
   @Event('onServerReady')
   async onServerReady() {
     if (!process['pkg']) return;
-    const port = this.app.getConfig('koa.port') || 8001;
+    const port = this.app.getConfig('koa.port') || 17801;
     this.logger.info(`Server is running at http://127.0.0.1:${port}`);
     const url = `http://127.0.0.1:${port}`;
 

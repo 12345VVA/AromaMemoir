@@ -161,7 +161,7 @@ cool-admin 按路由前缀天然分层，味记沿用（架构文档 §3.3）：
 | `POST /api/gamification/blindguess/round/:id/guess` | `POST /app/gamification/blindguess/round/:id/guess` | gamification | App JWT（家庭成员） | 提交猜测。body `{ itemId, guessAuthorId, guessAuthorName?, guessDishName }`，每题每用户仅一次 |
 | `POST /api/gamification/blindguess/round/:id/reveal` | `POST /app/gamification/blindguess/round/:id/reveal` | gamification | App JWT（轮次 creator） | 揭晓结果：计算排名并更新轮次状态为 revealed |
 
-### 3.9 ai 模块（AI 代理，转发 weiji-ai:8002）
+### 3.9 ai 模块（AI 代理，转发 weiji-ai:17802）
 
 | 旧路径（method + path） | 新路径 | 模块 | 鉴权 | 说明 |
 |---|---|---|---|---|
@@ -222,7 +222,7 @@ cool-admin 通过 `@CoolController({ api: ['add','delete','update','info','page'
 
 ## 5. AI 代理路径
 
-weiji-server 的 `ai` 模块（迁移自 `AiProxyService`）将 `/app/ai/*` 请求转发到 weiji-ai（FastAPI，:8002）的 `/ai/*`，处理 multipart 与 JSON、30s 超时与降级。配置项 `AI_SERVICE_URL`（默认 `http://localhost:8002`）。架构文档 §8.3。
+weiji-server 的 `ai` 模块（迁移自 `AiProxyService`）将 `/app/ai/*` 请求转发到 weiji-ai（FastAPI，:17802）的 `/ai/*`，处理 multipart 与 JSON、30s 超时与降级。配置项 `AI_SERVICE_URL`（默认 `http://localhost:17802`）。架构文档 §8.3。
 
 | 新路径（C 端入口） | 转发目标 weiji-ai 路径 | 方法 | 请求类型 | 说明 |
 |---|---|---|---|---|

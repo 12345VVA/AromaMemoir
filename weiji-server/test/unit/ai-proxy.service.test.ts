@@ -19,7 +19,7 @@ const mockedAxios = (axios as any).default as jest.Mock;
 
 function makeService() {
   const svc = new AiProxyService();
-  (svc as any).aiConfig = { url: 'http://localhost:8002' };
+  (svc as any).aiConfig = { url: 'http://localhost:17802' };
   (svc as any).logger = {
     error: jest.fn(),
     info: jest.fn(),
@@ -46,7 +46,7 @@ describe('AiProxyService.forward', () => {
 
   it('转发失败抛 CoolCommException 且 aiStatus=down', async () => {
     mockedAxios.mockRejectedValueOnce(
-      new Error('connect ECONNREFUSED 127.0.0.1:8002'),
+      new Error('connect ECONNREFUSED 127.0.0.1:17802'),
     );
     const svc = makeService();
     svc.aiStatus = 'up';

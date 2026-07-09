@@ -114,7 +114,7 @@ $ npm i
 $ npm run dev
 ```
 
-启动完成访问：[http://localhost:8001/](http://localhost:8001)
+启动完成访问：[http://localhost:17801/](http://localhost:17801)
 
 注： `npm i`如果安装失败可以尝试使用切换您的镜像源，推荐使用[pnpm](https://pnpm.io/)安装
 

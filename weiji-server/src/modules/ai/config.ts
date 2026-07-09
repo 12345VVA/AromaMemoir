@@ -16,6 +16,6 @@ export default () => {
     // app参数配置允许读取的key
     allowKeys: [],
     // AI 服务地址
-    url: process.env.AI_SERVICE_URL || 'http://localhost:8002',
+    url: process.env.AI_SERVICE_URL || 'http://localhost:17802',
   } as ModuleConfig;
 };

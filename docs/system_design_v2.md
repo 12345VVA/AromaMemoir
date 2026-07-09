@@ -54,7 +54,7 @@
 |---|--------|------|------|
 | **D1** | 迁移策略 | **全新 cool-admin 脚手架 + 业务逻辑迁移**。基于官方脚手架重建三个工程，迁移现有实体/服务/SQL/页面/测试；旧代码保留作参考，切换完成后清理 | 用户确认 |
 | **D2** | 本轮产出 | **架构设计文档 + 迁移路线图**，确认后再动代码 | 用户确认 |
-| **D3** | AI 服务定位 | **保留 weiji-ai 为独立 AI 层**，weiji-server 通过 HTTP（`/app/ai/*` → `:8002`）调用 | 用户确认；与「cool-admin适配度分析.md」推荐的「cool-admin + Python AI 混合架构」一致 |
+| **D3** | AI 服务定位 | **保留 weiji-ai 为独立 AI 层**，weiji-server 通过 HTTP（`/app/ai/*` → `:17802`）调用 | 用户确认；与「cool-admin适配度分析.md」推荐的「cool-admin + Python AI 混合架构」一致 |
 | **D4** | 移动端框架 | 采用 **cool-uni**（uni-app + Vue3 组合式 API），与现有 weiji-app 同源，迁移成本最低 | 用户确认（Q2） |
 | **D5** | 主键策略 | 采用 cool-admin 默认 **自增 bigint 主键**，废弃现有 uuid 主键 | 用户确认（Q1）；cool-admin 全家桶（RBAC/CRUD/关联表）均假设自增 id |
 | **D6** | 生产数据 | 现有库 **无生产数据**，无需保留历史数据、无需 id 映射脚本，Phase 4 直接重新灌种子 | 用户确认（Q3） |
@@ -85,13 +85,13 @@
 │   weiji-app      │        │  weiji-admin-web    │
 │   (cool-uni)     │        │  (cool-admin-vue)   │
 │ H5 / 微信小程序   │        │  后台管理 + 业务页面 │
-│   :5173(H5)      │        │      :9000          │
+│   :17900(H5)      │        │      :17901          │
 └────────┬─────────┘        └──────────┬──────────┘
          │                             │
          │      HTTPS / JWT            │
          ▼                             ▼
 ┌──────────────────────────────────────────────────┐
-│         weiji-server (cool-admin-midway) :8001   │
+│         weiji-server (cool-admin-midway) :17801   │
 │  ┌─────────────────┐    ┌──────────────────────┐ │
 │  │  base 模块(内置) │    │   业务模块(modules)   │ │
 │  │ RBAC/菜单/字典   │    │ account/record/      │ │
@@ -108,7 +108,7 @@
                              │ HTTP  /app/ai/*  (代理)
                              ▼
 ┌──────────────────────────────────────────────────┐
-│           weiji-ai (FastAPI)  :8002              │
+│           weiji-ai (FastAPI)  :17802              │
 │   食物识别 / 图片美化 / 菜谱推荐 / 语音 / 贴纸     │
 └──────────────────────────────────────────────────┘
                              │
@@ -120,12 +120,12 @@
 
 | 服务 | 端口 | 框架 | 技术栈 | 职责 |
 |------|------|------|--------|------|
-| **weiji-server** | **8001** | cool-admin-midway | Midway.js + TypeORM + MySQL + Redis + `@cool-midway/core` | 业务后端 + 后台管理 API（含 base 权限体系） |
-| **weiji-admin-web** | **9000** | cool-admin-vue | Vue3 + Vite + Element Plus + cl-crud/cl-form | PC 后台管理 + 业务页面 |
-| **weiji-app** | **5173 (H5)** | cool-uni | uni-app + Vue3 组合式 + Pinia | 移动端（微信小程序 / H5 / App） |
-| **weiji-ai** | **8002** | FastAPI | Python + httpx + AsyncOpenAI | 独立 AI 服务（不变） |
+| **weiji-server** | **17801** | cool-admin-midway | Midway.js + TypeORM + MySQL + Redis + `@cool-midway/core` | 业务后端 + 后台管理 API（含 base 权限体系） |
+| **weiji-admin-web** | **17901** | cool-admin-vue | Vue3 + Vite + Element Plus + cl-crud/cl-form | PC 后台管理 + 业务页面 |
+| **weiji-app** | **17900 (H5)** | cool-uni | uni-app + Vue3 组合式 + Pinia | 移动端（微信小程序 / H5 / App） |
+| **weiji-ai** | **17802** | FastAPI | Python + httpx + AsyncOpenAI | 独立 AI 服务（不变） |
 
-> 端口 8001/9000 对齐 cool-admin 官方默认，降低认知负担。原 admin-web 的 5173 让渡给 weiji-app 的 H5 调试。
+> 端口 17801/17901 对齐 cool-admin 官方默认，降低认知负担。原 admin-web 的 17900 让渡给 weiji-app 的 H5 调试。
 
 ### 3.3 API 分层设计
 
@@ -395,7 +395,7 @@ weiji-server-next/
 │   │   │   │   ├── admin/               # AI 调用监控
 │   │   │   │   └── app/                 # /app/ai/*（5 端点，代理 weiji-ai）
 │   │   │   ├── service/
-│   │   │   │   └── ai-proxy.ts          # HTTP 转发 → weiji-ai:8002
+│   │   │   │   └── ai-proxy.ts          # HTTP 转发 → weiji-ai:17802
 │   │   │   └── dto/
 │   │   └── analytics/                   # 数据埋点
 │   │       ├── config.ts
@@ -459,7 +459,7 @@ weiji-admin-web-next/
 │   │   └── record.ts
 │   ├── utils/                           # 工具函数
 │   └── static/                          # 静态资源
-├── vite.config.ts                       # 代理 /admin /app → :8001
+├── vite.config.ts                       # 代理 /admin /app → :17801
 ├── index.html
 ├── package.json
 └── tsconfig.json
@@ -908,7 +908,7 @@ export class AppAuthController extends BaseController {
 
 ```typescript
 // src/modules/ai/controller/app/ai.ts
-// AI 代理 Controller — 所有请求转发到 weiji-ai:8002
+// AI 代理 Controller — 所有请求转发到 weiji-ai:17802
 import { CoolController, BaseController } from '@cool-midway/core';
 import { Inject, Post, All } from '@midwayjs/core';
 import { AiProxyService } from '../../service/ai-proxy';
@@ -951,7 +951,7 @@ export class AppAiController extends BaseController {
 import { MidwayConfig } from '@midwayjs/core';
 
 export default {
-  koa: { port: 8001 },
+  koa: { port: 17801 },
   // cool-admin 核心配置
   cool: {
     eps: true,              // 开启路由自动注册
@@ -968,7 +968,7 @@ export default {
     client: { port: 6379, host: '127.0.0.1', password: '', db: 0 },
   },
   // AI 代理
-  ai: { serviceUrl: process.env.AI_SERVICE_URL || 'http://localhost:8002', timeout: 30000 },
+  ai: { serviceUrl: process.env.AI_SERVICE_URL || 'http://localhost:17802', timeout: 30000 },
 } as MidwayConfig;
 ```
 
@@ -1110,7 +1110,7 @@ export class AppJwtMiddleware {
 - [ ] 按 D7 新建 `*-next` 目录，拉取官方脚手架：`weiji-server-next`（cool-admin-midway）、`weiji-admin-web-next`（cool-admin-vue）、`weiji-app-next`（cool-uni）
 - [ ] 决策已全部确认（D4–D7），无需再拍板
 - [ ] MySQL 建 `weiji` 库；base 模块自动建表；Redis 就位
-- [ ] 三端默认能启动：server(:8001) + admin-web(:9000) + ai(:8002)
+- [ ] 三端默认能启动：server(:17801) + admin-web(:17901) + ai(:17802)
 - [ ] cool-admin 后台 admin/123456 可登录
 - [ ] 产出《API 路径映射表》契约文档（本文档 §4）
 
@@ -1122,7 +1122,7 @@ export class AppJwtMiddleware {
 - [ ] 迁移 12+ 表为 entity（§6.3 映射），表名统一 `weiji_` 前缀，主键 bigint
 - [ ] 迁移 6 个 service 业务逻辑
 - [ ] 迁移 C 端 controller 到 `/app/*`，B 端管理用 cl-crud（`/admin/*`）
-- [ ] 迁移 `ai` 模块代理 → weiji-ai:8002
+- [ ] 迁移 `ai` 模块代理 → weiji-ai:17802
 - [ ] 种子数据写入各模块 `db.json`（含演示账号 demo/mom/dad/grandma、成就定义、挑战等）
 - [ ] 迁移并改造现有 36 个测试到新工程
 
@@ -1192,7 +1192,7 @@ export class AppJwtMiddleware {
 | `weiji-server-next/src/interface.ts` | 共享 TS 类型定义（从 store/types.ts 迁移） | server |
 | `weiji-server-next/src/welcome.ts` | 环境 controller | server |
 | `weiji-admin-web-next/package.json` | 前端依赖声明 | admin-web |
-| `weiji-admin-web-next/vite.config.ts` | Vite 配置（proxy /admin、/app → :8001） | admin-web |
+| `weiji-admin-web-next/vite.config.ts` | Vite 配置（proxy /admin、/app → :17801） | admin-web |
 | `weiji-admin-web-next/tsconfig.json` | TypeScript 配置 | admin-web |
 | `weiji-admin-web-next/index.html` | HTML 入口 | admin-web |
 | `weiji-admin-web-next/src/main.ts` | Vue 应用入口 | admin-web |
@@ -1205,7 +1205,7 @@ export class AppJwtMiddleware {
 | `weiji-app-next/App.vue` | 根组件 | app |
 | `weiji-app-next/main.ts` | 入口 | app |
 
-**共 23 个文件。交付标准：** 三个子项目各自 `npm install && npm run dev` 可成功启动；server(:8001) + admin-web(:9000) 可访问；cool-admin 后台 admin/123456 可登录。
+**共 23 个文件。交付标准：** 三个子项目各自 `npm install && npm run dev` 可成功启动；server(:17801) + admin-web(:17901) 可访问；cool-admin 后台 admin/123456 可登录。
 
 ---
 
@@ -1281,7 +1281,7 @@ export class AppJwtMiddleware {
 | `weiji-server-next/src/modules/challenge/controller/admin/challenge.ts` | /admin/challenge/*（cl-crud） | challenge |
 | `weiji-server-next/src/modules/challenge/controller/app/challenge.ts` | /app/challenge/*（list） | challenge |
 | `weiji-server-next/src/modules/ai/config.ts` | 模块配置 | ai |
-| `weiji-server-next/src/modules/ai/service/ai-proxy.ts` | AI 代理服务（HTTP 转发 weiji-ai:8002 + 降级） | ai |
+| `weiji-server-next/src/modules/ai/service/ai-proxy.ts` | AI 代理服务（HTTP 转发 weiji-ai:17802 + 降级） | ai |
 | `weiji-server-next/src/modules/ai/controller/app/ai.ts` | /app/ai/*（5 端点代理） | ai |
 | `weiji-server-next/src/modules/ai/controller/admin/monitor.ts` | /admin/ai/monitor（B端 AI 调用监控） | ai |
 | `weiji-server-next/src/modules/analytics/config.ts` | 模块配置 | analytics |
@@ -1470,7 +1470,7 @@ export class AppJwtMiddleware {
 - B 端后台管理：`/admin/{模块}/*`，cl-crud 自动生成（`add|delete|update|info|page|list`）
 - C 端业务 API：`/app/{模块}/*`，手写业务逻辑
 - 开放接口：`/open/*`，无需鉴权
-- AI 代理路径：`/app/ai/*` → 转发 `weiji-ai:8002/ai/*`
+- AI 代理路径：`/app/ai/*` → 转发 `weiji-ai:17802/ai/*`
 - 健康检查：`/open/health`
 
 ### 13.4 JWT 认证约定
@@ -1500,7 +1500,7 @@ export class AppJwtMiddleware {
 | 403 | 无权限 | 非 owner/admin 操作 |
 | 404 | 资源不存在 | 记录/菜谱/成员不存在 |
 | 500 | 服务器内部错误 | 未捕获异常 |
-| 503 | AI 服务不可用 | weiji-ai:8002 不可达 |
+| 503 | AI 服务不可用 | weiji-ai:17802 不可达 |
 
 ### 13.7 cool-admin 内置能力复用
 
@@ -1518,9 +1518,9 @@ export class AppJwtMiddleware {
 
 | 工程 | 开发代理 |
 |------|----------|
-| weiji-admin-web-next | `vite` 代理 `/admin`、`/app` → `http://localhost:8001` |
-| weiji-app-next（H5） | `vite` 代理 `/app` → `http://localhost:8001`；小程序直连 `http://localhost:8001/app`（需关闭合法域名校验） |
-| weiji-server-next | `ai` 模块 `service/ai-proxy.ts` 转发 `/app/ai/*` → `http://localhost:8002` |
+| weiji-admin-web-next | `vite` 代理 `/admin`、`/app` → `http://localhost:17801` |
+| weiji-app-next（H5） | `vite` 代理 `/app` → `http://localhost:17801`；小程序直连 `http://localhost:17801/app`（需关闭合法域名校验） |
+| weiji-server-next | `ai` 模块 `service/ai-proxy.ts` 转发 `/app/ai/*` → `http://localhost:17802` |
 
 ---
 
@@ -1765,8 +1765,8 @@ classDiagram
 sequenceDiagram
     actor U as C端用户
     participant FE as cool-uni (App)
-    participant BE as weiji-server (:8001)
-    participant AI as weiji-ai (:8002)
+    participant BE as weiji-server (:17801)
+    participant AI as weiji-ai (:17802)
     participant DB as MySQL
 
     Note over U,DB: ===== 阶段1：C端登录 =====
@@ -1808,7 +1808,7 @@ sequenceDiagram
     actor M as 妈妈(C端用户)
     actor D as 小明(C端用户)
     participant FE as 前端
-    participant BE as weiji-server (:8001)
+    participant BE as weiji-server (:17801)
     participant DB as MySQL
 
     Note over M,DB: ===== 妈妈上传菜谱 =====

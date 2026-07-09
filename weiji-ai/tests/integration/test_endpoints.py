@@ -126,9 +126,9 @@ def test_sticker_blocks_non_compliant_image(client: TestClient, monkeypatch):
 # ============================================================
 def test_cors_whitelisted_origin_echoed(client: TestClient):
     # 白名单 Origin 应在响应头回显 access-control-allow-origin
-    res = client.get('/health', headers={'Origin': 'http://localhost:5173'})
+    res = client.get('/health', headers={'Origin': 'http://localhost:17900'})
     assert res.status_code == 200
-    assert res.headers.get('access-control-allow-origin') == 'http://localhost:5173'
+    assert res.headers.get('access-control-allow-origin') == 'http://localhost:17900'
 
 
 def test_cors_non_whitelisted_origin_not_echoed(client: TestClient):
@@ -151,6 +151,6 @@ def test_static_whitelisted_referer_passes_middleware(client: TestClient):
     # 白名单 Referer 不被中间件拦截（文件不存在返回 404，关键是未被 403 拦截）
     res = client.get(
         '/static/nonexistent.jpg',
-        headers={'Referer': 'http://localhost:5173/'},
+        headers={'Referer': 'http://localhost:17900/'},
     )
     assert res.status_code != 403

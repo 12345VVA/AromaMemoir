@@ -59,7 +59,7 @@ type UploadFile = {
 
 /**
  * AI 代理服务
- * 将 /app/ai/* 请求转发到 weiji-ai（FastAPI，:8002），处理超时与错误降级
+ * 将 /app/ai/* 请求转发到 weiji-ai（FastAPI，:17802），处理超时与错误降级
  * 同时维护 AI 服务连通性状态，供 /open/health 端点暴露
  */
 @Provide()
@@ -650,7 +650,7 @@ export class AiProxyService extends BaseService {
       timeout: 30_000,
       headers: {
         // weiji-ai requires a whitelisted Referer header for /static/ routes
-        Referer: 'http://localhost:8001'
+        Referer: 'http://localhost:17801'
       }
     });
   }

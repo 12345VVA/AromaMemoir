@@ -1,7 +1,7 @@
 /**
  * C 端 API 服务（对接 weiji-server / cool-admin-midway）
  * - 适配 uni.request / uni.uploadFile（uni-app 不支持 axios）
- * - 路径前缀：H5 走 vite 代理（/app、/open），小程序/App 直连 http://localhost:8001
+ * - 路径前缀：H5 走 vite 代理（/app、/open），小程序/App 直连 http://localhost:17801
  * - token 从 uni.getStorageSync('token') 读取，注入 Authorization header（不带 Bearer 前缀，
  *   cool-admin-midway 的 UserMiddleware 会用裸 token 直接 jwt.verify）
  * - 统一响应体 { code, data, message }，code === 1000 表示成功，返回 data
@@ -19,7 +19,7 @@ import { useUserStore } from "/@/cool/store/user";
 const HOST = "";
 // #endif
 // #ifndef H5
-const HOST = "http://localhost:8001";
+const HOST = "http://localhost:17801";
 // #endif
 
 /**

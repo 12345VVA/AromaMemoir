@@ -33,13 +33,13 @@ pnpm install
 pnpm dev:h5
 ```
 
-启动后访问 `http://localhost:9900`。
+启动后访问 `http://localhost:17900`。
 
 ### 环境要求
 
 - Node.js >= 16
 - pnpm（推荐）或 npm
-- 后端服务 `weiji-server` 需在 `http://localhost:8001` 运行（代理配置见 `config/proxy.ts`）
+- 后端服务 `weiji-server` 需在 `http://localhost:17801` 运行（代理配置见 `config/proxy.ts`）
 
 ## 更快
 

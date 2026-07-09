@@ -36,13 +36,13 @@
 │                         客户端层                                      │
 │   cool-admin-vue (管理后台)  │  cool-uni (移动端 H5/小程序/App)       │
 │   Vue3 + Element Plus       │  uni-app + Vue3                       │
-│   端口: 5173                 │  端口: 8080                            │
+│   端口: 17900                 │  端口: 8080                            │
 └──────────────────────────────┬───────────────────────────────────────┘
                                │ HTTP / WebSocket
 ┌──────────────────────────────▼───────────────────────────────────────┐
 │                   cool-admin-midway (业务后端)                         │
 │   Midway.js 3.x + TypeORM + MySQL + Redis + BullMQ                  │
-│   端口: 8001                                                         │
+│   端口: 17801                                                         │
 │   ┌──────────┬──────────┬──────────┬──────────┬──────────┐          │
 │   │ Auth     │ Record   │ Family   │ Checkin  │ Achievement│         │
 │   │ Controller│Controller│Controller│Controller│Controller │         │
@@ -54,7 +54,7 @@
 ┌──────────────────────────────▼───────────────────────────────────────┐
 │                   weiji-ai (AI 服务，不变)                             │
 │   FastAPI + 百度AI/通义千问/火山引擎/讯飞ASR/GPT-4o                  │
-│   端口: 8002                                                         │
+│   端口: 17802                                                         │
 └──────────────────────────────┬───────────────────────────────────────┘
                                │
 ┌──────────────────────────────▼───────────────────────────────────────┐
@@ -226,7 +226,7 @@ weiji-server/
 ```
 weiji-admin-web/
 ├── package.json                    # 项目依赖
-├── vite.config.ts                  # Vite 构建配置（proxy → :8001）
+├── vite.config.ts                  # Vite 构建配置（proxy → :17801）
 ├── tsconfig.json                   # TypeScript 配置
 ├── index.html                      # 入口 HTML
 ├── src/
@@ -605,8 +605,8 @@ classDiagram
 sequenceDiagram
     actor U as 用户
     participant FE as cool-admin-vue (前端)
-    participant BE as cool-admin-midway (:8001)
-    participant AI as weiji-ai (:8002)
+    participant BE as cool-admin-midway (:17801)
+    participant AI as weiji-ai (:17802)
     participant DB as MySQL
 
     Note over U,DB: ===== 阶段1：用户登录 =====
@@ -832,12 +832,12 @@ sequenceDiagram
 | `weiji-server/package.json` | 后端依赖声明 |
 | `weiji-server/tsconfig.json` | TypeScript 编译配置 |
 | `weiji-server/bootstrap.js` | cool-admin 启动入口 |
-| `weiji-server/src/app.ts` | Midway 应用配置（端口8001、CORS、中间件） |
+| `weiji-server/src/app.ts` | Midway 应用配置（端口17801、CORS、中间件） |
 | `weiji-server/src/configuration.ts` | cool-admin 生命周期配置 |
 | `weiji-server/src/global.ts` | 全局常量（JWT_SECRET、AI_URL、DB配置） |
 | `weiji-server/src/interface.ts` | 共享 TS 类型定义（从 store/types.ts 迁移，保留所有接口） |
 | `weiji-admin-web/package.json` | 前端依赖声明 |
-| `weiji-admin-web/vite.config.ts` | Vite 配置（proxy → :8001） |
+| `weiji-admin-web/vite.config.ts` | Vite 配置（proxy → :17801） |
 | `weiji-admin-web/tsconfig.json` | TypeScript 配置 |
 | `weiji-admin-web/index.html` | HTML 入口 |
 | `weiji-admin-web/src/main.ts` | Vue 应用入口 |
@@ -1043,7 +1043,7 @@ function fail(message: string, code = 400): ApiResponse {
 ### 8.3 API 路径约定
 
 - 所有业务 API 前缀：`/api/`
-- AI 代理路径：`/api/ai/*` → 转发 `weiji-ai:8002/ai/*`
+- AI 代理路径：`/api/ai/*` → 转发 `weiji-ai:17802/ai/*`
 - 健康检查：`/api/health`
 - 静态文件：`/public/*`（图片等）
 

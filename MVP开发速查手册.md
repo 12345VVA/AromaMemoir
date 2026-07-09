@@ -281,7 +281,7 @@ Authorization: Bearer {token}
 | 打卡 | `/app/checkin` | 打卡记录 + 连续天数查询 |
 | 挑战赛 | `/app/challenge` | 挑战赛定义 + 参与记录 + 排行榜 |
 | 玩法 | `/app/gamification` | 图鉴 / 人格 / 盲猜 |
-| AI 代理 | `/app/ai` | recognize / beautify / recommend / voice / sticker（转发 :8002） |
+| AI 代理 | `/app/ai` | recognize / beautify / recommend / voice / sticker（转发 :17802） |
 
 **统一规范：**
 
@@ -540,7 +540,7 @@ erDiagram
 
 # 三、模块边界图
 
-> **已落地：** 本节为 2026-06 草拟的 cool-admin 目标架构设计，**已按此方向落地**为 cool-admin 全家桶（见根 README）：weiji-admin-web（cool-admin-vue :9000）+ weiji-app（cool-uni :9900 H5）→ weiji-server（cool-admin-midway，Midway.js + TypeORM + MySQL + Redis，:8001）→ weiji-ai（FastAPI :8002）。下文图与流程中的 Socket.io / BullMQ / Redis PubSub / 腾讯云 COS / Flutter 客户端等**均未实现**，保留仅作目标设计参考。
+> **已落地：** 本节为 2026-06 草拟的 cool-admin 目标架构设计，**已按此方向落地**为 cool-admin 全家桶（见根 README）：weiji-admin-web（cool-admin-vue :17901）+ weiji-app（cool-uni :17900 H5）→ weiji-server（cool-admin-midway，Midway.js + TypeORM + MySQL + Redis，:17801）→ weiji-ai（FastAPI :17802）。下文图与流程中的 Socket.io / BullMQ / Redis PubSub / 腾讯云 COS / Flutter 客户端等**均未实现**，保留仅作目标设计参考。
 
 ## 3.1 架构总览
 
@@ -706,7 +706,7 @@ erDiagram
 ```bash
 cd weiji-server
 npm install
-npm run dev          # ts-node src/bootstrap.ts，监听 :8001
+npm run dev          # ts-node src/bootstrap.ts，监听 :17801
 ```
 
 启动入口 `src/bootstrap.ts`：顶部 `import 'dotenv/config'` 加载 `.env` → 装配 CORS / bodyParser / JWT 中间件 → 扫描 `@Controller` 装饰器将路由注册到 `@koa/router` → 触发 `Configuration.onReady`。默认内存模式加载种子数据；AI 健康检查每 60s 一次，状态由 `/health` 暴露。
@@ -723,11 +723,11 @@ cp .env.example .env
 | 变量 | 默认 | 说明 |
 |------|------|------|
 | `NODE_ENV` | development | production 下必须显式设置 `JWT_SECRET`，否则启动即退出 |
-| `PORT` | 8001 | 服务监听端口 |
+| `PORT` | 17801 | 服务监听端口 |
 | `JWT_SECRET` | （开发回退默认值） | JWT 密钥；生产必填，建议 `openssl rand -hex 32` |
 | `DB_DRIVER` | memory | `memory`（内存+种子，重启丢失）/ `mysql`（持久化，需先执行 `db/init.sql`） |
 | `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | localhost / 3306 / root / 空 / weiji | MySQL 连接参数（仅 `DB_DRIVER=mysql` 时生效） |
-| `AI_SERVICE_URL` | http://localhost:8002 | weiji-ai 服务地址 |
+| `AI_SERVICE_URL` | http://localhost:17802 | weiji-ai 服务地址 |
 
 完整清单见 `weiji-server/.env.example`。weiji-ai 的 AI 厂商 Key 环境变量见 `weiji-ai/README.md`（缺失时自动降级返回 mock）。
 
@@ -736,27 +736,27 @@ cp .env.example .env
 ```bash
 cd weiji-ai
 uv sync
-uv run uvicorn main:app --host 0.0.0.0 --port 8002
+uv run uvicorn main:app --host 0.0.0.0 --port 17802
 ```
 
 无需配置任何 AI Key 即可启动：5 个端点会降级返回 mock 数据。完整环境变量与降级策略见 `weiji-ai/README.md`。
 
 ## 4.5 本地启动（四终端）
 
-> 当前架构基于 cool-admin 全家桶：weiji-server（cool-admin-midway :8001）/ weiji-admin-web（cool-admin-vue :9000）/ weiji-app（cool-uni :9900 H5）/ weiji-ai（FastAPI :8002）。
+> 当前架构基于 cool-admin 全家桶：weiji-server（cool-admin-midway :17801）/ weiji-admin-web（cool-admin-vue :17901）/ weiji-app（cool-uni :17900 H5）/ weiji-ai（FastAPI :17802）。
 
 ```bash
 # 终端1：AI 服务
-cd weiji-ai && uv run uvicorn main:app --host 0.0.0.0 --port 8002
+cd weiji-ai && uv run uvicorn main:app --host 0.0.0.0 --port 17802
 
 # 终端2：业务后端（cool-admin-midway）
-cd weiji-server && NODE_ENV=local node bootstrap-local.js   # → http://localhost:8001
+cd weiji-server && NODE_ENV=local node bootstrap-local.js   # → http://localhost:17801
 
 # 终端3：PC 后台（cool-admin-vue）
-cd weiji-admin-web && npm run dev       # → http://localhost:9000（admin/123456）
+cd weiji-admin-web && npm run dev       # → http://localhost:17901（admin/123456）
 
 # 终端4：移动端 H5（cool-uni）
-cd weiji-app && npm run dev:h5          # → http://localhost:9900（demo/123456）
+cd weiji-app && npm run dev:h5          # → http://localhost:17900（demo/123456）
 ```
 
 CI / 只读环境需加 `CHOKIDAR_USEPOLLING=true` 启动前端 dev server。后端 cool-admin 启动时自动建表并加载各模块 `db.json` 种子数据；生产配置 `config.prod.ts` 强制 `synchronize:false`。

@@ -40,7 +40,7 @@ app = FastAPI(title="味记 AI 服务", version="0.1.0")
 # ============================================================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8001"],
+    allow_origins=["http://localhost:17900", "http://127.0.0.1:17900", "http://localhost:17801"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -54,9 +54,9 @@ os.makedirs('static', exist_ok=True)
 
 # /static 路径访问限制：仅允许白名单 Referer 的请求，阻止匿名外部枚举
 STATIC_ALLOWED_REFERERS = (
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://localhost:8001',
+    'http://localhost:17900',
+    'http://127.0.0.1:17900',
+    'http://localhost:17801',
 )
 
 
@@ -478,4 +478,4 @@ async def generate_sticker(image: UploadFile = File(...), style: str = Form("def
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8002)
+    uvicorn.run(app, host="0.0.0.0", port=17802)

@@ -35,7 +35,7 @@ function isPortAvailableSync(port: number): boolean {
 export function availablePort(startPort: number): number {
   if (!process['pkg']) return startPort;
   let port = startPort;
-  while (port <= 8010) {
+  while (port <= 17810) {
     if (isPortAvailableSync(port)) {
       if (port !== startPort) {
         console.warn(
@@ -47,5 +47,5 @@ export function availablePort(startPort: number): number {
     }
     port++;
   }
-  return 8001;
+  return 17801;
 }

@@ -1,16 +1,16 @@
 const proxy = {
 	'/admin': {
-		target: 'http://localhost:8001',
+		target: 'http://localhost:17801',
 		changeOrigin: true
 	},
 
 	'/app': {
-		target: 'http://localhost:8001',
+		target: 'http://localhost:17801',
 		changeOrigin: true
 	},
 
 	'/dev/': {
-		target: 'http://127.0.0.1:8001',
+		target: 'http://127.0.0.1:17801',
 		changeOrigin: true,
 		rewrite: (path: string) => path.replace(/^\/dev/, '')
 	},

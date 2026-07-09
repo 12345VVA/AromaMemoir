@@ -31,6 +31,10 @@
 						</view>
 					</view>
 
+					<view v-if="pokedexStats" class="stats-bar">
+						已收集 {{ pokedexStats.unlocked }}/{{ pokedexStats.total }} · 稀有 {{ pokedexStats.rare }} · 隐藏 {{ pokedexStats.hidden }}
+					</view>
+
 					<view
 						v-for="cat in pokedex.categories || []"
 						:key="cat.category"
@@ -69,6 +73,11 @@
 						<text v-for="(t, i) in personality.traits || []" :key="i" class="trait-tag">{{ t }}</text>
 					</view>
 					<text class="personality-stat">基于近 {{ personality.recordCount || 0 }} 条记录生成</text>
+					<button
+						v-if="personality.shareText"
+						class="wj-btn wj-btn-ghost share-btn"
+						@click="copyShareText"
+					>复制分享文案</button>
 				</view>
 				<view v-else class="empty-tip">
 					{{ personality.description || '记录不足 3 条，暂无法生成人格报告' }}
@@ -107,6 +116,79 @@
 
 			<!-- 4. 家庭盲猜 -->
 			<view v-else-if="activeTab === 'blindguess'">
+				<!-- 玩法选择面板 -->
+				<view class="section-title">选择玩法</view>
+				<view class="mode-panel">
+					<button
+						class="wj-btn mode-btn"
+						:class="{ active: currentMode === 'chef' }"
+						:disabled="modeLoading"
+						@click="startModeGuess('chef')"
+					>猜厨师</button>
+					<button
+						class="wj-btn mode-btn"
+						:class="{ active: currentMode === 'rating' }"
+						:disabled="modeLoading"
+						@click="startModeGuess('rating')"
+					>猜评分</button>
+					<button
+						class="wj-btn mode-btn"
+						:class="{ active: currentMode === 'date' }"
+						:disabled="modeLoading"
+						@click="startModeGuess('date')"
+					>猜日期</button>
+				</view>
+
+				<view v-if="modeLoading" class="empty-tip">加载中...</view>
+				<view v-else-if="modeRound" class="wj-card mode-round-card">
+					<image
+						v-if="modeRound.coverUrl"
+						class="mode-cover"
+						:src="resolveImg(modeRound.coverUrl)"
+						mode="aspectFill"
+					/>
+					<view v-else class="mode-cover placeholder">
+						<text class="thumb-emoji">🍽️</text>
+					</view>
+					<text v-if="modeRound.dishName" class="mode-dish">{{ modeRound.dishName }}</text>
+					<text class="mode-prompt">{{ modePromptText }}</text>
+					<view v-if="modeRound.options && modeRound.options.length" class="mode-options">
+						<button
+							v-for="opt in modeRound.options"
+							:key="opt"
+							class="wj-btn wj-btn-ghost mode-option"
+							:disabled="!!modeSelectedAnswer || modeSubmitting"
+							:class="{
+								selected: modeSelectedAnswer === opt,
+								correct: modeRevealed && opt === revealData?.answer,
+								wrong: modeRevealed && modeSelectedAnswer === opt && opt !== modeRound.answer
+							}"
+							@click="selectModeAnswer(opt)"
+						>{{ opt }}</button>
+					</view>
+					<button
+						v-if="modeSelectedAnswer && !modeRevealed"
+						class="wj-btn mode-submit-btn"
+						:disabled="modeSubmitting"
+						:loading="modeSubmitting"
+						@click="submitModeGuess"
+					>提交猜测</button>
+					<view v-if="modeRevealed" class="mode-result">
+						<text class="mode-result-text">
+							{{ modeIsCorrect ? "✅ 猜对了！" : "❌ 猜错了" }}
+						</text>
+						<text class="mode-answer-text">正确答案：{{ revealData?.answer || '—' }}</text>
+					</view>
+					<button
+						v-if="modeRevealed"
+						class="wj-btn wj-btn-ghost mode-restart-btn"
+						@click="resetModeGuess"
+					>再玩一局</button>
+				</view>
+				<view v-else-if="modeFallback" class="empty-tip">
+					数据不足，建议先记录更多美食
+				</view>
+
 				<!-- 查看轮次 -->
 				<view class="section-title">查看盲猜轮次</view>
 				<view class="round-search">
@@ -327,12 +409,43 @@ const createForm = reactive({
 });
 const creating = ref(false);
 
+// 盲猜玩法（猜厨师/猜评分/猜日期）
+type BlindGuessMode = "chef" | "rating" | "date";
+const currentMode = ref<BlindGuessMode>("chef");
+const modeLoading = ref(false);
+const modeRound = ref<any>(null);
+const modeFallback = ref(false);
+const modeSelectedAnswer = ref<string>("");
+const modeSubmitting = ref(false);
+const modeRevealed = ref(false);
+const modeIsCorrect = ref(false);
+const modeGuessSubmitted = ref(false);
+const revealData = ref<any>(null);
+
 const pokedexCompletion = computed(() => {
 	const r = Number(pokedex.value.completionRate || 0);
 	// 后端返回 0~1（unlockedSlots/totalSlots），×100 转百分比；
 	// 若误返 0~100 则视为已转好；min/max 兜底到 0~100 防溢出
 	const pct = r > 1 ? r : Math.round(r * 100);
 	return Math.min(100, Math.max(0, pct));
+});
+
+// 图鉴统计条：仅当后端返回 stats 且含 unlocked/total/rare/hidden 时展示
+const pokedexStats = computed(() => {
+	const s = pokedex.value?.stats;
+	if (!s) return null;
+	const unlocked = Number(s.unlocked ?? s.unlockedSlots ?? 0);
+	const total = Number(s.total ?? s.totalSlots ?? 0);
+	const rare = Number(s.rare ?? 0);
+	const hidden = Number(s.hidden ?? 0);
+	if (!unlocked && !total && !rare && !hidden) return null;
+	return { unlocked, total, rare, hidden };
+});
+
+const modePromptText = computed(() => {
+	if (currentMode.value === "chef") return "猜猜这道菜是哪位厨师做的？";
+	if (currentMode.value === "rating") return "猜猜这道菜的评分是多少？";
+	return "猜猜这道菜是哪天记录的？";
 });
 
 const personalityEmoji = computed(() => {
@@ -469,6 +582,15 @@ async function loadRound() {
 	try {
 		const data: any = await api.getBlindGuessRoundDetail(id);
 		round.value = data || null;
+		// 校验当前用户是否属于该家庭组
+		const currentFamilyId = familyInfo.value?.id || familyInfo.value?.familyId;
+		const roundFamilyId = data?.familyId || data?.groupId;
+		if (currentFamilyId && roundFamilyId && String(currentFamilyId) !== String(roundFamilyId)) {
+			uni.showToast({ title: "您无权访问该轮次，仅家庭成员可参与", icon: "none" });
+			round.value = null;
+			roundRanking.value = [];
+			return;
+		}
 		roundRanking.value = extractRanking(data);
 		// 初始化猜测表单
 		if (data && Array.isArray(data.items)) {
@@ -571,6 +693,100 @@ async function handleCreate() {
 	} finally {
 		creating.value = false;
 	}
+}
+
+// ===== 盲猜单题玩法（猜厨师/猜评分/猜日期） =====
+async function startModeGuess(mode: BlindGuessMode) {
+	if (!createForm.familyId) {
+		uni.showToast({ title: "请先创建或加入家庭组", icon: "none" });
+		return;
+	}
+	currentMode.value = mode;
+	modeLoading.value = true;
+	modeFallback.value = false;
+	modeRound.value = null;
+	modeSelectedAnswer.value = "";
+	modeRevealed.value = false;
+	modeIsCorrect.value = false;
+	modeGuessSubmitted.value = false;
+	revealData.value = null;
+	try {
+		const data: any = await api.createBlindGuessRound({
+			familyId: createForm.familyId,
+			mode,
+		});
+		// fallback 判定：后端显式 fallback 标志，或缺少 options 视为数据不足
+		if (!data || data.fallback || !data.options || !data.options.length) {
+			modeFallback.value = true;
+			modeRound.value = null;
+		} else {
+			// 前端防御：删除 answer 字段，避免抓包作弊
+			const { answer, ...safeRound } = data;
+			modeRound.value = safeRound;
+		}
+	} catch {
+		modeFallback.value = true;
+	} finally {
+		modeLoading.value = false;
+	}
+}
+
+function selectModeAnswer(opt: string) {
+	if (modeRevealed.value || modeSubmitting.value) return;
+	modeSelectedAnswer.value = opt;
+}
+
+async function submitModeGuess() {
+	if (!modeRound.value || !modeSelectedAnswer.value) return;
+	if (modeGuessSubmitted.value) return;
+	const roundId = modeRound.value.id || modeRound.value.roundId;
+	if (!roundId) {
+		uni.showToast({ title: "轮次信息异常", icon: "none" });
+		return;
+	}
+	modeSubmitting.value = true;
+	try {
+		const guessResult: any = await api.guessBlindGuess(roundId, { guessAnswer: modeSelectedAnswer.value });
+		modeGuessSubmitted.value = true;
+		// 如果后端返回中已包含揭晓数据（score/correct/revealed 等），直接使用，避免重复调用 reveal 导致重复发奖
+		if (guessResult && (guessResult.revealed || guessResult.answer !== undefined || guessResult.correct !== undefined)) {
+			revealData.value = guessResult;
+		} else {
+			revealData.value = await api.revealBlindGuess(roundId);
+		}
+		modeRevealed.value = true;
+		const correctAnswer = revealData.value?.answer ?? modeRound.value.answer;
+		modeIsCorrect.value = String(modeSelectedAnswer.value) === String(correctAnswer);
+		if (revealData.value) {
+			modeRound.value = { ...modeRound.value, ...revealData.value };
+		}
+	} catch {
+		// api.ts 已统一 toast
+	} finally {
+		modeSubmitting.value = false;
+	}
+}
+
+function resetModeGuess() {
+	modeRound.value = null;
+	modeSelectedAnswer.value = "";
+	modeRevealed.value = false;
+	modeIsCorrect.value = false;
+	modeFallback.value = false;
+	modeGuessSubmitted.value = false;
+	revealData.value = null;
+}
+
+// ===== 人格分享文案复制 =====
+function copyShareText() {
+	const text = personality.value?.shareText;
+	if (!text) return;
+	uni.setClipboardData({
+		data: String(text),
+		success: () => {
+			uni.showToast({ title: "已复制分享文案", icon: "success" });
+		},
+	});
 }
 
 const tabLoadedOnce = ref(false);
@@ -1128,5 +1344,156 @@ onShow(() => {
 	color: var(--wj-text-muted);
 	font-size: 26rpx;
 	padding: 48rpx 0;
+}
+
+/* 图鉴统计条 */
+.stats-bar {
+	background: #fff;
+	border-radius: var(--wj-radius);
+	box-shadow: var(--wj-shadow);
+	padding: 20rpx 24rpx;
+	font-size: 26rpx;
+	color: var(--wj-text);
+	text-align: center;
+	margin-bottom: 16rpx;
+}
+
+/* 人格分享按钮 */
+.share-btn {
+	margin-top: 32rpx;
+	width: 100%;
+	height: 72rpx;
+	line-height: 72rpx;
+	font-size: 28rpx;
+	border-radius: 12rpx;
+}
+
+/* 盲猜玩法面板 */
+.mode-panel {
+	display: flex;
+	gap: 16rpx;
+	margin-bottom: 16rpx;
+}
+.mode-btn {
+	flex: 1;
+	height: 80rpx;
+	line-height: 80rpx;
+	font-size: 28rpx;
+	border-radius: 12rpx;
+	background: #fff;
+	color: var(--wj-text);
+	border: 2rpx solid var(--wj-border);
+}
+.mode-btn.active {
+	background: var(--wj-primary);
+	color: #fff;
+	border-color: var(--wj-primary);
+}
+.mode-btn[disabled] {
+	opacity: 0.6;
+}
+
+.mode-round-card {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding: 32rpx 28rpx;
+	margin-bottom: 16rpx;
+	text-align: center;
+}
+.mode-cover {
+	width: 280rpx;
+	height: 280rpx;
+	border-radius: 16rpx;
+	margin-bottom: 20rpx;
+	background: var(--wj-bg);
+}
+.mode-cover.placeholder {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.mode-dish {
+	display: block;
+	font-size: 32rpx;
+	font-weight: 700;
+	color: var(--wj-text);
+	margin-bottom: 8rpx;
+}
+.mode-prompt {
+	display: block;
+	font-size: 26rpx;
+	color: var(--wj-text-muted);
+	margin-bottom: 24rpx;
+}
+.mode-options {
+	display: flex;
+	flex-direction: column;
+	gap: 16rpx;
+	width: 100%;
+	margin-bottom: 8rpx;
+}
+.mode-option {
+	width: 100%;
+	height: 80rpx;
+	line-height: 80rpx;
+	font-size: 28rpx;
+	border-radius: 12rpx;
+	background: #fff;
+	color: var(--wj-text);
+	border: 2rpx solid var(--wj-border);
+}
+.mode-option.selected {
+	border-color: var(--wj-primary);
+	color: var(--wj-primary);
+	background: rgba(255, 107, 53, 0.06);
+}
+.mode-option.correct {
+	border-color: #34c759;
+	color: #34c759;
+	background: rgba(52, 199, 89, 0.08);
+}
+.mode-option.wrong {
+	border-color: #ff3b30;
+	color: #ff3b30;
+	background: rgba(255, 59, 48, 0.08);
+}
+.mode-option[disabled] {
+	opacity: 1;
+}
+.mode-submit-btn {
+	width: 100%;
+	height: 84rpx;
+	line-height: 84rpx;
+	font-size: 30rpx;
+	border-radius: 12rpx;
+	margin-top: 16rpx;
+}
+.mode-result {
+	margin-top: 24rpx;
+	padding: 20rpx 24rpx;
+	background: var(--wj-bg);
+	border-radius: 12rpx;
+	width: 100%;
+}
+.mode-result-text {
+	display: block;
+	font-size: 30rpx;
+	font-weight: 700;
+	color: var(--wj-text);
+	margin-bottom: 8rpx;
+}
+.mode-answer-text {
+	display: block;
+	font-size: 26rpx;
+	color: var(--wj-text-muted);
+}
+.mode-restart-btn {
+	width: 100%;
+	height: 80rpx;
+	line-height: 80rpx;
+	font-size: 28rpx;
+	border-radius: 12rpx;
+	margin-top: 20rpx;
 }
 </style>

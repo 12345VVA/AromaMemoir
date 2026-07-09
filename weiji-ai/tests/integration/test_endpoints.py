@@ -7,6 +7,8 @@ autouse clean_env fixture 清空全部 12 个 AI 厂商环境变量并刷新 set
 import pytest
 from fastapi.testclient import TestClient
 
+import main as main_module
+
 # conftest 的 clean_env 已确保无 key 环境
 
 
@@ -68,7 +70,7 @@ def test_voice_recognize_degrades_without_key(client: TestClient):
     assert '未配置' in data['data']['message'] or '不可用' in data['data']['message']
 
 
-def test_sticker_returns_mock(client: TestClient):
+def test_sticker_degrades_without_key(client: TestClient):
     res = client.post(
         '/ai/sticker',
         files={'image': ('test.jpg', b'fake-image', 'image/jpeg')},
@@ -76,8 +78,47 @@ def test_sticker_returns_mock(client: TestClient):
     assert res.status_code == 200
     data = res.json()
     assert data['code'] == 0
-    # sticker 始终返回 mock，message 在 data 内
-    assert '开发中' in data['data']['message']
+    # 无 key 时降级返回占位图，message 在 data 内
+    assert data['data']['stickerUrl'] == 'assets/sticker-generated.png'
+    assert '占位图' in data['data']['message']
+
+
+def _force_tencent_ready(monkeypatch):
+    """配置腾讯云 key 使 settings.tencent_ready 为 True，便于测审核分支。"""
+    monkeypatch.setattr(main_module.settings, 'TENCENT_SECRET_ID', 'fake')
+    monkeypatch.setattr(main_module.settings, 'TENCENT_SECRET_KEY', 'fake')
+
+
+def test_beautify_blocks_non_compliant_image(client: TestClient, monkeypatch):
+    _force_tencent_ready(monkeypatch)
+
+    async def _block(_bytes):
+        return False
+
+    monkeypatch.setattr(main_module, 'tencent_check', _block)
+    res = client.post(
+        '/ai/beautify',
+        files={'image': ('test.jpg', b'fake-image', 'image/jpeg')},
+    )
+    data = res.json()
+    assert data['code'] != 0
+    assert '不合规' in data['message']
+
+
+def test_sticker_blocks_non_compliant_image(client: TestClient, monkeypatch):
+    _force_tencent_ready(monkeypatch)
+
+    async def _block(_bytes):
+        return False
+
+    monkeypatch.setattr(main_module, 'tencent_check', _block)
+    res = client.post(
+        '/ai/sticker',
+        files={'image': ('test.jpg', b'fake-image', 'image/jpeg')},
+    )
+    data = res.json()
+    assert data['code'] != 0
+    assert '不合规' in data['message']
 
 
 # ============================================================

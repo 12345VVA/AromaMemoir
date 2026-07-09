@@ -22,13 +22,14 @@ import services.baidu_vision as bv
 import services.openai_vision as ov
 import services.tencent_moderation as tm
 import services.qwen_llm as ql
-import services.volcano_image as vi
+import services.volcano_ark as va
+import services.volcano_tos as vt
 import services.xfyun_asr as xa
 
 
 # 各 service 模块已 `from config import settings` 绑定的 settings 引用，
 # 需逐一替换（运行时函数查找的是各自模块命名空间里的 settings）
-_SERVICE_MODULES = [bv, ov, tm, ql, vi, xa]
+_SERVICE_MODULES = [bv, ov, tm, ql, va, vt, xa]
 
 # 所有需要在测试时清空的 AI 厂商凭证环境变量
 _AI_ENV_KEYS = [
@@ -36,6 +37,7 @@ _AI_ENV_KEYS = [
     'OPENAI_API_KEY',
     'QWEN_API_KEY', 'QWEN_BASE_URL',
     'VOLCANO_ACCESS_KEY', 'VOLCANO_SECRET_KEY',
+    'ARK_API_KEY', 'ARK_BASE_URL', 'ARK_MODEL_MULTIMODAL', 'ARK_MODEL_SEEDREAM',
     'XFYUN_APP_ID', 'XFYUN_API_KEY', 'XFYUN_API_SECRET',
     'TENCENT_SECRET_ID', 'TENCENT_SECRET_KEY',
 ]

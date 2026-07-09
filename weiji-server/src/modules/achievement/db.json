@@ -65,6 +65,39 @@
       "condition": { "familyCreated": true },
       "exp": 100,
       "isActive": true
+    },
+    {
+      "id": 7,
+      "code": "breakfast_master",
+      "name": "早餐达人",
+      "description": "连续7天记录早餐",
+      "icon": "🥚",
+      "type": "breakfast",
+      "condition": { "breakfastDays": 7 },
+      "exp": 50,
+      "isActive": true
+    },
+    {
+      "id": 8,
+      "code": "nutrition_master",
+      "name": "营养大师",
+      "description": "连续30天均衡饮食",
+      "icon": "🥦",
+      "type": "nutrition",
+      "condition": { "nutritionDays": 30 },
+      "exp": 100,
+      "isActive": true
+    },
+    {
+      "id": 9,
+      "code": "chef_god",
+      "name": "厨神",
+      "description": "完成100次做饭记录",
+      "icon": "🍳",
+      "type": "cook",
+      "condition": { "cookCount": 100 },
+      "exp": 100,
+      "isActive": true
     }
   ]
 }

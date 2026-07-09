@@ -10,7 +10,7 @@ import { AppUserEntity } from '../../account/entity/user';
 import { FamilyMemberEntity } from '../../family/entity/member';
 import { ChallengeService } from '../../challenge/service/challenge';
 import { AchievementService } from '../../achievement/service/achievement';
-import { todayStr } from '../../../comm/date';
+import { todayStr, daysAgoStr } from '../../../comm/date';
 
 /**
  * 美食记录服务
@@ -150,6 +150,9 @@ export class RecordService extends BaseService {
       ingredients: Array.isArray(body.ingredients) ? body.ingredients : [],
       tags: Array.isArray(body.tags) ? body.tags : [],
       mealType: body.mealType,
+      cookId: typeof body.cookId === 'number' ? body.cookId : null,
+      nutritionTags: Array.isArray(body.nutritionTags) ? body.nutritionTags : null,
+      kidFriendly: typeof body.kidFriendly === 'boolean' ? body.kidFriendly : false,
       recordDate: body.recordDate || today,
       imageUrl: body.imageUrl,
       beautifiedUrl: body.beautifiedUrl,
@@ -194,6 +197,56 @@ export class RecordService extends BaseService {
         { type: 'cuisine_count', value: cuisineCount }
       );
       newAchievements.push(...cuisineAchievements);
+
+      // 早餐达人：统计最近30天有 breakfast 记录的去重天数
+      // 简化逻辑：统计最近30天符合条件的去重天数，非严格连续
+      const breakfastSince = daysAgoStr(30);
+      const breakfastRows = await this.recordEntity
+        .createQueryBuilder('r')
+        .select('DISTINCT r.recordDate', 'recordDate')
+        .where('r.userId = :userId', { userId })
+        .andWhere('r.mealType = :mealType', { mealType: 'breakfast' })
+        .andWhere('r.recordDate >= :since', { since: breakfastSince })
+        .getRawMany();
+      const breakfastDays = breakfastRows.length;
+      const breakfastAchievements = await this.achievementService.checkAndUnlock(
+        userId,
+        { type: 'breakfast_streak', value: breakfastDays }
+      );
+      newAchievements.push(...breakfastAchievements);
+
+      // 厨神：统计该用户作为 cookId 的记录总数
+      const cookCount = await this.recordEntity.count({
+        where: { cookId: userId },
+      });
+      const cookAchievements = await this.achievementService.checkAndUnlock(
+        userId,
+        { type: 'cook_count', value: cookCount }
+      );
+      newAchievements.push(...cookAchievements);
+
+      // 营养大师：统计最近30天 nutritionTags 同时包含'蔬菜'和'蛋白'的去重天数
+      // 简化逻辑：统计最近30天符合条件的去重天数，非严格连续
+      const nutritionRows = await this.recordEntity
+        .createQueryBuilder('r')
+        .select('DISTINCT r.recordDate', 'recordDate')
+        .where('r.userId = :userId', { userId })
+        .andWhere('r.recordDate >= :since', { since: breakfastSince })
+        .andWhere(
+          'JSON_CONTAINS(r.nutritionTags, JSON_QUOTE(:tag1)) = 1',
+          { tag1: '蔬菜' }
+        )
+        .andWhere(
+          'JSON_CONTAINS(r.nutritionTags, JSON_QUOTE(:tag2)) = 1',
+          { tag2: '蛋白' }
+        )
+        .getRawMany();
+      const nutritionDays = nutritionRows.length;
+      const nutritionAchievements = await this.achievementService.checkAndUnlock(
+        userId,
+        { type: 'nutrition_streak', value: nutritionDays }
+      );
+      newAchievements.push(...nutritionAchievements);
     } catch (e) {
       // 成就解锁失败不阻塞记录保存
     }
@@ -222,8 +275,15 @@ export class RecordService extends BaseService {
       return { list: [], total, page, pageSize };
     }
 
-    // 批量预加载作者信息
-    const userIds = [...new Set(records.map(r => r.userId).filter(v => v != null))];
+    // 批量预加载作者信息（同时包含 cookId 对应的用户，用于 cookName 展示）
+    const userIds = [
+      ...new Set(
+        [
+          ...records.map(r => r.userId),
+          ...records.map(r => r.cookId),
+        ].filter(v => v != null)
+      ),
+    ];
     const users =
       userIds.length > 0
         ? await this.appUserEntity.find({ where: { id: In(userIds) } })
@@ -251,28 +311,54 @@ export class RecordService extends BaseService {
       commentsByRecord.set(c.recordId, arr);
     }
 
+    // 聚合家庭内各 dishName 的记录数（单次聚合，不影响现有分页性能）
+    const dishCountStats = await this.recordEntity
+      .createQueryBuilder('r')
+      .select('r.dishName', 'dishName')
+      .addSelect('COUNT(*)', 'count')
+      .where('r.familyId = :familyId', { familyId })
+      .groupBy('r.dishName')
+      .getRawMany();
+    const dishCountMap = new Map<string, number>();
+    dishCountStats.forEach((s: any) => {
+      dishCountMap.set(s.dishName, Number(s.count));
+    });
+
     const list = records.map(r => {
       const u = userMap.get(r.userId);
+      const cook = r.cookId != null ? userMap.get(r.cookId) : null;
       const rl = likesByRecord.get(r.id) ?? [];
       const rc = (commentsByRecord.get(r.id) ?? []).slice().sort((a, b) =>
         a.createTime < b.createTime ? -1 : a.createTime > b.createTime ? 1 : 0
       );
+      // 最新一条评论摘要：评论已按 createTime 升序排序，取末尾元素
+      const lastComment = rc.length > 0 ? rc[rc.length - 1] : null;
       return {
         id: r.id,
         userId: r.userId,
         userNickname: u?.nickName ?? '',
         userAvatar: u?.avatarUrl ?? '',
         dishName: r.dishName,
+        cookCount: dishCountMap.get(r.dishName) || 1,
         imageUrl: r.imageUrl,
         beautifiedUrl: r.beautifiedUrl,
         rating: r.rating,
         tags: r.tags,
         recordDate: r.recordDate,
         cookingMethod: r.cookingMethod,
+        mealType: r.mealType,
+        cookId: r.cookId,
+        cookName: cook?.nickName ?? '',
+        cookAvatar: cook?.avatarUrl ?? '',
+        nutritionTags: r.nutritionTags,
+        kidFriendly: r.kidFriendly,
         likeCount: rl.length,
         commentCount: rc.length,
         likedByMe: rl.some(l => l.userId === userId),
         comments: rc,
+        latestComment: lastComment
+          ? { content: lastComment.content, nickName: lastComment.nickName }
+          : null,
       };
     });
 

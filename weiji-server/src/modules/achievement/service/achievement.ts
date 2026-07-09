@@ -4,6 +4,7 @@ import { InjectEntityModel } from '@midwayjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { AchievementEntity } from '../entity/achievement';
 import { UserAchievementEntity } from '../entity/user_achievement';
+import { CheckinEntity } from '../../checkin/entity/checkin';
 
 /**
  * 成就服务
@@ -16,6 +17,9 @@ export class AchievementService extends BaseService {
 
   @InjectEntityModel(UserAchievementEntity)
   userAchievementEntity: Repository<UserAchievementEntity>;
+
+  @InjectEntityModel(CheckinEntity)
+  checkinEntity: Repository<CheckinEntity>;
 
   /**
    * 徽章列表
@@ -100,6 +104,9 @@ export class AchievementService extends BaseService {
       family_created: 'family',
       recipe_count: 'recipe',
       gameplay_blindguess: 'gameplay',
+      breakfast_streak: 'breakfast',
+      nutrition_streak: 'nutrition',
+      cook_count: 'cook',
     };
     const achType = achTypeMap[type];
     if (!achType) return [];
@@ -151,6 +158,24 @@ export class AchievementService extends BaseService {
         cond.blindguessChef === true
       ) {
         matched = true;
+      } else if (
+        type === 'breakfast_streak' &&
+        typeof cond.breakfastDays === 'number' &&
+        value >= cond.breakfastDays
+      ) {
+        matched = true;
+      } else if (
+        type === 'nutrition_streak' &&
+        typeof cond.nutritionDays === 'number' &&
+        value >= cond.nutritionDays
+      ) {
+        matched = true;
+      } else if (
+        type === 'cook_count' &&
+        typeof cond.cookCount === 'number' &&
+        value >= cond.cookCount
+      ) {
+        matched = true;
       }
 
       if (matched) {
@@ -186,5 +211,83 @@ export class AchievementService extends BaseService {
       }
     }
     return condition;
+  }
+
+  /**
+   * 获取用户下一个未解锁的连续打卡类徽章（type='streak' 或 'breakfast'）及当前进度
+   * 当前进度取用户最近一条打卡记录的 streak（来自 CheckinEntity）
+   * 全部已解锁时返回 { allUnlocked: true, highestBadge }
+   * @param userId 用户ID
+   */
+  async getNextStreakBadge(userId: number) {
+    // 查询连续打卡类徽章：type='streak' 或 'breakfast'
+    const badges = await this.achievementEntity.find({
+      where: [
+        { type: 'streak', isActive: true },
+        { type: 'breakfast', isActive: true },
+      ],
+      order: { id: 'ASC' },
+    });
+    if (badges.length === 0) {
+      return { allUnlocked: false, highestBadge: null, currentStreak: 0 };
+    }
+
+    // 解析每个徽章的目标天数，按目标升序排列，便于"下一个"与"最高"判断
+    const withTarget = badges.map(b => {
+      const cond = this.parseCondition(b.condition);
+      const target =
+        Number(cond.streakDays ?? cond.breakfastDays) || 0;
+      return { badge: b, target };
+    });
+    withTarget.sort((a, b) => a.target - b.target);
+
+    // 已解锁集合
+    const earned = await this.userAchievementEntity.find({
+      where: { userId },
+    });
+    const earnedSet = new Set(earned.map(e => e.achievementId));
+
+    // 当前 checkin streak：取最近一条打卡记录的 streak 值
+    const latestCheckin = await this.checkinEntity.find({
+      where: { userId },
+      order: { checkDate: 'DESC' },
+      take: 1,
+    });
+    const currentStreak =
+      latestCheckin.length > 0 ? Number(latestCheckin[0].streak) || 0 : 0;
+
+    // 找到第一个未解锁的徽章
+    for (const { badge, target } of withTarget) {
+      if (earnedSet.has(badge.id)) continue;
+      const remainingDays = Math.max(0, target - currentStreak);
+      const progress =
+        target > 0 ? Math.min(100, Math.floor((currentStreak / target) * 100)) : 0;
+      return {
+        badge: {
+          id: badge.id,
+          code: badge.code,
+          name: badge.name,
+          icon: badge.icon,
+          condition: badge.condition,
+        },
+        currentStreak,
+        targetStreak: target,
+        remainingDays,
+        progress,
+      };
+    }
+
+    // 全部已解锁，返回最高徽章（按目标天数排序后的最后一条）
+    const highest = withTarget[withTarget.length - 1].badge;
+    return {
+      allUnlocked: true,
+      highestBadge: {
+        id: highest.id,
+        code: highest.code,
+        name: highest.name,
+        icon: highest.icon,
+        condition: highest.condition,
+      },
+    };
   }
 }

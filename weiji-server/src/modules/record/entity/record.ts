@@ -35,6 +35,16 @@ export class RecordEntity extends BaseEntity {
   mealType: string;
 
   @Index()
+  @Column({ comment: '制作人用户ID', nullable: true })
+  cookId: number;
+
+  @Column({ comment: '营养标签 JSON 数组', type: 'json', nullable: true })
+  nutritionTags: any;
+
+  @Column({ comment: '孩子是否喜欢', default: false, nullable: true })
+  kidFriendly: boolean;
+
+  @Index()
   @Column({ comment: '记录日期', type: 'date', nullable: true })
   recordDate: string;
 

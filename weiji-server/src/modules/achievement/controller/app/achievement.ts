@@ -32,4 +32,15 @@ export class AppAchievementController extends BaseController {
     const userId = this.ctx.user?.userId;
     return this.ok(await this.achievementService.level(userId));
   }
+
+  /**
+   * 下一个未解锁的连续打卡类徽章及当前进度
+   */
+  @Get('/next-streak-badge', { summary: '下一个连续打卡徽章' })
+  async nextStreakBadge() {
+    const userId = this.ctx.user?.userId;
+    return this.ok(
+      await this.achievementService.getNextStreakBadge(userId)
+    );
+  }
 }

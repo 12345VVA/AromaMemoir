@@ -29,7 +29,12 @@
 					<text class="badge-name">{{ b.name }}</text>
 					<text class="badge-desc">{{ b.description || "" }}</text>
 				</view>
-				<view v-if="!achievements.length" class="empty-tip">暂无成就数据</view>
+				<view v-if="!achievements.length" class="empty-state">
+					<text class="empty-icon">🏆</text>
+					<text class="empty-text">暂无成就数据</text>
+					<text class="empty-hint">记录美食、参与挑战，解锁更多成就</text>
+					<button class="wj-btn empty-btn" @click="goHome">去记录美食</button>
+				</view>
 			</view>
 
 			<!-- 挑战列表 -->
@@ -38,7 +43,8 @@
 				<view v-for="c in challenges" :key="c.id" class="wj-card challenge-card">
 					<view class="challenge-header">
 						<text class="challenge-name">{{ c.name }}</text>
-						<text v-if="c.userCompleted" class="challenge-status done">已完成 ✓</text>
+						<text v-if="c.userRewarded" class="challenge-status done">已领取</text>
+						<text v-else-if="c.userCompleted" class="challenge-status done">已完成</text>
 						<text v-else-if="c.userJoined" class="challenge-status">进行中</text>
 					</view>
 					<text class="challenge-desc">{{ c.description || "" }}</text>
@@ -48,10 +54,16 @@
 						</view>
 						<text class="progress-text">进度: {{ c.userProgress || 0 }}/{{ c.userTarget || 0 }}</text>
 					</view>
-					<button v-if="!c.userJoined" class="wj-btn join-btn" @click="joinChallenge(c)">参与</button>
+					<button v-if="!c.userJoined" class="wj-btn join-btn" :disabled="joiningId === c.id" :loading="joiningId === c.id" @click="joinChallenge(c)">参与</button>
+					<button v-if="c.userCompleted && !c.userRewarded" class="wj-btn claim-btn" :disabled="claimingId === c.id" :loading="claimingId === c.id" @click="claimReward(c)">领取奖励</button>
 				</view>
 			</view>
-			<view v-else class="empty-tip">暂无挑战</view>
+			<view v-else class="empty-state">
+				<text class="empty-icon">🎯</text>
+				<text class="empty-text">暂无挑战</text>
+				<text class="empty-hint">参与挑战赢取丰厚奖励，探索更多美味</text>
+				<button class="wj-btn empty-btn" @click="goHome">去参与挑战</button>
+			</view>
 		</view>
 	</cl-page>
 </template>
@@ -64,6 +76,8 @@ import { api } from "/@/utils/api";
 const level = ref<any>({});
 const achievements = ref<any[]>([]);
 const challenges = ref<any[]>([]);
+const joiningId = ref<number | null>(null);
+const claimingId = ref<number | null>(null);
 
 const progressPercent = computed(() => {
 	const cur = Number(level.value.exp || 0);
@@ -128,6 +142,7 @@ async function loadChallenges() {
 					userProgress: Number(p.progress || 0),
 					userTarget: Number(p.target || c.target || 0),
 					userCompleted: !!p.completed,
+					userRewarded: !!p.rewarded || !!p.claimed,
 				};
 			}
 			return {
@@ -136,6 +151,7 @@ async function loadChallenges() {
 				userProgress: 0,
 				userTarget: Number(c.target || 0),
 				userCompleted: false,
+				userRewarded: false,
 			};
 		});
 	} catch {
@@ -144,14 +160,34 @@ async function loadChallenges() {
 }
 
 async function joinChallenge(c: any) {
+	joiningId.value = c.id;
 	try {
 		await api.joinChallenge(c.id);
-		c.userJoined = true;
-		c.userProgress = 0;
 		uni.showToast({ title: "参与成功", icon: "success" });
+		await loadChallenges();
 	} catch {
 		// 错误已由 api 层 toast
+	} finally {
+		joiningId.value = null;
 	}
+}
+
+async function claimReward(c: any) {
+	claimingId.value = c.id;
+	try {
+		const res = await api.claimChallengeReward(c.id);
+		c.userRewarded = true;
+		uni.showToast({ title: "领取成功", icon: "success" });
+		await loadLevel();
+	} catch {
+		// 错误已由 api 层 toast
+	} finally {
+		claimingId.value = null;
+	}
+}
+
+function goHome() {
+	uni.switchTab({ url: "/pages/index/index" });
 }
 
 onMounted(() => {
@@ -162,6 +198,8 @@ onMounted(() => {
 
 onShow(() => {
 	loadLevel();
+	loadAchievements();
+	loadChallenges();
 });
 </script>
 
@@ -331,5 +369,50 @@ onShow(() => {
 	font-size: 28rpx;
 	border-radius: 12rpx;
 	margin-top: 16rpx;
+}
+.claim-btn {
+	width: 100%;
+	height: 72rpx;
+	line-height: 72rpx;
+	font-size: 28rpx;
+	border-radius: 12rpx;
+	margin-top: 16rpx;
+	background: linear-gradient(135deg, #ff8c00, #ff6600);
+	color: #fff;
+	border: none;
+}
+
+.empty-state {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding: 48rpx 32rpx;
+	background: #fff;
+	border-radius: var(--wj-radius);
+	box-shadow: var(--wj-shadow);
+}
+.empty-icon {
+	font-size: 80rpx;
+	margin-bottom: 16rpx;
+}
+.empty-text {
+	font-size: 28rpx;
+	color: var(--wj-text);
+	font-weight: 600;
+	margin-bottom: 8rpx;
+}
+.empty-hint {
+	font-size: 24rpx;
+	color: var(--wj-text-muted);
+	margin-bottom: 24rpx;
+	text-align: center;
+	line-height: 1.5;
+}
+.empty-btn {
+	width: 280rpx;
+	height: 72rpx;
+	line-height: 72rpx;
+	font-size: 28rpx;
+	border-radius: 12rpx;
 }
 </style>

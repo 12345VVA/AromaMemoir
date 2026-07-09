@@ -58,4 +58,28 @@ export class AppFamilyController extends BaseController {
     );
     return this.ok(result);
   }
+
+  @Get('/today-status', { summary: '家庭今日状态' })
+  async todayStatus() {
+    const userId = this.ctx.user?.userId;
+    return this.ok(await this.familyService.getTodayStatus(userId));
+  }
+
+  @Get('/contribution', { summary: '家庭贡献榜' })
+  async contribution() {
+    const userId = this.ctx.user?.userId;
+    return this.ok(await this.familyService.getContribution(userId));
+  }
+
+  @Get('/today-feed', { summary: '家庭今日动态' })
+  async todayFeed() {
+    const userId = this.ctx.user?.userId;
+    return this.ok(await this.familyService.getTodayFeed(userId));
+  }
+
+  @Get('/level', { summary: '家庭等级与积分' })
+  async level() {
+    const userId = this.ctx.user?.userId;
+    return this.ok(await this.familyService.getFamilyLevel(userId));
+  }
 }

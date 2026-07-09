@@ -10,8 +10,11 @@ import { WeeklyMenuEntity } from '../entity/menu';
 import { ShoppingItemEntity } from '../entity/shopping';
 import { AppUserEntity } from '../../account/entity/user';
 import { RecordEntity } from '../../record/entity/record';
+import { RecordCommentEntity } from '../../record/entity/comment';
+import { RecordLikeEntity } from '../../record/entity/like';
+import { BlindGuessRoundEntity } from '../../gamification/entity/blind_guess_round';
 import { AchievementService } from '../../achievement/service/achievement';
-import { mondayStr, currentMonthStr } from '../../../comm/date';
+import { mondayStr, currentMonthStr, todayStr, daysAgoStr } from '../../../comm/date';
 
 /**
  * 家庭组服务
@@ -42,6 +45,15 @@ export class FamilyService extends BaseService {
 
   @InjectEntityModel(RecordEntity)
   recordEntity: Repository<RecordEntity>;
+
+  @InjectEntityModel(RecordCommentEntity)
+  recordCommentEntity: Repository<RecordCommentEntity>;
+
+  @InjectEntityModel(RecordLikeEntity)
+  recordLikeEntity: Repository<RecordLikeEntity>;
+
+  @InjectEntityModel(BlindGuessRoundEntity)
+  blindGuessRoundEntity: Repository<BlindGuessRoundEntity>;
 
   @Inject()
   achievementService: AchievementService;
@@ -1281,6 +1293,426 @@ export class FamilyService extends BaseService {
       topDishes,
       avgRating,
       tagDistribution,
+    };
+  }
+
+  // ============================================================
+  // 今日状态 / 贡献榜
+  // ============================================================
+
+  /**
+   * 家庭今日状态
+   * - 无家庭返回 { hasFamily: false }
+   * - 含成员列表（带头像昵称）、今日已记录人数、家庭总人数、家庭连续记录天数
+   * - 连续天数：从今日往前数，最近 30 天内连续有记录的天数
+   */
+  async getTodayStatus(userId: number): Promise<any> {
+    const family = await this.getMyFamily(userId);
+    if (!family) {
+      return { hasFamily: false };
+    }
+    const familyId = family.id;
+    // 成员列表（已含头像昵称）
+    const members = await this.listMembers(userId, familyId);
+    // 今日有记录的 userId 去重集合
+    const today = todayStr();
+    const todayRecords = await this.recordEntity.find({
+      where: { familyId, recordDate: today },
+      select: ['userId'],
+    });
+    const todayRecordedUserIds = new Set<number>();
+    for (const r of todayRecords) {
+      if (r.userId != null) {
+        todayRecordedUserIds.add(r.userId);
+      }
+    }
+    // 家庭连续记录天数：查最近 30 天 distinct recordDate，从今日开始连续计数
+    const startDate = daysAgoStr(29); // 含今日共 30 天
+    const recentRecords = await this.recordEntity
+      .createQueryBuilder('r')
+      .select('DISTINCT r.recordDate', 'recordDate')
+      .where('r.familyId = :familyId', { familyId })
+      .andWhere('r.recordDate >= :start', { start: startDate })
+      .getRawMany();
+    const recentDates = new Set(recentRecords.map(r => r.recordDate));
+    let familyStreakDays = 0;
+    for (let i = 0; i < 30; i++) {
+      const dateStr = daysAgoStr(i);
+      if (recentDates.has(dateStr)) {
+        familyStreakDays++;
+      } else {
+        break;
+      }
+    }
+    return {
+      hasFamily: true,
+      familyId,
+      familyName: family.name,
+      members: members.map(m => ({
+        userId: m.userId,
+        nickName: m.nickName,
+        avatarUrl: m.avatarUrl,
+        role: m.role,
+      })),
+      todayRecordedCount: todayRecordedUserIds.size,
+      totalMemberCount: members.length,
+      familyStreakDays,
+    };
+  }
+
+  /**
+   * 家庭贡献榜
+   * - 无家庭返回 { hasFamily: false }
+   * - 三个维度：做饭榜（按 cookId）、评价榜（按评论 userId）、新菜榜（首次尝试者）
+   * - 各维度取 Top 3，无数据返回空数组
+   * - 四个聚合查询置于同一事务，遵循项目硬约束（事务保证一致性）
+   */
+  async getContribution(userId: number): Promise<any> {
+    const family = await this.getMyFamily(userId);
+    if (!family) {
+      return { hasFamily: false };
+    }
+    const familyId = family.id;
+    // getMyFamily 已隐含成员校验，显式调用以遵循硬约束
+    await this.assertFamilyMembership(userId, familyId);
+    // 查询该家庭全部成员 userIds
+    const members = await this.familyMemberEntity.find({
+      where: { familyId },
+    });
+    const memberUserIds = members.map(m => m.userId);
+    if (memberUserIds.length === 0) {
+      return {
+        hasFamily: true,
+        cookRank: [],
+        commentRank: [],
+        newDishRank: [],
+      };
+    }
+    // 四个只读聚合查询置于同一事务，保证数据快照一致（遵循项目硬约束）
+    const { cookStats, commentStats, allRecords, users } = await this.getOrmManager().transaction(
+      async tx => {
+        // 做饭榜：按 cookId 分组 count（cookId 非空），取 Top 3
+        // cookId 字段由另一处迁移添加，查询失败时降级为空数组
+        let cookStatsTx: any[] = [];
+        try {
+          cookStatsTx = await tx
+            .createQueryBuilder(RecordEntity, 'r')
+            .select('r.cookId', 'cookId')
+            .addSelect('COUNT(*)', 'count')
+            .where('r.familyId = :familyId', { familyId })
+            .andWhere('r.cookId IS NOT NULL')
+            .groupBy('r.cookId')
+            .orderBy('count', 'DESC')
+            .limit(3)
+            .getRawMany();
+        } catch (e) {
+          // cookId 字段可能尚未迁移，降级为空数组
+          cookStatsTx = [];
+        }
+        // 评价榜：查 RecordCommentEntity，按 userId 分组 count
+        // 限定 userId 在家庭成员内 + 评论所属记录在本家庭内（双隔离）
+        const commentStatsTx = await tx
+          .createQueryBuilder(RecordCommentEntity, 'c')
+          .select('c.userId', 'userId')
+          .addSelect('COUNT(*)', 'count')
+          .where('c.userId IN (:...memberUserIds)', { memberUserIds })
+          .andWhere(
+            'c.recordId IN (SELECT r.id FROM weiji_record r WHERE r.familyId = :familyId)',
+            { familyId }
+          )
+          .groupBy('c.userId')
+          .orderBy('count', 'DESC')
+          .limit(3)
+          .getRawMany();
+        // 新菜榜：每个 dishName 取最早 createTime 的记录的 userId 作为"尝试者"
+        const allRecordsTx = await tx.find(RecordEntity, {
+          where: { familyId },
+          order: { createTime: 'ASC' },
+        });
+        // 收集所有需要查询头像昵称的 userIds（成员 + 三个榜单出现的 id）
+        const dishFirstUserIdTx = new Map<string, number>();
+        for (const r of allRecordsTx) {
+          if (!dishFirstUserIdTx.has(r.dishName) && r.userId != null) {
+            dishFirstUserIdTx.set(r.dishName, r.userId);
+          }
+        }
+        const allUserIdsTx = new Set<number>(memberUserIds);
+        cookStatsTx.forEach(s => {
+          const id = Number(s.cookId);
+          if (!isNaN(id)) allUserIdsTx.add(id);
+        });
+        commentStatsTx.forEach(s => {
+          const id = Number(s.userId);
+          if (!isNaN(id)) allUserIdsTx.add(id);
+        });
+        dishFirstUserIdTx.forEach(uid => allUserIdsTx.add(uid));
+        const usersTx =
+          allUserIdsTx.size > 0
+            ? await tx.find(AppUserEntity, {
+                where: { id: In(Array.from(allUserIdsTx)) },
+              })
+            : [];
+        return {
+          cookStats: cookStatsTx,
+          commentStats: commentStatsTx,
+          allRecords: allRecordsTx,
+          users: usersTx,
+          dishFirstUserId: dishFirstUserIdTx,
+        } as any;
+      }
+    );
+    // 事务外基于快照计算榜单（纯内存计算，无 DB 访问）
+    const dishFirstUserId = new Map<string, number>();
+    for (const r of allRecords) {
+      if (!dishFirstUserId.has(r.dishName) && r.userId != null) {
+        dishFirstUserId.set(r.dishName, r.userId);
+      }
+    }
+    const newDishCount = new Map<number, number>();
+    for (const uid of dishFirstUserId.values()) {
+      newDishCount.set(uid, (newDishCount.get(uid) || 0) + 1);
+    }
+    const userMap: Map<number, any> = new Map(users.map((u: any) => [u.id, u]));
+    const cookRank = cookStats
+      .map((s: any) => {
+        const cookId = Number(s.cookId);
+        const user = userMap.get(cookId);
+        return {
+          userId: cookId,
+          nickName: user?.nickName ?? '',
+          avatarUrl: user?.avatarUrl ?? '',
+          count: Number(s.count),
+        };
+      })
+      .filter((item: any) => userMap.has(item.userId));
+    const commentRank = commentStats.map((s: any) => {
+      const uId = Number(s.userId);
+      const user = userMap.get(uId);
+      return {
+        userId: uId,
+        nickName: user?.nickName ?? '',
+        avatarUrl: user?.avatarUrl ?? '',
+        count: Number(s.count),
+      };
+    });
+    const newDishRank = Array.from(newDishCount.entries())
+      .map(([uid, count]) => {
+        const user = userMap.get(uid);
+        return {
+          userId: uid,
+          nickName: user?.nickName ?? '',
+          avatarUrl: user?.avatarUrl ?? '',
+          count,
+        };
+      })
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 3);
+    return {
+      hasFamily: true,
+      cookRank,
+      commentRank,
+      newDishRank,
+    };
+  }
+
+  // ============================================================
+  // 今日动态 / 家庭等级
+  // ============================================================
+
+  /**
+   * 家庭今日动态 feed
+   * - 无家庭返回 { hasFamily: false }
+   * - 聚合今日三类事件：记录上传 / 点赞 / 盲猜完成
+   * - 按 createdAt 倒序合并，最多 20 条
+   * - 所有只读查询置于同一事务，遵循项目硬约束
+   */
+  async getTodayFeed(userId: number): Promise<any> {
+    const family = await this.getMyFamily(userId);
+    if (!family) {
+      return { hasFamily: false };
+    }
+    const familyId = family.id;
+    // getMyFamily 已隐含成员校验，显式调用以遵循硬约束
+    await this.assertFamilyMembership(userId, familyId);
+    const today = todayStr();
+    const todayPrefix = `${today}%`;
+    // 三类只读查询置于同一事务，保证数据快照一致（遵循项目硬约束）
+    const { records, likes, challenges } = await this.getOrmManager().transaction(
+      async tx => {
+        // 1. 记录上传：familyId + createTime 今日
+        // createTime 为 varchar 存储 YYYY-MM-DD HH:mm:ss，用 LIKE 匹配今日
+        const recordsTx = await tx
+          .createQueryBuilder(RecordEntity, 'r')
+          .where('r.familyId = :familyId', { familyId })
+          .andWhere('r.createTime LIKE :today', { today: todayPrefix })
+          .getMany();
+        // 2. 点赞：RecordLikeEntity 无 familyId，需关联 record 过滤本家庭 + 取 dishName
+        const likesTx = await tx
+          .createQueryBuilder(RecordLikeEntity, 'l')
+          .leftJoin(RecordEntity, 'r', 'r.id = l.recordId')
+          .select('l.userId', 'userId')
+          .addSelect('l.createTime', 'createTime')
+          .addSelect('r.dishName', 'dishName')
+          .where('l.createTime LIKE :today', { today: todayPrefix })
+          .andWhere('r.familyId = :familyId', { familyId })
+          .getRawMany();
+        // 3. 盲猜完成：BlindGuessRoundEntity familyId + createTime 今日
+        const challengesTx = await tx
+          .createQueryBuilder(BlindGuessRoundEntity, 'b')
+          .where('b.familyId = :familyId', { familyId })
+          .andWhere('b.createTime LIKE :today', { today: todayPrefix })
+          .getMany();
+        return { records: recordsTx, likes: likesTx, challenges: challengesTx };
+      }
+    );
+    // 收集所有 actor userIds，关联 AppUserEntity 补全昵称/头像
+    const actorUserIds = new Set<number>();
+    for (const r of records) {
+      if (r.userId != null) actorUserIds.add(r.userId);
+    }
+    for (const l of likes) {
+      const uid = Number(l.userId);
+      if (!isNaN(uid)) actorUserIds.add(uid);
+    }
+    for (const c of challenges) {
+      if (c.creatorId != null) actorUserIds.add(c.creatorId);
+    }
+    const users =
+      actorUserIds.size > 0
+        ? await this.appUserEntity.find({
+            where: { id: In(Array.from(actorUserIds)) },
+          })
+        : [];
+    const userMap = new Map(users.map(u => [u.id, u]));
+    // 构建事件流
+    const feed: any[] = [];
+    for (const r of records) {
+      const user = r.userId != null ? userMap.get(r.userId) : undefined;
+      feed.push({
+        eventType: 'record',
+        actorUserId: r.userId,
+        actorNickName: user?.nickName ?? '',
+        actorAvatar: user?.avatarUrl ?? '',
+        targetName: r.dishName,
+        createdAt: r.createTime,
+        summary: `上传了 ${r.dishName}`,
+      });
+    }
+    for (const l of likes) {
+      const uid = Number(l.userId);
+      const user = userMap.get(uid);
+      feed.push({
+        eventType: 'like',
+        actorUserId: uid,
+        actorNickName: user?.nickName ?? '',
+        actorAvatar: user?.avatarUrl ?? '',
+        targetName: l.dishName,
+        createdAt: l.createTime,
+        summary: `点赞了 ${l.dishName}`,
+      });
+    }
+    for (const c of challenges) {
+      const user = userMap.get(c.creatorId);
+      feed.push({
+        eventType: 'challenge',
+        actorUserId: c.creatorId,
+        actorNickName: user?.nickName ?? '',
+        actorAvatar: user?.avatarUrl ?? '',
+        targetName: '盲猜',
+        createdAt: c.createTime,
+        summary: '完成了盲猜挑战',
+      });
+    }
+    // 按 createdAt 倒序，最多 20 条
+    feed.sort((a, b) => {
+      const at = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bt = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bt - at;
+    });
+    return {
+      hasFamily: true,
+      feed: feed.slice(0, 20),
+    };
+  }
+
+  /**
+   * 家庭等级与积分
+   * - 无家庭返回 { hasFamily: false }
+   * - exp = 记录数*10 + (点赞数+评论数+盲猜数)*5
+   * - level = floor(exp/100)+1，称号按 level 区间
+   * - 所有只读查询置于同一事务，遵循项目硬约束
+   */
+  async getFamilyLevel(userId: number): Promise<any> {
+    const family = await this.getMyFamily(userId);
+    if (!family) {
+      return { hasFamily: false };
+    }
+    const familyId = family.id;
+    // getMyFamily 已隐含成员校验，显式调用以遵循硬约束
+    await this.assertFamilyMembership(userId, familyId);
+    // 查询家庭成员 userIds（用于评论数过滤）
+    const members = await this.familyMemberEntity.find({
+      where: { familyId },
+    });
+    const memberUserIds = members.map(m => m.userId);
+    // 四个只读聚合查询置于同一事务，保证数据快照一致（遵循项目硬约束）
+    const { recordCount, likeCount, commentCount, challengeCount } = await this.getOrmManager().transaction(
+      async tx => {
+        // 记录数
+        const recordCountTx = await tx.count(RecordEntity, {
+          where: { familyId },
+        });
+        // 点赞数：RecordLikeEntity 无 familyId，按家庭记录子查询过滤
+        const likeCountTx = await tx
+          .createQueryBuilder(RecordLikeEntity, 'l')
+          .where(
+            'l.recordId IN (SELECT r.id FROM weiji_record r WHERE r.familyId = :familyId)',
+            { familyId }
+          )
+          .getCount();
+        // 评论数：按家庭成员 userId 过滤（无 type 字段区分，全部计入）
+        const commentCountTx =
+          memberUserIds.length > 0
+            ? await tx.count(RecordCommentEntity, {
+                where: { userId: In(memberUserIds) },
+              })
+            : 0;
+        // 盲猜参与数
+        const challengeCountTx = await tx.count(BlindGuessRoundEntity, {
+          where: { familyId },
+        });
+        return {
+          recordCount: recordCountTx,
+          likeCount: likeCountTx,
+          commentCount: commentCountTx,
+          challengeCount: challengeCountTx,
+        };
+      }
+    );
+    // 计算等级与称号
+    const exp = recordCount * 10 + (likeCount + commentCount + challengeCount) * 5;
+    const level = Math.floor(exp / 100) + 1;
+    let currentTitle: string;
+    if (level >= 20) {
+      currentTitle = '传奇家庭';
+    } else if (level >= 10) {
+      currentTitle = '达人家庭';
+    } else if (level >= 5) {
+      currentTitle = '美食家庭';
+    } else {
+      currentTitle = '新手家庭';
+    }
+    const nextLevelExp = level * 100 + 100;
+    const progress = (exp % 100) / 100;
+    return {
+      hasFamily: true,
+      familyName: family.name,
+      level,
+      exp,
+      currentTitle,
+      nextLevelExp,
+      progress,
+      interactions: likeCount + commentCount + challengeCount,
     };
   }
 }

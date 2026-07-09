@@ -36,6 +36,14 @@ const proxy = {
 		changeOrigin: true,
 	},
 
+	// AI 生成图片不直接走 /static，而是通过 weiji-server /app/ai/static/* 流式代理到 weiji-ai
+	// （见 weiji-server/ai/controller/app/ai.ts staticProxy），自动被 /app 代理捕获转发。
+	// 此处必须注释掉 /static 的代理，否则会导致本地 (如 /static/icon/tabbar/*) 的图片被 Vite 错误地转发到后端
+	// "/static": {
+	// 	target: DEV_SERVER,
+	// 	changeOrigin: true,
+	// },
+
 	// H5 生产构建使用 /api 前缀，本地预览/调试时由 vite 代理转发到 weiji-server
 	"/api": {
 		target: DEV_SERVER,

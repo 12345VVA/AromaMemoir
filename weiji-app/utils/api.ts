@@ -113,6 +113,8 @@ interface RequestOptions {
 	showError?: boolean;
 	/** 是否在 401 时自动跳转登录页，默认 true */
 	redirectOn401?: boolean;
+	/** 请求超时（毫秒），默认 15000；AI 等长耗时调用可传更大值 */
+	timeout?: number;
 }
 
 /** 将 params 拼接到 url 的 query string */
@@ -156,7 +158,7 @@ function request<T = any>(options: RequestOptions): Promise<T> {
 			method,
 			data,
 			header,
-			timeout: 15000,
+			timeout: options.timeout ?? 15000,
 			success: (res) => {
 				const statusCode = (res as any).statusCode || 200;
 				const body = res.data as ApiResult<T> | undefined;
@@ -216,6 +218,8 @@ interface UploadOptions {
 	formData?: Record<string, any>;
 	showError?: boolean;
 	redirectOn401?: boolean;
+	/** 上传超时（毫秒），默认 60000；AI 等长耗时调用可传更大值 */
+	timeout?: number;
 }
 
 /**
@@ -245,7 +249,7 @@ function upload<T = any>(options: UploadOptions): Promise<T> {
 			name,
 			formData,
 			header,
-			timeout: 60000,
+			timeout: options.timeout ?? 60000,
 			success: (res) => {
 				const statusCode = res.statusCode || 200;
 				if (statusCode === 401) {
@@ -549,6 +553,24 @@ export const api = {
 		return request<any>({ url: "/app/family/report", method: "GET", params });
 	},
 
+	// ===== family 今日状态与贡献榜 =====
+	getFamilyTodayStatus() {
+		return request<any>({ url: "/app/family/today-status", method: "GET", showError: false });
+	},
+
+	getFamilyContribution() {
+		return request<any>({ url: "/app/family/contribution", method: "GET", showError: false });
+	},
+
+	// ===== family 今日动态与等级 =====
+	getFamilyTodayFeed() {
+		return request<any>({ url: "/app/family/today-feed", method: "GET", showError: false });
+	},
+
+	getFamilyLevel() {
+		return request<any>({ url: "/app/family/level", method: "GET", showError: false });
+	},
+
 	// ===== achievement 成就 =====
 	getAchievements() {
 		return request<any>({ url: "/app/achievement/list", method: "GET" });
@@ -556,6 +578,10 @@ export const api = {
 
 	getLevel() {
 		return request<any>({ url: "/app/achievement/level", method: "GET" });
+	},
+
+	getNextStreakBadge() {
+		return request<any>({ url: "/app/achievement/next-streak-badge", method: "GET", showError: false });
 	},
 
 	// ===== challenge 挑战 =====
@@ -569,6 +595,10 @@ export const api = {
 
 	getChallengeProgress() {
 		return request<any[]>({ url: "/app/challenge/progress", method: "GET" });
+	},
+
+	claimChallengeReward(id: number) {
+		return request<any>({ url: `/app/challenge/${id}/claim`, method: "POST" });
 	},
 
 	// ===== checkin 打卡 =====
@@ -587,21 +617,22 @@ export const api = {
 
 	// ===== gamification 趣味玩法（图鉴/人格/时光机/盲猜） =====
 	getPokedex() {
-		return request<any>({ url: "/app/gamification/pokedex", method: "GET" });
+		return request<any>({ url: "/app/gamification/pokedex", method: "GET", showError: false });
 	},
 
 	getPersonality() {
-		return request<any>({ url: "/app/gamification/personality", method: "GET" });
+		return request<any>({ url: "/app/gamification/personality", method: "GET", showError: false });
 	},
 
 	getTimemachine() {
-		return request<any>({ url: "/app/gamification/timemachine", method: "GET" });
+		return request<any>({ url: "/app/gamification/timemachine", method: "GET", showError: false });
 	},
 
 	createBlindGuessRound(data: {
 		familyId: number | string;
-		roundName: string;
-		recordIds: (number | string)[];
+		roundName?: string;
+		recordIds?: (number | string)[];
+		mode?: "chef" | "rating" | "date";
 	}) {
 		return request<any>({
 			url: "/app/gamification/blindguess/round",
@@ -633,7 +664,27 @@ export const api = {
 		});
 	},
 
+	// 单题玩法：提交猜测（猜厨师/猜评分/猜日期等），guessAnswer 为选项值
+	guessBlindGuess(
+		id: string | number,
+		data: { guessAnswer: string | number }
+	) {
+		return request<any>({
+			url: `/app/gamification/blindguess/round/${id}/guess`,
+			method: "POST",
+			data,
+		});
+	},
+
 	revealBlindGuessRound(id: string | number) {
+		return request<any>({
+			url: `/app/gamification/blindguess/round/${id}/reveal`,
+			method: "POST",
+		});
+	},
+
+	// 单题玩法揭晓（revealBlindGuessRound 的语义别名）
+	revealBlindGuess(id: string | number) {
 		return request<any>({
 			url: `/app/gamification/blindguess/round/${id}/reveal`,
 			method: "POST",
@@ -666,29 +717,37 @@ export const api = {
 	// 前端不得直接请求 weiji-ai 服务地址或任何第三方 AI API（如百度/腾讯/讯飞/通义千问）。
 	// AI 服务的 Key 配置、降级策略、健康检查均由后端统一管理。
 	recognizeFood(filePath: string) {
-		return upload<any>({ url: "/app/ai/recognize", filePath, name: "image" });
+		// AI 识别耗时长（后端可达 120s），超时放宽到 180s（> 网关 150s）
+		return upload<any>({ url: "/app/ai/recognize", filePath, name: "image", timeout: 180000 });
 	},
 
-	beautifyImage(filePath: string) {
-		return upload<any>({ url: "/app/ai/beautify", filePath, name: "image" });
+	beautifyImage(filePath: string, style?: string) {
+		return upload<any>({
+			url: "/app/ai/beautify",
+			filePath,
+			name: "image",
+			formData: style ? { style } : undefined,
+			timeout: 180000,
+		});
 	},
 
-	getRecommendations(dishName: string) {
+	getRecommendations(dishName: string, scene?: string, familyId?: number) {
 		return request<any>({
 			url: "/app/ai/recommend",
 			method: "POST",
-			data: { dishName },
+			data: { dishName, scene, familyId },
 			showError: false,
+			timeout: 180000,
 		});
 	},
 
 	voiceRecognize(filePath: string) {
 		// 语音识别：multipart 字段名为 audio（非 image）
-		return upload<any>({ url: "/app/ai/voice/recognize", filePath, name: "audio" });
+		return upload<any>({ url: "/app/ai/voice/recognize", filePath, name: "audio", timeout: 180000 });
 	},
 
 	generateSticker(filePath: string) {
-		return upload<any>({ url: "/app/ai/sticker", filePath, name: "image" });
+		return upload<any>({ url: "/app/ai/sticker", filePath, name: "image", timeout: 180000 });
 	},
 
 	// ===== open 公开 =====

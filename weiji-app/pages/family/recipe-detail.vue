@@ -6,7 +6,7 @@
 			<view v-else>
 				<!-- 封面 -->
 				<view class="cover-wrap">
-					<image v-if="recipe.coverUrl" class="cover-img" :src="recipe.coverUrl" mode="aspectFill" />
+					<image v-if="recipe.coverUrl" class="cover-img" :src="resolveImg(recipe.coverUrl)" mode="aspectFill" />
 					<view v-else class="cover-placeholder">🍽️</view>
 				</view>
 
@@ -41,7 +41,7 @@
 						<view class="step-num">{{ idx + 1 }}</view>
 						<view class="step-body">
 							<text class="step-text">{{ typeof step === "string" ? step : step.text || step.description }}</text>
-							<image v-if="step.imageUrl" class="step-img" :src="step.imageUrl" mode="aspectFill" />
+							<image v-if="step.imageUrl" class="step-img" :src="resolveImg(step.imageUrl)" mode="aspectFill" />
 						</view>
 					</view>
 					<view v-if="!steps.length" class="empty-tip">暂无步骤信息</view>
@@ -85,7 +85,7 @@
 import { ref, reactive, computed } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import { useStore } from "/@/cool";
-import { api } from "/@/utils/api";
+import { api, resolveImg } from "/@/utils/api";
 
 const { user } = useStore();
 const recipeId = ref("");
@@ -115,14 +115,7 @@ const steps = computed<any[]>(() => {
 });
 
 // 作者鉴权：当前用户为菜谱作者
-const canEdit = computed(() => {
-	if (!recipe.value) return false;
-	const curUser = user.info || {};
-	const curId = curUser.id || curUser.userId || curUser._id;
-	const authorId = recipe.value.authorId || recipe.value.userId || recipe.value.createdBy;
-	if (authorId && curId && String(authorId) === String(curId)) return true;
-	return false;
-});
+const canEdit = ref(false);
 
 function difficultyText(d: string) {
 	const map: Record<string, string> = { easy: "简单", medium: "中等", hard: "困难" };
@@ -137,6 +130,11 @@ async function loadDetail() {
 	try {
 		const data: any = await api.getRecipeDetail(recipeId.value);
 		recipe.value = data;
+		// 鉴权：用 recipe 的 authorId 与 store 中的 user.info 对比，避免 store 未初始化导致 canEdit 恒为 false
+		const curUser = user.info || {};
+		const curId = curUser.id || curUser.userId || curUser._id;
+		const authorId = data.authorId || data.userId || data.createdBy;
+		canEdit.value = !!(authorId && curId && String(authorId) === String(curId));
 	} catch {
 		recipe.value = null;
 	} finally {

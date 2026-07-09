@@ -125,6 +125,10 @@ function addIngredient() {
 	form.ingredients.push({ name: "", amount: "" });
 }
 function removeIngredient(idx: number) {
+	if (form.ingredients.length <= 1) {
+		uni.showToast({ title: "至少保留一种食材", icon: "none" });
+		return;
+	}
 	form.ingredients.splice(idx, 1);
 }
 

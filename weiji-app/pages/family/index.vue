@@ -217,6 +217,7 @@ function handleJoinFamily() {
 				await api.joinFamily(code);
 				uni.showToast({ title: "加入成功", icon: "success" });
 				uni.$emit("familyChanged");
+				refreshAll();
 			} catch (err: any) {
 				error.value = err?.message || "加载失败";
 			}

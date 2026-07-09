@@ -25,6 +25,15 @@ const HEALTH_CHECK_INTERVAL = 60_000;
 const RECOMMEND_CACHE_TTL = 60_000; // 缓存有效期 60s
 const RECOMMEND_CACHE_MAX = 200; // LRU 最大条目
 const RECOMMEND_MIN_INTERVAL = 3_000; // 同一用户最小请求间隔 3s（防刷）
+// 仅重写已知图片字段中的 /static/ URL，避免误改菜谱正文等业务字符串里的字面量
+const STATIC_URL_KEYS = new Set([
+  'url',
+  'coverUrl',
+  'imageUrl',
+  'beautifiedUrl',
+  'originalUrl',
+  'stickerUrl',
+]);
 
 // weiji-ai 返回的响应体格式（与 cool-admin 统一响应一致：{ code, data, message }）
 type AiServiceResponse = {
@@ -299,6 +308,14 @@ export class AiProxyService extends BaseService {
     //   - 失败响应不缓存/不节流，允许用户立即重试
     if (result && result.code === 1000) {
       this.recommendLastSuccess.set(userId, now);
+      // LRU 淘汰：recommendLastSuccess 与 recommendCache 共用同一容量上限，
+      // 超出时删最旧条目，防止长期运行后该 Map 单调增长导致内存泄漏
+      if (this.recommendLastSuccess.size > RECOMMEND_CACHE_MAX) {
+        const oldestUser = this.recommendLastSuccess.keys().next().value;
+        if (oldestUser !== undefined) {
+          this.recommendLastSuccess.delete(oldestUser);
+        }
+      }
       this.cacheResult(cacheKey, result, Date.now());
     }
     return result;
@@ -556,8 +573,8 @@ export class AiProxyService extends BaseService {
   /**
    * 贴纸生成，转发到 /ai/sticker
    */
-  async sticker(file: UploadFile): Promise<AiServiceResponse> {
-    const form = this.buildMultipartForm(file, 'image');
+  async sticker(file: UploadFile, style?: string): Promise<AiServiceResponse> {
+    const form = this.buildMultipartForm(file, 'image', style ? { style } : undefined);
     return this.forward('/ai/sticker', {
       body: form,
       headers: form.getHeaders(),
@@ -592,7 +609,8 @@ export class AiProxyService extends BaseService {
 
   /**
    * 递归重写响应中的 /static/xxx URL → /app/ai/static/xxx
-   * 仅处理字符串值，不修改数字/布尔/对象其他键名
+   * 仅处理已知图片字段（见 STATIC_URL_KEYS）的字符串值，避免误改菜谱正文等
+   * 业务字符串中恰好出现的 /static/ 字面量
    */
   private rewriteStaticUrls(obj: any): void {
     if (!obj || typeof obj !== 'object') return;
@@ -602,10 +620,12 @@ export class AiProxyService extends BaseService {
     }
     for (const key of Object.keys(obj)) {
       const val = obj[key];
-      if (typeof val === 'string') {
-        if (val.startsWith('/static/')) {
-          obj[key] = '/app/ai/static/' + val.slice('/static/'.length);
-        }
+      if (
+        typeof val === 'string' &&
+        STATIC_URL_KEYS.has(key) &&
+        val.startsWith('/static/')
+      ) {
+        obj[key] = '/app/ai/static/' + val.slice('/static/'.length);
       } else if (val && typeof val === 'object') {
         this.rewriteStaticUrls(val);
       }

@@ -141,7 +141,9 @@ export class AppAiController extends BaseController {
       if (!file) {
         return this.fail('上传文件为空', 400);
       }
-      return await this.aiProxyService.sticker(file);
+      const fields = (this.ctx.request?.body || {}) as Record<string, any>;
+      const style = typeof fields?.style === 'string' ? fields.style : undefined;
+      return await this.aiProxyService.sticker(file, style);
     } catch (err) {
       this.ctx.logger?.error(
         '[ai-proxy] /app/ai/sticker',
@@ -164,9 +166,9 @@ export class AppAiController extends BaseController {
    * 标记 IGNORE_TOKEN：静态资源无需登录鉴权，且便于 <img> 直接引用。
    */
   @CoolTag(TagTypes.IGNORE_TOKEN)
-  @Get('/static/:fileName', { summary: 'AI静态资源代理' })
+  @Get('/static/:path(.*)', { summary: 'AI静态资源代理' })
   async staticProxy() {
-    const filePath = (this.ctx as any).params?.fileName ?? '';
+    const filePath = (this.ctx as any).params?.path ?? '';
     try {
       const resp = await this.aiProxyService.fetchStaticFile(filePath);
       // 透传 Content-Type / Content-Length / Cache-Control

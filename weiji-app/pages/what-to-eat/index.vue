@@ -112,6 +112,9 @@ const emptyActionText = computed(() => {
 	if (currentMode.value === "records") {
 		return "去AI记录";
 	}
+	if (currentMode.value === "recipes") {
+		return "去创建家庭";
+	}
 	return "";
 });
 
@@ -173,6 +176,8 @@ function checkEmpty() {
 function handleEmptyAction() {
 	if (currentMode.value === "records") {
 		uni.navigateTo({ url: "/pages/record/ai-record" });
+	} else if (currentMode.value === "recipes") {
+		uni.navigateTo({ url: "/pages/family/index" });
 	}
 }
 
@@ -225,10 +230,17 @@ function stopAnimation() {
 }
 
 async function startRecommend() {
+	// 防重入：动画/请求进行中若再次触发（双击、事件冒泡、uni-h5 事件 patch），
+	// 会并发打出第二个相同 body 的 /app/ai/recommend。animating 态直接放行拦截，
+	// 保证一次交互只发一次请求。
+	if (status.value === "animating") return;
 	startAnimation();
-	await new Promise((resolve) => setTimeout(resolve, 1500));
-	stopAnimation();
-	await generateRecommendation();
+	try {
+		// 动画需覆盖整个 AI 请求；原先 1.5s 后即 stop，请求期间反而无反馈
+		await generateRecommendation();
+	} finally {
+		stopAnimation();
+	}
 }
 
 async function generateRecommendation() {

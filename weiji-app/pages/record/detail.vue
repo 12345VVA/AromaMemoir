@@ -8,9 +8,9 @@
 			</view>
 			<view v-else>
 				<!-- 菜品图片 -->
-				<view v-if="record.imageUrl" class="cover-wrap">
-					<image class="cover-img" :src="record.imageUrl" mode="aspectFill" />
-				</view>
+			<view v-if="coverImage" class="cover-wrap">
+			<image class="cover-img" :src="resolveImg(coverImage)" mode="aspectFill" />
+			</view>
 
 				<!-- 基本信息 -->
 				<view class="wj-card info-card">
@@ -75,10 +75,17 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
-import { api } from "/@/utils/api";
+import { api, resolveImg } from "/@/utils/api";
 
 const record = ref<any>(null);
 const loading = ref(true);
+
+// 封面图字段兼容（imageUrl || image）
+const coverImage = computed(() => {
+	const r = record.value;
+	if (!r) return "";
+	return r.imageUrl || r.image || "";
+});
 
 // 食材列表（兼容字符串数组 / 对象数组 / 逗号字符串）
 const ingredients = computed<string[]>(() => {

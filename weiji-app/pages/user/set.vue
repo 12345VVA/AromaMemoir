@@ -34,6 +34,14 @@
 					</cl-list-item>
 				</cl-list>
 			</template>
+			<template v-else>
+				<cl-text :value="t('账号')" :margin="[0, 0, 20, 20]" block />
+				<cl-list :radius="16">
+					<cl-list-item :label="t('未登录')" :arrow-icon="false" :border="false">
+						<cl-text :value="t('请先登录')" />
+					</cl-list-item>
+				</cl-list>
+			</template>
 
 			<cl-text :value="t('关于')" :margin="[30, 0, 20, 20]" block />
 
@@ -69,7 +77,7 @@
 				/>
 			</cl-list>
 
-			<cl-list :radius="16">
+			<cl-list v-if="user.info" :radius="16">
 				<cl-list-item :label="t('切换账号')" @tap="switchAccount" />
 				<cl-list-item :label="t('退出登录')" :arrow-icon="false" @tap="handleLogout">
 					<cl-icon :size="36" name="exit" />
@@ -151,25 +159,44 @@ async function loadProfile() {
 	}
 }
 
-// 切换账号（先清除本地登录态，再跳转登录页，避免残留状态）
-function switchAccount() {
+// 切换账号（先调后端 logout，再清除本地登录态，最后跳转登录页，避免残留状态）
+async function switchAccount() {
+	try {
+		await api.logout();
+	} catch {
+		// 登出失败不阻塞切换账号
+	}
 	user.clear();
 	uni.reLaunch({ url: "/pages/user/login" });
 }
 
 // 退出登录（调用后端 logout 并清理本地）
+const loggingOut = ref(false);
+
 async function handleLogout() {
+	if (loggingOut.value) return;
+	loggingOut.value = true;
 	uni.showModal({
 		title: t("退出登录"),
 		content: t("确定要退出登录吗？"),
 		confirmColor: "#FF6B35",
 		success: async (res) => {
-			if (!res.confirm) return;
-			await api.logout();
+			if (!res.confirm) {
+				loggingOut.value = false;
+				return;
+			}
+			try {
+				await api.logout();
+			} catch {
+				// 登出接口失败不阻塞本地清理
+			}
 			uni.showToast({ title: t("已退出"), icon: "success" });
 			setTimeout(() => {
 				uni.reLaunch({ url: "/pages/user/login" });
 			}, 400);
+		},
+		fail: () => {
+			loggingOut.value = false;
 		},
 	});
 }

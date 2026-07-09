@@ -17,7 +17,7 @@
 			</view>
 
 			<cl-footer>
-				<cl-button custom type="primary" :loading="loading" @tap="save">
+				<cl-button custom type="primary" :loading="loading" :disabled="loading || !form.nickName.trim()" @tap="save">
 					{{ t("保存") }}
 				</cl-button>
 			</cl-footer>
@@ -45,6 +45,10 @@ const form = reactive({
 });
 
 async function save() {
+	if (!form.nickName.trim()) {
+		uni.showToast({ title: "昵称不能为空", icon: "none" });
+		return;
+	}
 	loading.value = true;
 
 	try {
@@ -61,9 +65,9 @@ async function save() {
 		});
 	} catch (err: any) {
 		ui.showToast(err?.message || t("保存失败"));
+	} finally {
+		loading.value = false;
 	}
-
-	loading.value = false;
 }
 
 onReady(async () => {

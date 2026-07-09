@@ -130,6 +130,9 @@ function validate(): string | null {
 }
 
 async function handleSubmit() {
+	// 防重入：密码输入框 @confirm 可绕过按钮 disabled，loading 时直接返回
+	if (loading.value) return;
+
 	// 注册模式：本地保留词预校验，命中则提示并阻止提交
 	if (isRegister.value) {
 		if (isReservedUsername(form.username)) {
@@ -163,8 +166,11 @@ async function handleSubmit() {
 				uni.switchTab({ url: "/pages/index/home" });
 			}, 400);
 		}
-	} catch {
-		// api.ts 已统一 toast
+	} catch (e: any) {
+		// api.ts 已统一 toast；兜底未覆盖场景
+		if (e?.message) {
+			uni.showToast({ title: e.message, icon: 'none' });
+		}
 	} finally {
 		loading.value = false;
 	}

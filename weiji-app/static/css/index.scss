@@ -17,14 +17,37 @@ page {
 	--wj-primary: #ff6b35;
 	--wj-primary-light: #ff8a5c;
 	--wj-primary-dark: #e5511e;
-	--wj-bg: #f7f7f8;
+	--wj-bg: #FFFBF5;
 	--wj-card-bg: #ffffff;
 	--wj-text: #1f1f22;
 	--wj-text-muted: #8a8a8f;
 	--wj-border: #ececee;
-	--wj-radius: 12px;
-	--wj-radius-lg: 16px;
-	--wj-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+
+	/* 暖色辅助色板 */
+	--wj-family-green: #9ED7A8;
+	--wj-growth-yellow: #FFD666;
+	--wj-memory-cream: #FFF1E6;
+	--wj-cream-bg: #FFFBF5;
+
+	/* 圆角四级 */
+	--wj-radius-sm: 12px;
+	--wj-radius: 16px;
+	--wj-radius-lg: 20px;
+	--wj-radius-xl: 24px;
+
+	/* 间距四级 */
+	--wj-space-xs: 8px;
+	--wj-space-sm: 12px;
+	--wj-space-md: 16px;
+	--wj-space-lg: 24px;
+
+	/* 字体层级 */
+	--wj-fs-title: 20px;
+	--wj-fs-sub: 14px;
+	--wj-fs-data: 32px;
+	--wj-fs-body: 14px;
+
+	--wj-shadow: 0 2px 8px rgba(255, 122, 69, 0.04);
 }
 
 view,
@@ -40,21 +63,58 @@ textarea {
 	background: var(--wj-card-bg);
 	border-radius: var(--wj-radius);
 	box-shadow: var(--wj-shadow);
-	padding: 14px 16px;
-	margin-bottom: 12px;
+	padding: 16px 18px;
+	margin-bottom: var(--wj-space-lg);
+}
+
+/* 主角卡片 */
+.wj-card-hero {
+	position: relative;
+	border-radius: var(--wj-radius-xl);
+	overflow: hidden;
+	padding: 0;
+	margin-bottom: var(--wj-space-lg);
+}
+
+/* 故事流卡片 */
+.wj-card-story {
+	background: var(--wj-card-bg);
+	border-radius: var(--wj-radius);
+	box-shadow: none;
+	padding: 16px 18px;
+	margin-bottom: var(--wj-space-lg);
 }
 
 /* 区块标题 */
 .section-title {
-	font-size: 16px;
+	font-size: var(--wj-fs-title);
 	font-weight: 600;
 	color: var(--wj-text);
-	margin: 16px 0 10px;
+	margin: var(--wj-space-lg) 0 var(--wj-space-md);
+}
+
+/* 区块副标题 */
+.section-sub {
+	font-size: var(--wj-fs-sub);
+	color: #999;
+	margin-top: 4px;
 }
 
 /* 页面容器 */
 .page-content {
 	padding: 12px 14px 24px;
+	/* 全 App 统一氛围背景：美食图 + 高透白遮罩，保证内容可读 */
+	background-image: linear-gradient(180deg, rgba(255, 250, 245, 0.94) 0%, rgba(255, 251, 245, 0.92) 100%), url("/static/bg/bg-kitchen.jpg");
+	background-size: cover;
+	background-position: center top;
+	background-repeat: no-repeat;
+	background-attachment: fixed;
+	min-height: 100vh;
+}
+
+/* 页面级暖色渐变背景 */
+.wj-page-warm-bg {
+	background: linear-gradient(180deg, #FFF1E6 0%, #FFFBF5 480rpx);
 }
 
 /* 空提示 */

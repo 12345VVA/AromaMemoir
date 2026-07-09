@@ -1389,7 +1389,7 @@ export class FamilyService extends BaseService {
       };
     }
     // 四个只读聚合查询置于同一事务，保证数据快照一致（遵循项目硬约束）
-    const { cookStats, commentStats, allRecords, users } = await this.getOrmManager().transaction(
+    const { cookStats, commentStats, allRecords, users, dishFirstUserId } = await this.getOrmManager().transaction(
       async tx => {
         // 做饭榜：按 cookId 分组 count（cookId 非空），取 Top 3
         // cookId 字段由另一处迁移添加，查询失败时降级为空数组
@@ -1425,8 +1425,10 @@ export class FamilyService extends BaseService {
           .limit(3)
           .getRawMany();
         // 新菜榜：每个 dishName 取最早 createTime 的记录的 userId 作为"尝试者"
+        // 只取新菜榜计算所需列，避免全量加载所有字段到内存
         const allRecordsTx = await tx.find(RecordEntity, {
           where: { familyId },
+          select: ['dishName', 'userId', 'createTime'],
           order: { createTime: 'ASC' },
         });
         // 收集所有需要查询头像昵称的 userIds（成员 + 三个榜单出现的 id）
@@ -1462,12 +1464,7 @@ export class FamilyService extends BaseService {
       }
     );
     // 事务外基于快照计算榜单（纯内存计算，无 DB 访问）
-    const dishFirstUserId = new Map<string, number>();
-    for (const r of allRecords) {
-      if (!dishFirstUserId.has(r.dishName) && r.userId != null) {
-        dishFirstUserId.set(r.dishName, r.userId);
-      }
-    }
+    // dishFirstUserId 复用事务内已计算的结果（同时用于补全 users 查询范围），避免重复遍历
     const newDishCount = new Map<number, number>();
     for (const uid of dishFirstUserId.values()) {
       newDishCount.set(uid, (newDishCount.get(uid) || 0) + 1);
@@ -1539,12 +1536,11 @@ export class FamilyService extends BaseService {
     // 三类只读查询置于同一事务，保证数据快照一致（遵循项目硬约束）
     const { records, likes, challenges } = await this.getOrmManager().transaction(
       async tx => {
-        // 1. 记录上传：familyId + createTime 今日
-        // createTime 为 varchar 存储 YYYY-MM-DD HH:mm:ss，用 LIKE 匹配今日
+        // 1. 记录上传：familyId + recordDate 今日（recordDate 为 date 类型且带索引，走索引）
         const recordsTx = await tx
           .createQueryBuilder(RecordEntity, 'r')
           .where('r.familyId = :familyId', { familyId })
-          .andWhere('r.createTime LIKE :today', { today: todayPrefix })
+          .andWhere('r.recordDate = :today', { today })
           .getMany();
         // 2. 点赞：RecordLikeEntity 无 familyId，需关联 record 过滤本家庭 + 取 dishName
         const likesTx = await tx
@@ -1670,12 +1666,18 @@ export class FamilyService extends BaseService {
             { familyId }
           )
           .getCount();
-        // 评论数：按家庭成员 userId 过滤（无 type 字段区分，全部计入）
+        // 评论数：限定 userId 在家庭成员内 + 评论所属记录在本家庭内（双隔离）
+        // RecordCommentEntity 无 familyId，必须经 record 子查询过滤，否则会跨家庭重复计数
         const commentCountTx =
           memberUserIds.length > 0
-            ? await tx.count(RecordCommentEntity, {
-                where: { userId: In(memberUserIds) },
-              })
+            ? await tx
+                .createQueryBuilder(RecordCommentEntity, 'c')
+                .where('c.userId IN (:...memberUserIds)', { memberUserIds })
+                .andWhere(
+                  'c.recordId IN (SELECT r.id FROM weiji_record r WHERE r.familyId = :familyId)',
+                  { familyId }
+                )
+                .getCount()
             : 0;
         // 盲猜参与数
         const challengeCountTx = await tx.count(BlindGuessRoundEntity, {

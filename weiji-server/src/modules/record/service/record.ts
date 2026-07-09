@@ -262,10 +262,18 @@ export class RecordService extends BaseService {
   async listFamilyRecords(userId: number, familyId: number, query: any) {
     const page = Math.max(1, Number(query.page) || 1);
     const pageSize = Math.max(1, Number(query.pageSize) || 20);
+    // 可选成员过滤：按 userId 或 cookId 命中（任一匹配即返回）。
+    // familyId 已在上层校验归属，此处仅缩小范围，不存在跨家庭越权。
+    const qUserId = Number(query.userId);
+    const memberUid = !isNaN(qUserId) && qUserId > 0 ? qUserId : null;
 
-    const [records, total] = await this.recordEntity
+    const qb = this.recordEntity
       .createQueryBuilder('r')
-      .where('r.familyId = :familyId', { familyId })
+      .where('r.familyId = :familyId', { familyId });
+    if (memberUid) {
+      qb.andWhere('(r.userId = :qUid OR r.cookId = :qUid)', { qUid: memberUid });
+    }
+    const [records, total] = await qb
       .orderBy('r.createTime', 'DESC')
       .skip((page - 1) * pageSize)
       .take(pageSize)

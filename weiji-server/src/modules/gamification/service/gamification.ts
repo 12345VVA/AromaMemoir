@@ -639,7 +639,7 @@ export class GamificationService extends BaseService {
 
     const record = this.pickRandom(records)!;
     const correctRating = Math.round(record.rating * 2) / 2; // 取 0.5 的整数倍
-    if (correctRating <= 0) return null;
+    if (correctRating < 1) return null;
 
     // 生成评分选项池（0.5 步长，1.0-5.0）
     const allRatings = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0];
@@ -768,14 +768,6 @@ export class GamificationService extends BaseService {
       throw new CoolCommException('itemId 不存在于轮次中', 400);
     }
 
-    const guesses: any[] = Array.isArray(round.guesses) ? round.guesses : [];
-    const alreadyGuessed = guesses.some(
-      g => Number(g.userId) === userId && Number(g.itemId) === itemId
-    );
-    if (alreadyGuessed) {
-      throw new CoolCommException('已对该题目提交过猜测', 400);
-    }
-
     if (!body.guessAuthorId || !body.guessDishName) {
       throw new CoolCommException('guessAuthorId 和 guessDishName 不能为空', 400);
     }
@@ -802,20 +794,44 @@ export class GamificationService extends BaseService {
       createdAt: new Date().toISOString(),
     };
 
-    // 用 JSON_ARRAY_APPEND 增量追加，避免 read-modify-write 并发覆盖丢失
-    // COALESCE 兜底 guesses 为 NULL 的情况
-    await this.blindGuessRoundEntity
-      .createQueryBuilder()
-      .update()
-      .set({
-        guesses: () =>
-          `JSON_ARRAY_APPEND(COALESCE(guesses, JSON_ARRAY()), '$', CAST(:guessJson AS JSON))`,
-      })
-      .where('id = :id', { id })
-      .setParameter('guessJson', JSON.stringify(guess))
-      .execute();
+    // 悲观锁防 TOCTOU：并发提交同一题时，锁内重新判重，避免「判重-追加」竞态
+    // 导致同一用户同一题被记录两次（参考 family.voteMenu 的锁用法）。
+    // JSON_ARRAY_APPEND 保留以防空指针/丢失更新，加锁防重复，二者互补。
+    await this.getOrmManager().transaction(async tx => {
+      const locked = await tx
+        .getRepository(BlindGuessRoundEntity)
+        .createQueryBuilder('b')
+        .setLock('pessimistic_write')
+        .where('b.id = :id', { id })
+        .getOne();
+      if (!locked) {
+        throw new CoolCommException('轮次不存在', 404);
+      }
+      if (locked.status !== 'active') {
+        throw new CoolCommException('轮次已揭晓', 400);
+      }
+      const lockedGuesses: any[] = Array.isArray(locked.guesses) ? locked.guesses : [];
+      const alreadyGuessed = lockedGuesses.some(
+        g => Number(g.userId) === userId && Number(g.itemId) === itemId
+      );
+      if (alreadyGuessed) {
+        throw new CoolCommException('已对该题目提交过猜测', 400);
+      }
+      await tx
+        .getRepository(BlindGuessRoundEntity)
+        .createQueryBuilder()
+        .update()
+        .set({
+          guesses: () =>
+            `JSON_ARRAY_APPEND(COALESCE(guesses, JSON_ARRAY()), '$', CAST(:guessJson AS JSON))`,
+        })
+        .where('id = :id', { id })
+        .setParameter('guessJson', JSON.stringify(guess))
+        .execute();
+    });
 
-    return guess;
+    // pending 标记：揭晓前 correct/score 仅为占位，避免前端误判为「猜错」
+    return { ...guess, pending: true };
   }
 
   /**
@@ -843,14 +859,6 @@ export class GamificationService extends BaseService {
       throw new CoolCommException('itemId 不存在于轮次中', 400);
     }
 
-    const guesses: any[] = Array.isArray(round.guesses) ? round.guesses : [];
-    const alreadyGuessed = guesses.some(
-      g => Number(g.userId) === userId && Number(g.itemId) === itemId
-    );
-    if (alreadyGuessed) {
-      throw new CoolCommException('已对该题目提交过猜测', 400);
-    }
-
     if (body.guessAnswer == null) {
       throw new CoolCommException('guessAnswer 不能为空', 400);
     }
@@ -867,18 +875,42 @@ export class GamificationService extends BaseService {
       createdAt: new Date().toISOString(),
     };
 
-    await this.blindGuessRoundEntity
-      .createQueryBuilder()
-      .update()
-      .set({
-        guesses: () =>
-          `JSON_ARRAY_APPEND(COALESCE(guesses, JSON_ARRAY()), '$', CAST(:guessJson AS JSON))`,
-      })
-      .where('id = :id', { id })
-      .setParameter('guessJson', JSON.stringify(guess))
-      .execute();
+    // 悲观锁防 TOCTOU：并发提交同一题时，锁内重新判重（参考 family.voteMenu）
+    await this.getOrmManager().transaction(async tx => {
+      const locked = await tx
+        .getRepository(BlindGuessRoundEntity)
+        .createQueryBuilder('b')
+        .setLock('pessimistic_write')
+        .where('b.id = :id', { id })
+        .getOne();
+      if (!locked) {
+        throw new CoolCommException('轮次不存在', 404);
+      }
+      if (locked.status !== 'active') {
+        throw new CoolCommException('轮次已揭晓', 400);
+      }
+      const lockedGuesses: any[] = Array.isArray(locked.guesses) ? locked.guesses : [];
+      const alreadyGuessed = lockedGuesses.some(
+        g => Number(g.userId) === userId && Number(g.itemId) === itemId
+      );
+      if (alreadyGuessed) {
+        throw new CoolCommException('已对该题目提交过猜测', 400);
+      }
+      await tx
+        .getRepository(BlindGuessRoundEntity)
+        .createQueryBuilder()
+        .update()
+        .set({
+          guesses: () =>
+            `JSON_ARRAY_APPEND(COALESCE(guesses, JSON_ARRAY()), '$', CAST(:guessJson AS JSON))`,
+        })
+        .where('id = :id', { id })
+        .setParameter('guessJson', JSON.stringify(guess))
+        .execute();
+    });
 
-    return guess;
+    // pending 标记：揭晓前 correct/score 仅为占位，避免前端误判为「猜错」
+    return { ...guess, pending: true };
   }
 
   /**

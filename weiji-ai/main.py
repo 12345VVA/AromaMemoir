@@ -10,7 +10,7 @@ import asyncio
 import os
 import uuid
 
-from fastapi import FastAPI, File, UploadFile, Request
+from fastapi import FastAPI, File, UploadFile, Request, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -257,8 +257,8 @@ async def recognize_food(image: UploadFile = File(...)):
                 if not moderation_result:
                     return fail("图片内容不合规，请更换图片后重试")
             except Exception as mod_err:
-                # 审核 key 配置但调用失败，记 warning 并放行，不阻塞合规图
-                logger.warning("腾讯云审核调用异常，放行继续识别: %s", type(mod_err).__name__)
+                # 审核 key 配置但调用失败：fail-open 放行，不阻塞合规图；记 error 以便发现鉴权问题
+                logger.error("腾讯云审核调用异常，fail-open 放行继续识别: %s", mod_err, exc_info=True)
         # tencent_ready 为 False 时直接跳过审核走识别
 
         # 首选：火山方舟豆包多模态（先上传 TOS 再识别）
@@ -314,7 +314,7 @@ async def recognize_food(image: UploadFile = File(...)):
 # 图片美化服务
 # ============================================================
 @app.post("/ai/beautify")
-async def beautify_image(image: UploadFile = File(...), style: str = "auto"):
+async def beautify_image(image: UploadFile = File(...), style: str = Form("auto")):
     """
     AI 图片美化
     首选火山方舟豆包 Seedream（先上传 TOS 再编辑），返回 /static/ 落盘路径；
@@ -331,7 +331,7 @@ async def beautify_image(image: UploadFile = File(...), style: str = "auto"):
                 if not await tencent_check(image_bytes):
                     return fail("图片内容不合规，请更换图片后重试")
             except Exception as mod_err:
-                logger.warning("腾讯云审核调用异常，放行继续美化: %s", type(mod_err).__name__)
+                logger.error("腾讯云审核调用异常，fail-open 放行继续美化: %s", mod_err, exc_info=True)
 
         # 保存原图作为 fallback
         original_filename = f"original_{uuid.uuid4().hex}.jpg"
@@ -430,7 +430,7 @@ async def recognize_voice(audio: UploadFile = File(...)):
 # AI 贴纸生成
 # ============================================================
 @app.post("/ai/sticker")
-async def generate_sticker(image: UploadFile = File(...), style: str = "default"):
+async def generate_sticker(image: UploadFile = File(...), style: str = Form("default")):
     """
     AI 贴纸生成
     首选火山方舟豆包 Seedream（先上传 TOS 再生成），返回 /static/ 落盘路径；
@@ -447,7 +447,7 @@ async def generate_sticker(image: UploadFile = File(...), style: str = "default"
                 if not await tencent_check(image_bytes):
                     return fail("图片内容不合规，请更换图片后重试")
             except Exception as mod_err:
-                logger.warning("腾讯云审核调用异常，放行继续贴纸: %s", type(mod_err).__name__)
+                logger.error("腾讯云审核调用异常，fail-open 放行继续贴纸: %s", mod_err, exc_info=True)
 
         # 首选：火山方舟豆包 Seedream 生成贴纸
         try:

@@ -2,9 +2,9 @@
 味记 AI 服务 - 腾讯云图片内容审核
 
 调用腾讯云内容安全 ImageModeration 接口审核图片合规性。
-容错与安全平衡：
+容错与安全平衡（fail-open 策略，优先保证主流程可用）：
 - key 缺失或网络瞬时异常 → 降级视为合规（返回 True），不阻塞主流程
-- 鉴权失败（密钥/签名问题）→ 记录 error 并返回 False，避免静默放行
+- 鉴权失败（密钥/签名问题）→ 向上抛出 AiAuthError，调用方记录 error 后放行（fail-open）
 - 仅当接口明确返回 Suggestion=Pass/Review 时视为合规，Block 时拒绝
 """
 import base64

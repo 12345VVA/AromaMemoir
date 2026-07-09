@@ -62,3 +62,6 @@ deliverables/
 
 # Docker
 .dockerignore
+
+# 临时调试探针（打印 API key 片段，不入库）
+weiji-ai/_ark_probe.py

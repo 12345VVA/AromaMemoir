@@ -31,6 +31,20 @@ def _resolve_endpoint() -> str:
     return _DEFAULT_ENDPOINTS.get(region, f'tos-{region}.volces.com')
 
 
+# 模块级懒加载 TOS 客户端单例：同步 SDK 经 run_in_executor 多线程复用，
+# 避免每次上传新建 TosClientV2 导致底层连接池/句柄泄漏。
+# 配置来自环境变量，运行期不变，首次创建后复用（范式同 volcano_ark._get_client）。
+_client = None
+
+
+def _get_client(ak: str, sk: str, endpoint: str, region: str):
+    """懒加载 TosClientV2 单例。调用方需确保 ak/sk/endpoint/region 已配置。"""
+    global _client
+    if _client is None:
+        _client = tos.TosClientV2(ak, sk, endpoint, region)
+    return _client
+
+
 async def upload_image(image_bytes: bytes, ext: str = 'jpg') -> str:
     """
     上传图片字节流到 TOS，返回可访问 URL。
@@ -69,7 +83,7 @@ async def upload_image(image_bytes: bytes, ext: str = 'jpg') -> str:
 
     def _do_upload() -> None:
         """同步执行 TOS 上传（在 executor 线程中调用）。"""
-        client = tos.TosClientV2(ak, sk, endpoint, region)
+        client = _get_client(ak, sk, endpoint, region)
         # 显式设置公共读 ACL，否则对象默认私有，
         # 豆包服务端拉取图片会 403 → 识别失败 → 整体降级
         # tos SDK 的 acl 参数要求传 ACLType 枚举，不能用字符串

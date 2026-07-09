@@ -803,6 +803,11 @@ onLoad((options: any) => {
 	if (tab && validTabs.includes(tab)) {
 		activeTab.value = tab;
 	}
+	// discover 跳转可能带 mode=chef/rating/date，预选盲猜玩法模式（仅高亮，开局仍需点按钮）
+	const mode = options?.mode;
+	if (mode === "chef" || mode === "rating" || mode === "date") {
+		currentMode.value = mode;
+	}
 });
 
 onShow(() => {

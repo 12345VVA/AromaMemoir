@@ -88,7 +88,7 @@
 			@click="goWhatToEat"
 		>
 			<!-- 背景层：始终使用本地美食背景图轮换 -->
-			<image v-if="heroBg" class="hero-bg" :src="heroBg" mode="aspectFill" @error="onHeroImgErr" />
+			<image v-if="heroBg" class="hero-bg" :src="resolveImg(heroBg)" mode="aspectFill" @error="onHeroImgErr" />
 				<!-- 遮罩层 -->
 				<view class="hero-mask"></view>
 				<!-- 内容层 -->
@@ -232,35 +232,19 @@ import Tabbar from "./components/tabbar.vue";
 
 // Task 0.12: 美食背景图常量（兜底用于主角卡片）
 const BG_IMAGES = [
-	"/static/bg/bg-ramen.jpg",
-	"/static/bg/bg-hotpot.jpg",
-	"/static/bg/bg-baozi.jpg",
-	"/static/bg/bg-tea.jpg",
-	"/static/bg/bg-spice.jpg",
-	"/static/bg/bg-ingredients.jpg",
-	"/static/bg/bg-family.jpg",
-	"/static/bg/bg-kitchen.jpg",
-	"/static/bg/bg-harvest.jpg",
-	"/static/bg/bg-ricefield.jpg",
+	"/upload/bg/bg-ramen.jpg",
+	"/upload/bg/bg-hotpot.jpg",
+	"/upload/bg/bg-baozi.jpg",
+	"/upload/bg/bg-tea.jpg",
+	"/upload/bg/bg-spice.jpg",
+	"/upload/bg/bg-ingredients.jpg",
+	"/upload/bg/bg-family.jpg",
+	"/upload/bg/bg-kitchen.jpg",
+	"/upload/bg/bg-harvest.jpg",
+	"/upload/bg/bg-ricefield.jpg",
 ];
 // 当前主角卡片背景图
 const heroBg = ref<string>(BG_IMAGES[0]);
-// 整页背景图（每次打开随机选一张，避免与 heroBg 重复）
-const pageBg = ref<string>("");
-// 整页背景样式：背景图 + 半透明白色遮罩，保证内容可读
-const pageBgStyle = computed(() => {
-	if (!pageBg.value) {
-		// 兜底：暖色渐变
-		return { background: "linear-gradient(180deg, #FFF1E6 0%, #FFFBF5 480rpx)" };
-	}
-	return {
-		backgroundImage: `linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(255,250,245,0.88) 100%), url(${pageBg.value})`,
-		backgroundSize: "cover",
-		backgroundPosition: "center top",
-		backgroundRepeat: "no-repeat",
-		backgroundAttachment: "fixed",
-	};
-});
 // 主角卡片推荐结果（Task 5）
 const recommend = ref<any>(null);
 // 「换一批」刷新状态
@@ -279,16 +263,13 @@ function pickRandomBg(exclude?: string): string {
 }
 
 // 主角卡片图片加载失败：清空 heroBg 触发兜底渐变背景
-const heroImgFailed = ref(false);
 function onHeroImgErr() {
-	heroImgFailed.value = true;
 	heroBg.value = "";
 }
 
 // 「换一批」：重新拉取推荐，若新推荐无 imageUrl 则随机换背景
 async function loadRecommendation() {
 	refreshing.value = true;
-	heroImgFailed.value = false;
 	try {
 		const familyId = familyStatus.value?.familyId;
 		const data: any = await api.getRecommendations("", "dinner", familyId);
@@ -641,8 +622,14 @@ onMounted(async () => {
 	uni.$on("recordSaved", onRecordSaved);
 });
 
-// tabBar 页每次显示时刷新轻量数据
+// tabBar 页每次显示时刷新：加 60s 节流，避免频繁切 tab 重复打接口；
+// recordSaved 事件已覆盖「记录保存后刷新」，故长窗口可接受。
+let lastHomeLoadTime = 0;
+const HOME_LOAD_INTERVAL = 60 * 1000;
 onShow(() => {
+	const now = Date.now();
+	if (now - lastHomeLoadTime < HOME_LOAD_INTERVAL) return;
+	lastHomeLoadTime = now;
 	loadCheckin();
 	loadRecords();
 	loadFamilyStatus();

@@ -76,9 +76,6 @@ const keyword = ref("");
 const targetUserId = ref<number | null>(null);
 const targetName = ref("");
 
-// 成员模式：拉取家庭动态后前端按 userId/cookId 过滤，本地切片分页
-const allMemberRecords = ref<any[]>([]);
-
 // 分页：每页不超过 5 条。后端 /app/record/list 已支持 page/pageSize，按 createTime DESC 返回 { list, total }
 const PAGE_SIZE = 5;
 const page = ref(1);
@@ -175,46 +172,38 @@ async function loadRecords(reset = true) {
 	}
 }
 
-// 成员模式：通过家庭动态接口拉取全部记录，前端按 userId 或 cookId 过滤后切片分页
+// 成员模式：服务端按 userId/cookId 过滤 + 标准分页（后端 listFamilyRecords 已支持）
 async function loadMemberRecords(reset: boolean) {
 	if (reset) {
 		if (recordsLoading.value) return;
 		recordsLoading.value = true;
 		page.value = 1;
-		// 首屏/刷新时重新拉取家庭动态全量数据
-		try {
-			const data: any = await api.getFamilyFeed({ pageSize: 999 });
-			const list = Array.isArray(data) ? data : data?.list || data?.records || [];
-			const uid = Number(targetUserId.value);
-			allMemberRecords.value = list.filter((r: any) => {
-				const rUid = Number(r.userId);
-				const cUid = Number(r.cookId);
-				// 匹配记录创建者或制作人
-				return rUid === uid || cUid === uid;
-			});
-			total.value = allMemberRecords.value.length;
-		} catch {
-			allMemberRecords.value = [];
-			total.value = 0;
-		}
 	} else {
 		if (loadingMore.value || !hasMore.value) return;
 		loadingMore.value = true;
 		page.value += 1;
 	}
-	// 关键词二次过滤
-	const kw = keyword.value.trim();
-	const filtered = kw
-		? allMemberRecords.value.filter(r =>
-				(r.dishName || r.title || "").toLowerCase().includes(kw.toLowerCase())
-			)
-		: allMemberRecords.value;
-	total.value = filtered.length;
-	const start = (page.value - 1) * PAGE_SIZE;
-	const slice = filtered.slice(start, start + PAGE_SIZE);
-	records.value = reset ? slice : [...records.value, ...slice];
-	recordsLoading.value = false;
-	loadingMore.value = false;
+	try {
+		const data: any = await api.getFamilyFeed({
+			userId: targetUserId.value,
+			page: page.value,
+			pageSize: PAGE_SIZE,
+		});
+		const list = Array.isArray(data) ? data : data?.list || data?.records || [];
+		total.value = Array.isArray(data) ? list.length : Number(data?.total) || 0;
+		records.value = reset ? list : [...records.value, ...list];
+	} catch {
+		if (reset) {
+			records.value = [];
+			total.value = 0;
+		} else {
+			// 加载更多失败：回退页码，下次触底重试同一页
+			page.value -= 1;
+		}
+	} finally {
+		recordsLoading.value = false;
+		loadingMore.value = false;
+	}
 }
 
 function goDetail(id: number) {

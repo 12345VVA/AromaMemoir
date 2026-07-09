@@ -20,7 +20,7 @@
 					</view>
 					<view class="challenge-progress">
 						<view class="progress-bar">
-							<view class="progress-fill" :style="{ width: (levelData.progress * 100) + '%' }"></view>
+							<view class="progress-fill" :style="{ width: ((levelData.progress || 0) * 100) + '%' }"></view>
 						</view>
 						<text class="progress-text">{{ levelData.exp }}/{{ levelData.nextLevelExp }} EXP</text>
 					</view>

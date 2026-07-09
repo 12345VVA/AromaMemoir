@@ -187,7 +187,7 @@ async function claimReward(c: any) {
 }
 
 function goHome() {
-	uni.switchTab({ url: "/pages/index/index" });
+	uni.switchTab({ url: "/pages/index/home" });
 }
 
 onMounted(() => {

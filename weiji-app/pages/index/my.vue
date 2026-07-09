@@ -331,10 +331,11 @@ async function handleLogout() {
 	});
 }
 
-onShow(() => {
+onShow(async () => {
 	loadProfile();
 	checkAiStatus();
-	loadFamilyLevel();
+	// loadStats 依赖 familyLevel.interactions，需先等其就绪，否则首屏互动数恒为 0
+	await loadFamilyLevel();
 	loadFamilyInfo();
 	loadMembers();
 	loadAchievements();

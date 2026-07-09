@@ -20,3 +20,6 @@ data/*
 pnpm-lock.yaml
 public/uploads/*
 public/upload/*
+# 背景图为应用静态资产，需入库（区别于运行时用户上传图）
+!public/upload/bg/
+!public/upload/bg/*

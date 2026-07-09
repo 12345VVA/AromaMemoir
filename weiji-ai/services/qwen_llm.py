@@ -81,7 +81,7 @@ async def recommend(dish_name: str, recent_records: list = None) -> list:
 
     try:
         response = await client.chat.completions.create(
-            model="qwen-turbo",
+            model=settings.QWEN_MODEL,
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
             timeout=20.0,

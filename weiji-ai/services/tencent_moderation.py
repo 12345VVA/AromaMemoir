@@ -138,7 +138,7 @@ async def check_image(image_bytes: bytes) -> bool:
 
     容错与安全平衡：
         - key 缺失（not settings.tencent_ready）→ 直接返回 True（不阻塞主流程）
-        - 鉴权异常（AiAuthError / API 返回 AuthFailure.*）→ 记录 error，返回 False
+        - 鉴权异常（AiAuthError / API 返回 AuthFailure.*）→ 抛出 AiAuthError，由调用方决定 fail-open/fail-closed
         - 网络瞬时异常（ConnectError/Timeout/NetworkError）→ 重试一次，仍失败返回 True
         - 其他异常 / Suggestion 字段缺失或未知 → 记录 warning，返回 True（容错优先）
         - 仅 Suggestion=Pass/Review 视为明确合规
@@ -153,11 +153,8 @@ async def check_image(image_bytes: bytes) -> bool:
         "FileContent": file_content,
     }
 
-    try:
-        headers = _build_signed_headers(payload)
-    except AiAuthError as e:
-        logger.error("tencent moderation auth error: %s", e)
-        return False
+    # 鉴权异常向上抛出，由调用方（main.py）决定 fail-open 还是 fail-closed
+    headers = _build_signed_headers(payload)
 
     # body 序列化方式与签名时一致（json.dumps 默认行为）
     body = json.dumps(payload)
@@ -195,11 +192,8 @@ async def check_image(image_bytes: bytes) -> bool:
         error_code = error_info.get("Code", "")
         error_message = error_info.get("Message", "")
         if error_code.startswith("AuthFailure"):
-            logger.error(
-                "tencent moderation auth failure: code=%s message=%s",
-                error_code, error_message,
-            )
-            return False
+            # 鉴权失败向上抛出，由调用方（main.py）决定 fail-open 还是 fail-closed
+            raise AiAuthError('tencent', f'鉴权失败: {error_code}')
         logger.warning(
             "tencent moderation API error: code=%s message=%s, fail-open",
             error_code, error_message,

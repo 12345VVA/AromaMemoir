@@ -66,7 +66,7 @@ async def recognize_dish(image_bytes: bytes) -> dict:
 
     try:
         response = await client.chat.completions.create(
-            model="gpt-4o",
+            model=settings.OPENAI_MODEL,
             messages=[{
                 "role": "user",
                 "content": [

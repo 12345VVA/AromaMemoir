@@ -23,9 +23,12 @@ from exceptions import AiProviderError, AiAuthError, AiQuotaError, AiInvalidInpu
 from services.baidu_vision import recognize_dish as baidu_recognize
 from services.openai_vision import recognize_dish as openai_recognize
 from services.tencent_moderation import check_image as tencent_check
-from services.volcano_image import beautify as volcano_beautify
 from services.qwen_llm import recommend as qwen_recommend
 from services.xfyun_asr import recognize as xfyun_recognize
+from services.volcano_tos import upload_image as volcano_tos_upload
+from services.volcano_ark import recognize_dish as ark_recognize
+from services.volcano_ark import recommend as ark_recommend
+from services.volcano_ark import edit_image as ark_edit_image
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -93,6 +96,83 @@ async def health_check():
 # ============================================================
 # 降级用 mock 数据（key 缺失或服务异常时返回演示数据）
 # ============================================================
+# 允许的样式枚举（beautify / sticker 端点 style 参数白名单，防止 prompt 注入）
+_ALLOWED_STYLES = {'auto', 'enhance', 'vivid', 'poster', 'sticker', 'cute', 'cartoon', 'art', 'default'}
+
+
+def _validate_style(style: str) -> bool:
+    """校验 style 参数：在白名单内且长度 ≤50。"""
+    if not isinstance(style, str) or len(style) > 50:
+        return False
+    return style in _ALLOWED_STYLES
+
+
+# ============================================================
+# 图片美化提示词（按 style 分支，专业美食摄影指令）
+# ============================================================
+# 核心约束：保持食物主体（种类、形态、摆盘、器皿）基本不变，仅增强环境
+# （背景、光影、色彩、构图、滤镜）。否则 Seedream 图生图会把菜重绘成另一道菜，
+# 失去“美化”意义。auto/default 综合去杂物+换干净背景+暖光+饱和+热气，食欲感拉满。
+_BEAUTIFY_PROMPTS = {
+    'auto': (
+        "专业美食摄影级修图，保持图中食物主体（种类、形态、摆盘、器皿）基本不变，仅做以下增强："
+        "1）背景：移除杂乱、抢镜的背景杂物与无关元素，替换为干净协调的桌面"
+        "（浅色木纹 / 大理石 / 纯色亚光背景），可点缀少量新鲜食材或简洁餐具营造用餐氛围；"
+        "2）光影：自然柔和的侧逆光 / 顶光，突出食物立体感与油亮光泽，高光不过曝、暗部保留细节；"
+        "3）色彩：适度提升饱和度与对比度、暖色调偏移，强化食材本来的新鲜诱人色泽"
+        "（肉质的油润、蔬菜的翠绿、酱汁的浓郁），明显增强食欲感；"
+        "4）细节：锐化食物纹理（焦脆、汤汁、蓬松），适度添加袅袅升腾的热气；"
+        "5）构图：浅景深虚化背景，使主体居中、平衡突出。"
+        "整体风格温暖、明亮、诱人，呈现高级餐厅菜单或美食杂志大片质感。"
+    ),
+    'enhance': (
+        "轻度美食修图：严格保持原图场景、摆盘与背景完全不变，仅提升清晰度与锐度、"
+        "提亮画面、修正偏色与暗部、适度增强色彩饱和与对比，让食物更鲜亮、通透、诱人。"
+    ),
+    'vivid': (
+        "浓郁滤镜风格美食大片：保持食物主体不变，大幅提升色彩饱和度与对比度、整体偏暖色调，"
+        "强化油亮光泽、焦糖化反应的诱人色泽与升腾热气，背景做柔焦虚化，"
+        "呈现鲜艳明快、冲击力强的美食摄影质感。"
+    ),
+    'art': (
+        "艺术美食摄影：保持食物可识别，采用电影感打光、高级色彩调色与精致摆盘，"
+        "背景简洁有质感（深色高级感或纯净留白），浅景深，"
+        "呈现美食杂志封面级的艺术大片氛围。"
+    ),
+    'poster': (
+        "商业美食海报级修图，保持图中食物主体（种类、形态、摆盘）基本不变，"
+        "将其处理为高视觉冲击力的广告海报大片："
+        "1）背景：替换为深色高级感纯色或柔和暗调渐变（深棕 / 墨黑 / 暖灰），"
+        "四周留出干净留白以适合海报排版；"
+        "2）光影：戏剧化聚光灯式打光，强高光与深邃暗部对比，突出食物立体感、"
+        "油亮光泽与质感，营造舞台聚焦感；"
+        "3）色彩：高饱和、高对比、暖色调偏移，强化食物诱人色泽与新鲜感；"
+        "4）氛围：适度添加升腾热气、飞溅酱汁或散落食材等动感元素，增强画面张力；"
+        "5）构图：主体居中突出、画面平衡，留白充足的广告海报构图。"
+        "整体高级、诱人、有品牌广告大片质感，像米其林餐厅或美食品牌的宣传海报。"
+    ),
+    'sticker': (
+        "将这张食物图片转为精致的卡通贴纸风格：保持食物可识别，线条圆润、色彩明快饱满、"
+        "高光柔和，去除复杂背景替换为简洁纯色或柔和渐变底，整体可爱且有食欲。"
+    ),
+    'cute': (
+        "将这张食物图片转为可爱日系插画美食风格：保持食物可识别，色彩柔和明亮、"
+        "笔触细腻、带有温暖手绘感，背景简洁温馨，突出食物的诱人与萌感。"
+    ),
+    'cartoon': (
+        "将这张食物图片转为精致卡通插画风格：保持食物可识别，造型圆润、色彩饱和明快、"
+        "光影干净，背景简化为纯色或简洁图案，呈现像动画截图般诱人的美食画面。"
+    ),
+}
+
+
+def _build_beautify_prompt(style: str) -> str:
+    """根据 style 返回专业的食物美化提示词。default 等同 auto，未知值回退 auto。"""
+    if style == 'default':
+        style = 'auto'
+    return _BEAUTIFY_PROMPTS.get(style) or _BEAUTIFY_PROMPTS['auto']
+
+
 def _mock_recognize_data():
     """食物识别降级演示数据"""
     return {
@@ -162,14 +242,39 @@ def _mock_recommend_data():
 async def recognize_food(image: UploadFile = File(...)):
     """
     食物图片识别
-    流程：腾讯云审核 + 百度识别 并行 → 违规拦截 → 百度 confidence ≥ 0.8 直接返回
-         → < 0.8 或百度失败调 GPT-4o 兜底 → 任一异常降级返回 mock
+    流程：腾讯云审核 → 违规拦截
+         → 首选火山方舟豆包多模态（先上传 TOS 再识别）
+         → 火山方舟不可用时降级到百度（confidence ≥ 0.8）+ GPT-4o 兜底
+         → 任一异常降级返回 mock
     """
     try:
         image_bytes = await image.read()
 
-        # 百度识别用 try/except 包裹单独捕获，失败时返回 None 触发 GPT 兜底
-        # 捕获 Exception 而非仅 AiProviderError，防止 httpx 原生异常破坏 asyncio.gather 降级链路
+        # 腾讯云审核：key 未配置时跳过，调用异常时 fail-open 放行，仅审核成功且违规时拦截
+        if settings.tencent_ready:
+            try:
+                moderation_result = await tencent_check(image_bytes)
+                if not moderation_result:
+                    return fail("图片内容不合规，请更换图片后重试")
+            except Exception as mod_err:
+                # 审核 key 配置但调用失败，记 warning 并放行，不阻塞合规图
+                logger.warning("腾讯云审核调用异常，放行继续识别: %s", type(mod_err).__name__)
+        # tencent_ready 为 False 时直接跳过审核走识别
+
+        # 首选：火山方舟豆包多模态（先上传 TOS 再识别）
+        try:
+            image_url = await volcano_tos_upload(image_bytes)
+            ark_result = await ark_recognize(image_url)
+            return ok({
+                **ark_result,
+                'imageUrl': image_url,  # 复用 TOS 原图 URL 供前端展示
+                'needManualInput': False,
+            })
+        except (AiAuthError, AiProviderError) as ark_err:
+            # key 缺失或调用异常均属预期降级，用 info 级别记录
+            logger.info("火山方舟识别不可用，降级到百度+GPT-4o: %s", ark_err)
+
+        # 降级：原 百度+GPT-4o 链路（保留原逻辑）
         async def _safe_baidu():
             try:
                 return await baidu_recognize(image_bytes)
@@ -177,15 +282,7 @@ async def recognize_food(image: UploadFile = File(...)):
                 logger.exception("baidu recognize failed, fallback to GPT-4o")
                 return None
 
-        # 并行：腾讯云审核 + 百度识别
-        moderation_result, baidu_result = await asyncio.gather(
-            tencent_check(image_bytes),
-            _safe_baidu(),
-        )
-
-        # 违规拦截
-        if not moderation_result:
-            return fail("图片内容不合规，请更换图片后重试")
+        baidu_result = await _safe_baidu()
 
         # 百度高置信度直接返回
         if baidu_result and (baidu_result.get('confidence') or 0) >= 0.8:
@@ -220,36 +317,42 @@ async def recognize_food(image: UploadFile = File(...)):
 async def beautify_image(image: UploadFile = File(...), style: str = "auto"):
     """
     AI 图片美化
-    调用火山引擎，失败时降级返回原图保存到 static
+    首选火山方舟豆包 Seedream（先上传 TOS 再编辑），返回 /static/ 落盘路径；
+    火山方舟不可用时降级返回原图 static 路径（不再走旧 SDK 落盘美化图）。
     """
+    if not _validate_style(style):
+        return fail("不支持的样式参数")
     try:
         image_bytes = await image.read()
+
+        # 腾讯云审核：key 未配置时跳过，调用异常 fail-open 放行，仅审核成功且违规时拦截
+        if settings.tencent_ready:
+            try:
+                if not await tencent_check(image_bytes):
+                    return fail("图片内容不合规，请更换图片后重试")
+            except Exception as mod_err:
+                logger.warning("腾讯云审核调用异常，放行继续美化: %s", type(mod_err).__name__)
+
         # 保存原图作为 fallback
         original_filename = f"original_{uuid.uuid4().hex}.jpg"
         original_path = f"static/{original_filename}"
         with open(original_path, 'wb') as f:
             f.write(image_bytes)
 
+        # 首选：火山方舟豆包 Seedream（先上传 TOS 再编辑）
         try:
-            beautified_bytes = await volcano_beautify(image_bytes, style)
-            filename = f"beautified_{uuid.uuid4().hex}.jpg"
-            filepath = f"static/{filename}"
-            with open(filepath, 'wb') as f:
-                f.write(beautified_bytes)
+            image_url = await volcano_tos_upload(image_bytes)
+            prompt = _build_beautify_prompt(style)
+            new_image_url = await ark_edit_image(image_url, prompt)
             return ok({
-                'beautifiedUrl': f'/static/{filename}',
+                'beautifiedUrl': new_image_url,
                 'originalUrl': f'/static/{original_filename}',
                 'style': style,
                 'message': '美化完成',
             })
-        except AiAuthError:
-            return ok({
-                'beautifiedUrl': f'/static/{original_filename}',
-                'originalUrl': f'/static/{original_filename}',
-                'style': style,
-                'message': '未配置火山引擎 Key，已返回原图',
-            })
-        except AiProviderError:
+        except (AiAuthError, AiProviderError) as ark_err:
+            # 火山方舟不可用，降级返回原图（key 缺失属预期，info 级别记录）
+            logger.info("火山方舟美化不可用，降级返回原图: %s", ark_err)
             return ok({
                 'beautifiedUrl': f'/static/{original_filename}',
                 'originalUrl': f'/static/{original_filename}',
@@ -267,12 +370,24 @@ async def beautify_image(image: UploadFile = File(...), style: str = "auto"):
 @app.post("/ai/recommend")
 async def recommend_recipe(request: dict):
     """
-    菜谱推荐（LLM）
-    调用通义千问，失败时降级返回 mock
+    菜谱推荐
+    首选火山方舟豆包多模态，失败时降级到通义千问，再降级返回 mock。
     """
     dish_name = request.get('dishName', '')
     recent_records = request.get('recentRecords')
 
+    # 首选：火山方舟豆包多模态
+    try:
+        recipes = await ark_recommend(dish_name, recent_records)
+        return ok({
+            'recipes': recipes,
+            'message': f'为你推荐了 {len(recipes)} 道菜谱',
+        })
+    except (AiAuthError, AiProviderError) as ark_err:
+        # key 缺失或调用异常均属预期降级，用 info 级别记录
+        logger.info("火山方舟推荐不可用，降级到通义千问: %s", ark_err)
+
+    # 降级：通义千问
     try:
         recipes = await qwen_recommend(dish_name, recent_records)
         return ok({
@@ -318,15 +433,47 @@ async def recognize_voice(audio: UploadFile = File(...)):
 async def generate_sticker(image: UploadFile = File(...), style: str = "default"):
     """
     AI 贴纸生成
-    保留 mock 实现，标注 TODO 等待后续集成
+    首选火山方舟豆包 Seedream（先上传 TOS 再生成），返回 /static/ 落盘路径；
+    火山方舟不可用时降级返回占位图。
     """
-    # TODO: 集成 AI 贴纸生成（火山引擎/通义万相）
-    data = {
-        "stickerUrl": "assets/sticker-generated.png",
-        "style": style,
-        "message": "贴纸生成功能开发中",
-    }
-    return ok(data)
+    if not _validate_style(style):
+        return fail("不支持的样式参数")
+    try:
+        image_bytes = await image.read()
+
+        # 腾讯云审核：key 未配置时跳过，调用异常 fail-open 放行，仅审核成功且违规时拦截
+        if settings.tencent_ready:
+            try:
+                if not await tencent_check(image_bytes):
+                    return fail("图片内容不合规，请更换图片后重试")
+            except Exception as mod_err:
+                logger.warning("腾讯云审核调用异常，放行继续贴纸: %s", type(mod_err).__name__)
+
+        # 首选：火山方舟豆包 Seedream 生成贴纸
+        try:
+            image_url = await volcano_tos_upload(image_bytes)
+            prompt = f"将这张食物图片转换为可爱贴纸风格，风格：{style}"
+            sticker_url = await ark_edit_image(image_url, prompt)
+            return ok({
+                'stickerUrl': sticker_url,
+                'style': style,
+                'message': '贴纸生成完成',
+            })
+        except (AiAuthError, AiProviderError) as ark_err:
+            # 火山方舟不可用，降级返回占位图（key 缺失属预期，info 级别记录）
+            logger.info("火山方舟贴纸生成不可用，降级返回 mock: %s", ark_err)
+            return ok({
+                'stickerUrl': "assets/sticker-generated.png",
+                'style': style,
+                'message': '贴纸生成功能暂不可用，返回占位图',
+            })
+    except Exception:
+        logger.exception("generate_sticker error")
+        return ok({
+            'stickerUrl': "assets/sticker-generated.png",
+            'style': style,
+            'message': '贴纸生成服务异常',
+        })
 
 
 if __name__ == "__main__":

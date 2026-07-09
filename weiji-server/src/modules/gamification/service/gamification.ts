@@ -3,6 +3,7 @@ import { BaseService, CoolCommException } from '@cool-midway/core';
 import { InjectEntityModel } from '@midwayjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { RecordEntity } from '../../record/entity/record';
+import { RecordCommentEntity } from '../../record/entity/comment';
 import { AppUserEntity } from '../../account/entity/user';
 import { FamilyMemberEntity } from '../../family/entity/member';
 import { BlindGuessRoundEntity } from '../entity/blind_guess_round';
@@ -35,6 +36,9 @@ export class GamificationService extends BaseService {
 
   @InjectEntityModel(FamilyMemberEntity)
   familyMemberEntity: Repository<FamilyMemberEntity>;
+
+  @InjectEntityModel(RecordCommentEntity)
+  recordCommentEntity: Repository<RecordCommentEntity>;
 
   @Inject()
   achievementService: AchievementService;
@@ -91,48 +95,56 @@ export class GamificationService extends BaseService {
     {
       code: 'carb_lover',
       name: '碳水爱好者',
+      emoji: '🍚',
       description: '你是碳水的忠实粉丝，每一口米饭与面条都是幸福的味道',
       traits: ['米饭党', '面条控', '能量满载'],
     },
     {
       code: 'spice_explorer',
       name: '辣味探险家',
+      emoji: '🌶️',
       description: '无辣不欢的你，用每一次舌尖的刺激探索美食的边界',
       traits: ['无辣不欢', '重口偏好', '味蕾冒险'],
     },
     {
       code: 'health_guru',
       name: '健康达人',
+      emoji: '🥗',
       description: '你追求轻盈与营养的平衡，每一餐都是对身体最好的告白',
       traits: ['轻食主义', '营养均衡', '自律人生'],
     },
     {
       code: 'meat_enthusiast',
       name: '肉食主义者',
+      emoji: '🥩',
       description: '肉食是你的信仰，每一块鲜嫩的肉类都是无法抗拒的诱惑',
       traits: ['无肉不欢', '高蛋白', '能量爆炸'],
     },
     {
       code: 'sweet_tooth',
       name: '甜品控',
+      emoji: '🍰',
       description: '甜食是你的快乐源泉，每一口甜品都是治愈心灵的良药',
       traits: ['甜品爱好', '甜味至上', '快乐源泉'],
     },
     {
       code: 'light_eater',
       name: '清淡派',
+      emoji: '🍵',
       description: '你崇尚清淡饮食，用最简单的烹饪还原食材本真的味道',
       traits: ['清淡饮食', '少油少盐', '本味追求'],
     },
     {
       code: 'family_chef',
       name: '家庭厨神',
+      emoji: '👨‍🍳',
       description: '你是家里的掌勺大厨，用一道道家常菜温暖整个家庭的胃',
       traits: ['家常菜大师', '温暖厨艺', '家的味道'],
     },
     {
       code: 'adventurer',
       name: '美食冒险家',
+      emoji: '🌍',
       description: '你的味蕾永远在路上，乐于尝试各种风格与新颖的菜品',
       traits: ['多元尝试', '美食探险', '不设边界'],
     },
@@ -214,11 +226,31 @@ export class GamificationService extends BaseService {
       })
     );
 
+    // 按 rarity 聚合统计
+    const rarityStats = { common: 0, rare: 0, epic: 0, legend: 0 };
+    for (const entry of GamificationService.POKEDEX_CATALOG) {
+      if (entry.rarity === 'common') rarityStats.common += 1;
+      else if (entry.rarity === 'rare') rarityStats.rare += 1;
+      else if (entry.rarity === 'epic') rarityStats.epic += 1;
+      else if (entry.rarity === 'legendary') rarityStats.legend += 1;
+    }
+
+    const stats = {
+      total: totalSlots,
+      unlocked: unlockedSlots,
+      common: rarityStats.common,
+      rare: rarityStats.rare,
+      epic: rarityStats.epic,
+      legend: rarityStats.legend,
+      hidden: Math.max(totalSlots - unlockedSlots, 0),
+    };
+
     return {
       totalSlots,
       unlockedSlots,
       completionRate: totalSlots > 0 ? unlockedSlots / totalSlots : 0,
       categories,
+      stats,
     };
   }
 
@@ -333,11 +365,14 @@ export class GamificationService extends BaseService {
       };
     }
 
-    const shareText = `我是「${typeDef.name}」——${typeDef.description}。来味记测测你的美食人格！`;
+    const trait0 = typeDef.traits[0] || '';
+    const trait1 = typeDef.traits[1] || '';
+    const shareText = `我是${typeDef.emoji}${typeDef.name}，喜欢${trait0}和${trait1}，来味记测测你的美食人格吧~`;
 
     return {
       available: true,
       personalityType: typeDef.name,
+      emoji: typeDef.emoji,
       description: typeDef.description,
       traits: typeDef.traits,
       shareText,
@@ -471,6 +506,229 @@ export class GamificationService extends BaseService {
   }
 
   /**
+   * 发起盲猜轮次（多玩法版）：根据 mode 自动选题并生成 4 个选项
+   * - mode=chef：猜厨师（cookId），4 个家庭成员选项
+   * - mode=rating：猜评分，4 个评分选项
+   * - mode=date：猜日期区间，4 个时间区间选项
+   * - 各玩法数据不足时返回 fallback
+   */
+  async createBlindGuessRound(userId: number, body: any) {
+    const mode = String(body?.mode || 'chef').toLowerCase();
+    if (!['chef', 'rating', 'date'].includes(mode)) {
+      throw new CoolCommException('mode 参数无效，可选 chef/rating/date', 400);
+    }
+    if (!body || !body.familyId) {
+      throw new CoolCommException('familyId 不能为空', 400);
+    }
+    const familyId = Number(body.familyId);
+    await this.ensureFamilyMember(familyId, userId);
+
+    let roundData: {
+      recordId: number;
+      item: any;
+    } | null = null;
+
+    if (mode === 'chef') {
+      roundData = await this.buildChefModeRound(familyId);
+    } else if (mode === 'rating') {
+      roundData = await this.buildRatingModeRound(familyId);
+    } else if (mode === 'date') {
+      roundData = await this.buildDateModeRound(familyId);
+    }
+
+    if (!roundData) {
+      return { fallback: true, message: '数据不足，建议先记录更多美食' };
+    }
+
+    const roundName = body.roundName
+      ? String(body.roundName).trim()
+      : `盲猜-${mode}`;
+
+    const round = await this.blindGuessRoundEntity.save({
+      familyId,
+      roundName,
+      creatorId: userId,
+      status: 'active',
+      recordIds: [roundData.recordId],
+      items: [roundData.item],
+      guesses: [],
+      rankings: null,
+      mode,
+      correctAnswer: roundData.item.correctAnswer,
+    });
+
+    return this.sanitizeRound(round);
+  }
+
+  /**
+   * chef 模式：选有 cookId 的记录，生成 4 个家庭成员选项
+   */
+  private async buildChefModeRound(
+    familyId: number
+  ): Promise<{ recordId: number; item: any } | null> {
+    const records = await this.recordEntity.find({
+      where: { familyId },
+    });
+    // 过滤出 cookId 不为空的记录
+    const withCook = records.filter(r => r.cookId != null);
+    if (withCook.length === 0) return null;
+
+    const record = this.pickRandom(withCook)!;
+    const cookId = record.cookId;
+
+    // 取家庭成员列表
+    const members = await this.familyMemberEntity.find({ where: { familyId } });
+    if (members.length < 4) return null;
+
+    const memberUserIds = members.map(m => m.userId);
+    const users = await this.appUserEntity.find({
+      where: { id: In(memberUserIds) },
+    });
+    const userMap = new Map(users.map(u => [u.id, u]));
+
+    const memberOptions = members.map(m => ({
+      value: m.userId,
+      label: userMap.get(m.userId)?.nickName || `用户${m.userId}`,
+    }));
+
+    // 正确选项是 cookId
+    const correctOption = memberOptions.find(o => o.value === cookId);
+    if (!correctOption) return null; // cookId 不在当前家庭成员中
+
+    // 其他 3 个随机
+    const others = memberOptions.filter(o => o.value !== cookId);
+    const pickedOthers = this.shuffle(others).slice(0, 3);
+    if (pickedOthers.length < 3) return null;
+
+    const options = this.shuffle([correctOption, ...pickedOthers]);
+
+    return {
+      recordId: record.id,
+      item: {
+        recordId: record.id,
+        dishName: record.dishName,
+        coverUrl: record.imageUrl || record.beautifiedUrl || '',
+        options,
+        correctAnswer: cookId,
+      },
+    };
+  }
+
+  /**
+   * rating 模式：选有多评价的记录（count >= 2），生成 4 个评分选项
+   */
+  private async buildRatingModeRound(
+    familyId: number
+  ): Promise<{ recordId: number; item: any } | null> {
+    // 找出评论数 >= 2 的记录
+    const commentCounts = await this.recordCommentEntity
+      .createQueryBuilder('c')
+      .select('c.recordId', 'recordId')
+      .addSelect('COUNT(*)', 'cnt')
+      .groupBy('c.recordId')
+      .having('COUNT(*) >= 2')
+      .getRawMany<{ recordId: number; cnt: number }>();
+
+    if (commentCounts.length === 0) return null;
+
+    const candidateRecordIds = commentCounts.map(c => c.recordId);
+    const records = await this.recordEntity.find({
+      where: { id: In(candidateRecordIds), familyId },
+    });
+    if (records.length === 0) return null;
+
+    const record = this.pickRandom(records)!;
+    const correctRating = Math.round(record.rating * 2) / 2; // 取 0.5 的整数倍
+    if (correctRating <= 0) return null;
+
+    // 生成评分选项池（0.5 步长，1.0-5.0）
+    const allRatings = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0];
+    const others = allRatings.filter(r => r !== correctRating);
+    const pickedOthers = this.shuffle(others).slice(0, 3);
+    if (pickedOthers.length < 3) return null;
+
+    const options = this.shuffle([
+      { value: correctRating, label: `${correctRating.toFixed(1)}` },
+      ...pickedOthers.map(r => ({ value: r, label: `${r.toFixed(1)}` })),
+    ]);
+
+    return {
+      recordId: record.id,
+      item: {
+        recordId: record.id,
+        dishName: record.dishName,
+        coverUrl: record.imageUrl || record.beautifiedUrl || '',
+        options,
+        correctAnswer: correctRating,
+      },
+    };
+  }
+
+  /**
+   * date 模式：选记录，生成 4 个日期区间选项
+   */
+  private async buildDateModeRound(
+    familyId: number
+  ): Promise<{ recordId: number; item: any } | null> {
+    const records = await this.recordEntity.find({ where: { familyId } });
+    if (records.length === 0) return null;
+
+    const record = this.pickRandom(records)!;
+    const createTime = record.createTime
+      ? new Date(record.createTime)
+      : null;
+    if (!createTime || isNaN(createTime.getTime())) return null;
+
+    const now = Date.now();
+    const diffMs = now - createTime.getTime();
+    const diffDays = diffMs / (24 * 60 * 60 * 1000);
+
+    let correctRange: string;
+    if (diffDays <= 7) correctRange = 'this_week';
+    else if (diffDays <= 30) correctRange = 'last_month';
+    else if (diffDays <= 180) correctRange = 'half_year';
+    else correctRange = 'year_ago';
+
+    const options = [
+      { value: 'this_week', label: '本周' },
+      { value: 'last_month', label: '上月' },
+      { value: 'half_year', label: '半年前' },
+      { value: 'year_ago', label: '一年前' },
+    ];
+
+    return {
+      recordId: record.id,
+      item: {
+        recordId: record.id,
+        dishName: record.dishName,
+        coverUrl: record.imageUrl || record.beautifiedUrl || '',
+        options,
+        correctAnswer: correctRange,
+      },
+    };
+  }
+
+  /**
+   * 数组随机选取
+   */
+  private pickRandom<T>(arr: T[]): T | null {
+    if (arr.length === 0) return null;
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  /**
+   * Fisher-Yates 洗牌
+   */
+  private shuffle<T>(arr: T[]): T[] {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  /**
    * 查看轮次详情：active 状态脱敏 items 真实作者信息
    * - 仅家庭成员可查看
    */
@@ -561,6 +819,69 @@ export class GamificationService extends BaseService {
   }
 
   /**
+   * 提交猜测（多玩法版）：根据 round.mode 校验 guessAnswer
+   * - mode 轮次要求 body.guessAnswer（chef: cookId, rating: 评分值, date: 区间标识）
+   * - 每题每用户仅一次
+   */
+  async guessBlindGuess(userId: number, id: number, body: any) {
+    const round = await this.blindGuessRoundEntity.findOneBy({ id });
+    if (!round) {
+      throw new CoolCommException('轮次不存在', 404);
+    }
+    if (round.status !== 'active') {
+      throw new CoolCommException('轮次已揭晓', 400);
+    }
+    await this.ensureFamilyMember(round.familyId, userId);
+
+    if (!body || body.itemId == null) {
+      throw new CoolCommException('itemId 不能为空', 400);
+    }
+    const itemId = Number(body.itemId);
+    const items: any[] = Array.isArray(round.items) ? round.items : [];
+    const itemExists = items.some(it => Number(it.recordId) === itemId);
+    if (!itemExists) {
+      throw new CoolCommException('itemId 不存在于轮次中', 400);
+    }
+
+    const guesses: any[] = Array.isArray(round.guesses) ? round.guesses : [];
+    const alreadyGuessed = guesses.some(
+      g => Number(g.userId) === userId && Number(g.itemId) === itemId
+    );
+    if (alreadyGuessed) {
+      throw new CoolCommException('已对该题目提交过猜测', 400);
+    }
+
+    if (body.guessAnswer == null) {
+      throw new CoolCommException('guessAnswer 不能为空', 400);
+    }
+
+    const user = await this.appUserEntity.findOneBy({ id: userId });
+
+    const guess = {
+      userId,
+      userNickname: user?.nickName ?? '',
+      itemId,
+      guessAnswer: body.guessAnswer,
+      correct: false,
+      score: 0,
+      createdAt: new Date().toISOString(),
+    };
+
+    await this.blindGuessRoundEntity
+      .createQueryBuilder()
+      .update()
+      .set({
+        guesses: () =>
+          `JSON_ARRAY_APPEND(COALESCE(guesses, JSON_ARRAY()), '$', CAST(:guessJson AS JSON))`,
+      })
+      .where('id = :id', { id })
+      .setParameter('guessJson', JSON.stringify(guess))
+      .execute();
+
+    return guess;
+  }
+
+  /**
    * 揭晓结果：仅 creator 可操作；计算排名并更新轮次状态为 revealed
    */
   async reveal(userId: number, id: number) {
@@ -601,15 +922,17 @@ export class GamificationService extends BaseService {
 
   /**
    * 计算盲猜轮次得分排名
-   * - guessAuthorId === item.realAuthorId → +1 分
-   * - guessDishName === item.dishName（大小写不敏感） → +1 分
-   * - 单 guess 最高 2 分；任一命中即 correct=true
+   * - 传统轮次：guessAuthorId === item.realAuthorId → +1 分；
+   *   guessDishName === item.dishName（大小写不敏感） → +1 分；单 guess 最高 2 分
+   * - mode 轮次：guessAnswer === item.correctAnswer → +1 分；单 guess 最高 1 分
+   * - 任一命中即 correct=true
    * - 按 userId 聚合 totalScore/correctCount，排序赋 rank（competition ranking）
    * - rank=1 标记 isChef
    */
   private scoreBlindGuess(round: BlindGuessRoundEntity) {
     const items: any[] = Array.isArray(round.items) ? round.items : [];
     let guesses: any[] = Array.isArray(round.guesses) ? round.guesses : [];
+    const mode = round.mode || null;
 
     // 计算每个 guess 得分
     guesses = guesses.map(guess => {
@@ -619,20 +942,33 @@ export class GamificationService extends BaseService {
       let score = 0;
       let correct = false;
       if (item) {
-        if (
-          guess.guessAuthorId != null &&
-          Number(guess.guessAuthorId) === Number(item.realAuthorId)
-        ) {
-          score += 1;
-          correct = true;
-        }
-        if (
-          guess.guessDishName &&
-          String(guess.guessDishName).toLowerCase() ===
-            String(item.dishName).toLowerCase()
-        ) {
-          score += 1;
-          correct = true;
+        if (mode) {
+          // mode 轮次：比较 guessAnswer 与 correctAnswer
+          if (
+            guess.guessAnswer != null &&
+            item.correctAnswer != null &&
+            String(guess.guessAnswer) === String(item.correctAnswer)
+          ) {
+            score += 1;
+            correct = true;
+          }
+        } else {
+          // 传统轮次：作者 + 菜名
+          if (
+            guess.guessAuthorId != null &&
+            Number(guess.guessAuthorId) === Number(item.realAuthorId)
+          ) {
+            score += 1;
+            correct = true;
+          }
+          if (
+            guess.guessDishName &&
+            String(guess.guessDishName).toLowerCase() ===
+              String(item.dishName).toLowerCase()
+          ) {
+            score += 1;
+            correct = true;
+          }
         }
       }
       return { ...guess, score, correct };
@@ -694,17 +1030,29 @@ export class GamificationService extends BaseService {
 
     const chefWinner = ranking.find(r => r.isChef) || null;
 
-    const revealItems = items.map(it => ({
-      recordId: it.recordId,
-      dishName: it.dishName,
-      realAuthorName: it.realAuthorName,
-      coverUrl: it.coverUrl,
-    }));
+    const revealItems = items.map(it => {
+      if (mode) {
+        return {
+          recordId: it.recordId,
+          dishName: it.dishName,
+          coverUrl: it.coverUrl,
+          options: it.options,
+          correctAnswer: it.correctAnswer,
+        };
+      }
+      return {
+        recordId: it.recordId,
+        dishName: it.dishName,
+        realAuthorName: it.realAuthorName,
+        coverUrl: it.coverUrl,
+      };
+    });
 
     return {
       roundId: round.id,
       roundName: round.roundName,
       status: round.status,
+      mode: mode || undefined,
       items: revealItems,
       ranking,
       chefWinner,
@@ -712,15 +1060,30 @@ export class GamificationService extends BaseService {
   }
 
   /**
-   * active 状态下脱敏轮次：剔除 items 中的 realAuthorId / realAuthorName
+   * active 状态下脱敏轮次：
+   * - 传统轮次：剔除 items 中的 realAuthorId / realAuthorName
+   * - mode 轮次：保留 options 供前端展示，剔除 correctAnswer 防止泄露答案
    */
   private sanitizeRound(round: BlindGuessRoundEntity) {
     const items: any[] = Array.isArray(round.items) ? round.items : [];
-    const sanitizedItems = items.map(it => ({
-      recordId: it.recordId,
-      dishName: it.dishName,
-      coverUrl: it.coverUrl,
-    }));
+    const mode = round.mode || null;
+    const sanitizedItems = items.map(it => {
+      if (mode) {
+        // mode 轮次：保留 options，剔除 correctAnswer
+        return {
+          recordId: it.recordId,
+          dishName: it.dishName,
+          coverUrl: it.coverUrl,
+          options: it.options,
+        };
+      }
+      // 传统轮次：剔除 realAuthorId / realAuthorName
+      return {
+        recordId: it.recordId,
+        dishName: it.dishName,
+        coverUrl: it.coverUrl,
+      };
+    });
     return {
       id: round.id,
       familyId: round.familyId,
@@ -731,6 +1094,7 @@ export class GamificationService extends BaseService {
       items: sanitizedItems,
       guesses: round.guesses,
       rankings: round.rankings,
+      mode: mode || undefined,
       createTime: round.createTime,
     };
   }

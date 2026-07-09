@@ -45,11 +45,16 @@ export class AppGamificationController extends BaseController {
 
   /**
    * 发起盲猜轮次
-   * body: { familyId, roundName, recordIds[3-10] }
+   * body: { familyId, roundName, recordIds[3-10] } 或 { familyId, mode: chef|rating|date, roundName? }
    */
   @Post('/blindguess/round', { summary: '发起盲猜轮次' })
   async createRound(@Body() body) {
     const userId = this.ctx.user?.userId;
+    if (body && body.mode) {
+      return this.ok(
+        await this.gamificationService.createBlindGuessRound(userId, body)
+      );
+    }
     return this.ok(await this.gamificationService.createRound(userId, body));
   }
 
@@ -64,11 +69,17 @@ export class AppGamificationController extends BaseController {
 
   /**
    * 提交猜测
-   * body: { itemId, guessAuthorId, guessAuthorName?, guessDishName }
+   * 传统轮次 body: { itemId, guessAuthorId, guessAuthorName?, guessDishName }
+   * mode 轮次 body: { itemId, guessAnswer }
    */
   @Post('/blindguess/round/:id/guess', { summary: '提交猜测' })
   async guess(@Param('id') id, @Body() body) {
     const userId = this.ctx.user?.userId;
+    if (body && body.guessAnswer != null) {
+      return this.ok(
+        await this.gamificationService.guessBlindGuess(userId, id, body)
+      );
+    }
     return this.ok(await this.gamificationService.guess(userId, id, body));
   }
 

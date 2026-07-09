@@ -31,4 +31,14 @@ export class BlindGuessRoundEntity extends BaseEntity {
 
   @Column({ comment: '揭晓排名 JSON', type: 'json', nullable: true })
   rankings: any;
+
+  @Column({
+    comment: '盲猜玩法模式 chef/rating/date',
+    default: 'chef',
+    nullable: true,
+  })
+  mode: string;
+
+  @Column({ comment: '正确答案 JSON', type: 'json', nullable: true })
+  correctAnswer: any;
 }

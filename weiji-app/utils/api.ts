@@ -633,11 +633,20 @@ export const api = {
 		roundName?: string;
 		recordIds?: (number | string)[];
 		mode?: "chef" | "rating" | "date";
+		expireDays?: number;
 	}) {
 		return request<any>({
 			url: "/app/gamification/blindguess/round",
 			method: "POST",
 			data,
+			showError: false,
+		});
+	},
+
+	getBlindGuessRounds() {
+		return request<any>({
+			url: "/app/gamification/blindguess/rounds",
+			method: "GET",
 		});
 	},
 
@@ -667,7 +676,7 @@ export const api = {
 	// 单题玩法：提交猜测（猜厨师/猜评分/猜日期等），guessAnswer 为选项值
 	guessBlindGuess(
 		id: string | number,
-		data: { guessAnswer: string | number }
+		data: { itemId: number | string; guessAnswer: string | number }
 	) {
 		return request<any>({
 			url: `/app/gamification/blindguess/round/${id}/guess`,

@@ -39,6 +39,15 @@ export class BlindGuessRoundEntity extends BaseEntity {
   })
   mode: string;
 
-  @Column({ comment: '正确答案 JSON', type: 'json', nullable: true })
-  correctAnswer: any;
+  @Column({
+    comment: '有效期截止时间（猜厨师模式，过期自动关闭）',
+    type: 'datetime',
+    nullable: true,
+  })
+  expiresAt: Date;
+  // 注意：不设顶层 correctAnswer 列。
+  // date 模式下正确答案为字符串标量（如 'this_week'），存入 type:'json' 列后，
+  // mysql2 自动解析为 JS 字符串，typeorm prepareHydratedValue 再次 JSON.parse 会抛
+  // "Unexpected token ... is not valid JSON"，导致任何 getMany/find（含 /app/family/today-feed
+  // 与 admin page/info）整行水合失败。正确答案已冗余存于 items[].correctAnswer（json 数组，水合安全）。
 }

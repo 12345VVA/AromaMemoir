@@ -447,8 +447,8 @@ export class GamificationService extends BaseService {
    * - 按 recordIds 取记录，组装脱敏 items
    */
   async createRound(userId: number, body: any) {
-    if (!body || !body.familyId || !body.roundName || !String(body.roundName).trim()) {
-      throw new CoolCommException('familyId 和 roundName 不能为空', 400);
+    if (!body || !body.familyId) {
+      throw new CoolCommException('familyId 不能为空', 400);
     }
     const recordIds: any[] = Array.isArray(body.recordIds) ? body.recordIds : [];
     if (recordIds.length < 3 || recordIds.length > 10) {
@@ -492,17 +492,20 @@ export class GamificationService extends BaseService {
 
     const round = await this.blindGuessRoundEntity.save({
       familyId: Number(body.familyId),
-      roundName: String(body.roundName).trim(),
+      roundName: String(body.roundName || '').trim() || `盲猜挑战 ${todayStr()}`,
       creatorId: userId,
       status: 'active',
       recordIds: items.map(it => it.recordId),
       items,
       guesses: [],
       rankings: null,
+      // 传统轮次显式置 mode=null，避免实体 default:'chef' 让其被 getActiveChefRound
+      // 误判为活跃猜厨师轮次而永久阻塞新活动发起
+      mode: null,
     });
 
     // 创建后立即返回脱敏视图
-    return this.sanitizeRound(round);
+    return await this.sanitizeRound(round, userId);
   }
 
   /**
@@ -523,6 +526,31 @@ export class GamificationService extends BaseService {
     const familyId = Number(body.familyId);
     await this.ensureFamilyMember(familyId, userId);
 
+    // 猜厨师模式：同一家庭同时仅允许一个未完成的活动
+    // - 先惰性关闭已过期的 active 猜厨师轮次（status -> 'expired'）
+    // - 再检查是否仍存在未过期的 active 猜厨师轮次，存在则返回 conflict 提示
+    let expiresAt: Date | null = null;
+    if (mode === 'chef') {
+      await this.closeExpiredChefRounds(familyId);
+      const active = await this.getActiveChefRound(familyId);
+      if (active) {
+        return {
+          conflict: true,
+          message: '该家庭有未完成的猜厨师活动，请先揭晓上一轮',
+          activeRound: {
+            id: active.id,
+            roundName: active.roundName,
+            status: active.status,
+            expiresAt: active.expiresAt,
+            createTime: active.createTime,
+          },
+        };
+      }
+      // 默认有效期 7 天，允许 1-30 天自定义
+      const days = Math.min(30, Math.max(1, Number(body.expireDays) || 7));
+      expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+    }
+
     let roundData: {
       recordId: number;
       item: any;
@@ -540,9 +568,8 @@ export class GamificationService extends BaseService {
       return { fallback: true, message: '数据不足，建议先记录更多美食' };
     }
 
-    const roundName = body.roundName
-      ? String(body.roundName).trim()
-      : `盲猜-${mode}`;
+    const roundName =
+      String(body.roundName || '').trim() || `盲猜挑战 ${todayStr()}`;
 
     const round = await this.blindGuessRoundEntity.save({
       familyId,
@@ -554,10 +581,55 @@ export class GamificationService extends BaseService {
       guesses: [],
       rankings: null,
       mode,
-      correctAnswer: roundData.item.correctAnswer,
+      expiresAt,
+      // correctAnswer 不再写入顶层列（见实体注释）；正确答案保留在 items[].correctAnswer
     });
 
-    return this.sanitizeRound(round);
+    return await this.sanitizeRound(round, userId);
+  }
+
+  /**
+   * 惰性关闭已过期的猜厨师轮次：status active -> 'expired'
+   * - 仅处理 mode='chef' 且 expiresAt < now 的 active 轮次
+   * - 过期但未揭晓的轮次不再接受猜测，也不再阻塞新活动发起
+   * - 发起人仍可对过期轮次手动揭晓以查看排名
+   */
+  private async closeExpiredChefRounds(familyId: number) {
+    const now = new Date();
+    const expired = await this.blindGuessRoundEntity.find({
+      where: { familyId, mode: 'chef', status: 'active' },
+    });
+    const toClose = expired.filter(
+      r => r.expiresAt && new Date(r.expiresAt).getTime() < now.getTime()
+    );
+    if (toClose.length === 0) return;
+    for (const r of toClose) {
+      r.status = 'expired';
+    }
+    await this.blindGuessRoundEntity.save(toClose);
+  }
+
+  /**
+   * 获取家庭下未过期的 active 猜厨师轮次（阻塞新活动的判定依据）
+   * 返回首个匹配项或 null
+   */
+  private async getActiveChefRound(
+    familyId: number
+  ): Promise<BlindGuessRoundEntity | null> {
+    const rounds = await this.blindGuessRoundEntity.find({
+      where: { familyId, mode: 'chef', status: 'active' },
+    });
+    const now = new Date();
+    // 仅把 mode='chef' 且 expiresAt 存在且未过期的轮次视为活跃猜厨师轮次。
+    // 历史数据中 mode 落入 default 'chef' 但无 expiresAt 的轮次（含旧传统轮次）
+    // 不再阻塞新活动发起。
+    return (
+      rounds.find(
+        r =>
+          r.expiresAt &&
+          new Date(r.expiresAt).getTime() >= now.getTime()
+      ) || null
+    );
   }
 
   /**
@@ -738,8 +810,9 @@ export class GamificationService extends BaseService {
       throw new CoolCommException('轮次不存在', 404);
     }
     await this.ensureFamilyMember(round.familyId, userId);
-    if (round.status === 'active') {
-      return this.sanitizeRound(round);
+    // active / expired 状态均脱敏（隐藏正确答案）；仅 revealed 返回完整数据
+    if (round.status !== 'revealed') {
+      return await this.sanitizeRound(round, userId);
     }
     return round;
   }
@@ -845,7 +918,10 @@ export class GamificationService extends BaseService {
       throw new CoolCommException('轮次不存在', 404);
     }
     if (round.status !== 'active') {
-      throw new CoolCommException('轮次已揭晓', 400);
+      throw new CoolCommException(
+        round.status === 'expired' ? '轮次已过期，无法继续猜测' : '轮次已揭晓',
+        400
+      );
     }
     await this.ensureFamilyMember(round.familyId, userId);
 
@@ -921,7 +997,8 @@ export class GamificationService extends BaseService {
     if (!round) {
       throw new CoolCommException('轮次不存在', 404);
     }
-    if (round.status !== 'active') {
+    // active 与 expired 均允许揭晓：过期未揭晓的轮次，发起人仍可手动揭晓查看排名
+    if (round.status !== 'active' && round.status !== 'expired') {
       throw new CoolCommException('轮次已揭晓', 400);
     }
     if (round.creatorId !== userId) {
@@ -1095,8 +1172,12 @@ export class GamificationService extends BaseService {
    * active 状态下脱敏轮次：
    * - 传统轮次：剔除 items 中的 realAuthorId / realAuthorName
    * - mode 轮次：保留 options 供前端展示，剔除 correctAnswer 防止泄露答案
+   * - 补充参与者摘要 participants 与家庭组总人数 totalMembers，便于前端展示进度
    */
-  private sanitizeRound(round: BlindGuessRoundEntity) {
+  private async sanitizeRound(
+    round: BlindGuessRoundEntity,
+    viewerUserId?: number
+  ) {
     const items: any[] = Array.isArray(round.items) ? round.items : [];
     const mode = round.mode || null;
     const sanitizedItems = items.map(it => {
@@ -1116,6 +1197,41 @@ export class GamificationService extends BaseService {
         coverUrl: it.coverUrl,
       };
     });
+
+    // 全量猜测：仅用于聚合参与者摘要（userId/nickname/count，不含答案字段，安全）
+    const allGuesses: any[] = Array.isArray(round.guesses) ? round.guesses : [];
+    const participantMap = new Map<
+      number,
+      { userId: number; userNickname: string; guessedCount: number }
+    >();
+    for (const g of allGuesses) {
+      const uid = Number(g.userId);
+      if (Number.isNaN(uid)) continue;
+      let entry = participantMap.get(uid);
+      if (!entry) {
+        entry = {
+          userId: uid,
+          userNickname: g.userNickname ?? '',
+          guessedCount: 0,
+        };
+        participantMap.set(uid, entry);
+      }
+      entry.guessedCount += 1;
+    }
+    const participants = Array.from(participantMap.values());
+
+    // 未揭晓（active/expired）仅向当前查看者返回其本人的猜测，避免泄露他人答案；
+    // 已揭晓（revealed）返回全量用于排名展示
+    const isRevealed = round.status === 'revealed';
+    const visibleGuesses = isRevealed
+      ? allGuesses
+      : allGuesses.filter(g => Number(g.userId) === Number(viewerUserId));
+
+    // 查询家庭组总成员数
+    const totalMembers = await this.familyMemberEntity.count({
+      where: { familyId: round.familyId },
+    });
+
     return {
       id: round.id,
       familyId: round.familyId,
@@ -1124,11 +1240,88 @@ export class GamificationService extends BaseService {
       status: round.status,
       recordIds: round.recordIds,
       items: sanitizedItems,
-      guesses: round.guesses,
+      guesses: visibleGuesses,
       rankings: round.rankings,
       mode: mode || undefined,
+      expiresAt: round.expiresAt || undefined,
       createTime: round.createTime,
+      participants,
+      totalMembers,
     };
+  }
+
+  /**
+   * 本家庭盲猜轮次列表
+   * - 通过当前用户查家庭组成员资格，获取 familyId
+   * - 按 familyId 查询盲猜轮次：active 优先、createTime DESC，limit 50
+   * - 批量取发起人昵称，聚合参与人数、本人是否已猜、题目数
+   */
+  async listRounds(userId: number) {
+    if (!userId) {
+      return { list: [], message: '请先加入家庭组' };
+    }
+    // 多家庭用户取最近加入的家庭（id DESC 确定性排序，避免 findOneBy 无序导致归属不确定）
+    const membership = await this.familyMemberEntity.findOne({
+      where: { userId },
+      order: { id: 'DESC' },
+    });
+    if (!membership) {
+      return { list: [], message: '请先加入家庭组' };
+    }
+    const familyId = membership.familyId;
+
+    // 惰性关闭已过期的猜厨师轮次，保证列表状态及时更新
+    await this.closeExpiredChefRounds(familyId);
+
+    // active 优先，createTime DESC
+    const rounds = await this.blindGuessRoundEntity
+      .createQueryBuilder('r')
+      .where('r.familyId = :familyId', { familyId })
+      .orderBy(
+        "CASE WHEN r.status = 'active' THEN 0 ELSE 1 END",
+        'ASC'
+      )
+      .addOrderBy('r.createTime', 'DESC')
+      .limit(50)
+      .getMany();
+
+    // 批量取发起人昵称
+    const creatorIds = [
+      ...new Set(rounds.map(r => r.creatorId).filter(v => v != null)),
+    ];
+    const creators =
+      creatorIds.length > 0
+        ? await this.appUserEntity.find({ where: { id: In(creatorIds) } })
+        : [];
+    const creatorMap = new Map(creators.map(u => [u.id, u]));
+
+    const list = rounds.map(round => {
+      const guesses: any[] = Array.isArray(round.guesses) ? round.guesses : [];
+      const items: any[] = Array.isArray(round.items) ? round.items : [];
+      // 参与人数：guesses 中不同 userId 的数量
+      const userIdSet = new Set<number>();
+      for (const g of guesses) {
+        const uid = Number(g.userId);
+        if (!Number.isNaN(uid)) userIdSet.add(uid);
+      }
+      const hasMyGuess = userIdSet.has(userId);
+      const creator = round.creatorId != null ? creatorMap.get(round.creatorId) : null;
+      return {
+        id: round.id,
+        roundName: round.roundName,
+        mode: round.mode || null,
+        status: round.status,
+        creatorId: round.creatorId,
+        creatorName: creator?.nickName ?? '',
+        participantCount: userIdSet.size,
+        itemCount: items.length,
+        createTime: round.createTime,
+        expiresAt: round.expiresAt || undefined,
+        hasMyGuess,
+      };
+    });
+
+    return { list };
   }
 
   /**

@@ -67,6 +67,15 @@
 						<text v-for="(tag, idx) in tags" :key="idx" class="chip chip--tag">{{ tag }}</text>
 					</view>
 				</view>
+
+				<!-- 点赞 -->
+				<view v-if="record.likedByMe !== undefined" class="like-bar wj-card">
+					<view class="like-btn" :class="{ liked: record.likedByMe }" @click="handleLike">
+						<text class="like-icon">{{ record.likedByMe ? '❤️' : '🤍' }}</text>
+						<text class="like-text">{{ record.likedByMe ? '已赞' : '点赞' }}</text>
+						<text v-if="Number(record.likeCount) > 0" class="like-count">{{ record.likeCount }}</text>
+					</view>
+				</view>
 			</view>
 		</view>
 	</cl-page>
@@ -158,6 +167,25 @@ async function loadDetail(id: string | number) {
 
 function goBack() {
 	uni.navigateBack();
+}
+
+// 点赞/取消点赞（toggle）
+async function handleLike() {
+	if (!record.value || record.value.likedByMe === undefined) return;
+	const prevLiked = record.value.likedByMe;
+	const prevCount = Number(record.value.likeCount) || 0;
+	// 乐观更新
+	record.value.likedByMe = !prevLiked;
+	record.value.likeCount = prevLiked ? prevCount - 1 : prevCount + 1;
+	try {
+		const res: any = await api.likeFamilyRecord(record.value.id);
+		record.value.likedByMe = res.liked;
+		record.value.likeCount = res.likes;
+	} catch {
+		// 回滚
+		record.value.likedByMe = prevLiked;
+		record.value.likeCount = prevCount;
+	}
 }
 
 onLoad((options: any) => {
@@ -289,5 +317,38 @@ onLoad((options: any) => {
 	font-size: 30rpx;
 	border-radius: 16rpx;
 	margin-top: 32rpx;
+}
+
+.like-bar {
+	display: flex;
+	align-items: center;
+	padding: 20rpx 28rpx;
+	margin-top: 16rpx;
+}
+.like-btn {
+	display: flex;
+	align-items: center;
+	gap: 10rpx;
+	padding: 12rpx 32rpx;
+	border-radius: 36rpx;
+	background: rgba(255, 107, 53, 0.06);
+}
+.like-btn.liked {
+	background: rgba(255, 107, 53, 0.12);
+}
+.like-icon {
+	font-size: 32rpx;
+}
+.like-text {
+	font-size: 28rpx;
+	color: var(--wj-text);
+}
+.like-btn.liked .like-text {
+	color: var(--wj-primary);
+	font-weight: 600;
+}
+.like-count {
+	font-size: 26rpx;
+	color: var(--wj-text-muted);
 }
 </style>

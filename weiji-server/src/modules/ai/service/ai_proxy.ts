@@ -620,12 +620,17 @@ export class AiProxyService extends BaseService {
     }
     for (const key of Object.keys(obj)) {
       const val = obj[key];
-      if (
-        typeof val === 'string' &&
-        STATIC_URL_KEYS.has(key) &&
-        val.startsWith('/static/')
-      ) {
-        obj[key] = '/app/ai/static/' + val.slice('/static/'.length);
+      if (typeof val === 'string' && STATIC_URL_KEYS.has(key)) {
+        // 清洗 LLM 输出可能带的 markdown 反引号包裹（如 `https://xxx.jpg`）
+        let cleaned = val.trim();
+        while (cleaned.startsWith('`') || cleaned.endsWith('`')) {
+          if (cleaned.startsWith('`')) cleaned = cleaned.slice(1);
+          if (cleaned.endsWith('`')) cleaned = cleaned.slice(0, -1);
+          cleaned = cleaned.trim();
+        }
+        obj[key] = cleaned.startsWith('/static/')
+          ? '/app/ai/static/' + cleaned.slice('/static/'.length)
+          : cleaned;
       } else if (val && typeof val === 'object') {
         this.rewriteStaticUrls(val);
       }

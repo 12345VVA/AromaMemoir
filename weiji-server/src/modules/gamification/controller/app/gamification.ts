@@ -59,6 +59,16 @@ export class AppGamificationController extends BaseController {
   }
 
   /**
+   * 本家庭盲猜轮次列表
+   * 注意：路由需在 /blindguess/round/:id 之前声明，避免 'rounds' 被当作 :id 参数
+   */
+  @Get('/blindguess/rounds', { summary: '本家庭盲猜轮次列表' })
+  async listRounds() {
+    const userId = this.ctx.user?.userId;
+    return this.ok(await this.gamificationService.listRounds(userId));
+  }
+
+  /**
    * 查看轮次详情（active 状态脱敏真实作者）
    */
   @Get('/blindguess/round/:id', { summary: '查看盲猜轮次详情' })

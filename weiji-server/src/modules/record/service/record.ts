@@ -94,15 +94,35 @@ export class RecordService extends BaseService {
 
   /**
    * 记录详情（C 端，做归属校验防 IDOR）
-   * 找不到返回 null，非本人抛 403
+   * 本人可查看；同家庭成员可查看（记录含 familyId 时校验成员归属）
+   * 返回值附带 likeCount / likedByMe 供前端展示点赞状态
    */
   async get(userId: number, id: number) {
     const record = await this.recordEntity.findOneBy({ id });
     if (!record) return null;
     if (record.userId !== userId) {
-      throw new CoolCommException('无权访问该记录', 403);
+      // 非本人：校验是否为同家庭成员
+      if (record.familyId != null) {
+        const membership = await this.familyMemberEntity.findOneBy({
+          familyId: record.familyId,
+          userId,
+        });
+        if (!membership) {
+          throw new CoolCommException('无权访问该记录', 403);
+        }
+      } else {
+        throw new CoolCommException('无权访问该记录', 403);
+      }
     }
-    return record;
+    // 附带点赞状态
+    const likeCount = await this.recordLikeEntity.count({
+      where: { recordId: id },
+    });
+    const likedByMe = !!(await this.recordLikeEntity.findOneBy({
+      recordId: id,
+      userId,
+    }));
+    return { ...record, likeCount, likedByMe };
   }
 
   /**
@@ -130,13 +150,24 @@ export class RecordService extends BaseService {
       throw new CoolCommException('菜品名称不能为空');
     }
     // 校验家庭归属：若指定 familyId，当前用户必须是该家庭成员
-    if (body.familyId != null) {
+    let familyId = body.familyId != null ? Number(body.familyId) : null;
+    if (familyId != null) {
       const membership = await this.familyMemberEntity.findOneBy({
-        familyId: body.familyId,
+        familyId,
         userId,
       });
       if (!membership) {
         throw new CoolCommException('无权操作该家庭', 403);
+      }
+    } else {
+      // 兜底：body 未传 familyId 时，查询当前用户家庭组自动填充
+      // 多家庭用户取最近加入的家庭（id DESC 确定性排序，避免归属不确定）
+      const membership = await this.familyMemberEntity.findOne({
+        where: { userId },
+        order: { id: 'DESC' },
+      });
+      if (membership) {
+        familyId = membership.familyId;
       }
     }
     const today = todayStr();
@@ -154,10 +185,10 @@ export class RecordService extends BaseService {
       nutritionTags: Array.isArray(body.nutritionTags) ? body.nutritionTags : null,
       kidFriendly: typeof body.kidFriendly === 'boolean' ? body.kidFriendly : false,
       recordDate: body.recordDate || today,
-      imageUrl: body.imageUrl,
-      beautifiedUrl: body.beautifiedUrl,
+      imageUrl: this.sanitizeImageUrl(body.imageUrl),
+      beautifiedUrl: this.sanitizeImageUrl(body.beautifiedUrl),
       source: body.source || 'manual',
-      familyId: body.familyId,
+      familyId,
     });
 
     // 触发挑战进度更新（失败不阻塞记录保存）
@@ -255,6 +286,21 @@ export class RecordService extends BaseService {
   }
 
   /**
+   * 清洗图片 URL：去除首尾空白与 LLM 输出可能带的反引号包裹
+   * 防止 weiji-ai 返回 `https://xxx.jpg` 这类 markdown 包裹污染数据
+   */
+  private sanitizeImageUrl(url: any): string {
+    if (typeof url !== 'string') return url ?? '';
+    let cleaned = url.trim();
+    while (cleaned.startsWith('`') || cleaned.endsWith('`')) {
+      if (cleaned.startsWith('`')) cleaned = cleaned.slice(1);
+      if (cleaned.endsWith('`')) cleaned = cleaned.slice(0, -1);
+      cleaned = cleaned.trim();
+    }
+    return cleaned;
+  }
+
+  /**
    * 家庭组记录动态（C 端，familyId 由调用方解析传入）
    * 关联 AppUser 补全昵称/头像，附 likeCount/commentCount/likedByMe
    * 按 createTime 降序
@@ -266,12 +312,16 @@ export class RecordService extends BaseService {
     // familyId 已在上层校验归属，此处仅缩小范围，不存在跨家庭越权。
     const qUserId = Number(query.userId);
     const memberUid = !isNaN(qUserId) && qUserId > 0 ? qUserId : null;
+    const keyword = String(query.keyword || '').trim();
 
     const qb = this.recordEntity
       .createQueryBuilder('r')
       .where('r.familyId = :familyId', { familyId });
     if (memberUid) {
       qb.andWhere('(r.userId = :qUid OR r.cookId = :qUid)', { qUid: memberUid });
+    }
+    if (keyword) {
+      qb.andWhere('r.dishName LIKE :kw', { kw: `%${keyword}%` });
     }
     const [records, total] = await qb
       .orderBy('r.createTime', 'DESC')

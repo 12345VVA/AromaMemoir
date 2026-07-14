@@ -19,9 +19,10 @@
 						<text v-if="recipe.cookTime" class="meta-text">⏱ {{ recipe.cookTime }}</text>
 					</view>
 					<view class="author-row">
-						<text class="author-name">by {{ recipe.authorName || recipe.author || "匿名" }}</text>
-						<text class="vis-text">{{ visibilityText(recipe.visibility) }}</text>
-					</view>
+					<text class="author-name">by {{ recipe.authorName || recipe.author || "匿名" }}</text>
+					<text v-if="canEdit" class="vis-text vis-editable" @click="onVisibilityTap">{{ visibilityText(recipe.visibility) }} ›</text>
+					<text v-else class="vis-text">{{ visibilityText(recipe.visibility) }}</text>
+				</view>
 				</view>
 
 				<!-- 食材 -->
@@ -123,6 +124,27 @@ function difficultyText(d: string) {
 }
 function visibilityText(v: string) {
 	return v === "private" ? "🔒仅自己" : v === "family" ? "👨‍👩‍👧家庭" : "🌍公开";
+}
+
+// 设置可见性（仅作者）：弹出 ActionSheet 选择
+const visLabels = ["👨‍👩‍👧 家庭可见", "🌍 公开", "🔒 仅自己"];
+const visValues = ["family", "public", "private"];
+function onVisibilityTap() {
+	if (!canEdit.value || !recipe.value) return;
+	uni.showActionSheet({
+		itemList: visLabels,
+		success: async (res) => {
+			const next = visValues[res.tapIndex];
+			if (next === recipe.value.visibility) return;
+			try {
+				await api.updateRecipeVisibility(recipeId.value, next);
+				recipe.value.visibility = next;
+				uni.showToast({ title: "已更新可见性", icon: "success" });
+			} catch {
+				// api.ts 已统一 toast
+			}
+		},
+	});
 }
 
 async function loadDetail() {
@@ -259,6 +281,12 @@ onLoad((options: any) => {
 .vis-text {
 	font-size: 24rpx;
 	color: var(--wj-text-muted);
+}
+.vis-editable {
+	color: var(--wj-primary);
+	background: rgba(255, 107, 53, 0.08);
+	padding: 4rpx 14rpx;
+	border-radius: 8rpx;
 }
 
 .ing-item {

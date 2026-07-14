@@ -123,20 +123,64 @@
 						class="wj-btn mode-btn"
 						:class="{ active: currentMode === 'chef' }"
 						:disabled="modeLoading"
-						@click="startModeGuess('chef')"
+						@click="openModeConfig('chef')"
 					>猜厨师</button>
 					<button
 						class="wj-btn mode-btn"
 						:class="{ active: currentMode === 'rating' }"
 						:disabled="modeLoading"
-						@click="startModeGuess('rating')"
+						@click="openModeConfig('rating')"
 					>猜评分</button>
 					<button
 						class="wj-btn mode-btn"
 						:class="{ active: currentMode === 'date' }"
 						:disabled="modeLoading"
-						@click="startModeGuess('date')"
+						@click="openModeConfig('date')"
 					>猜日期</button>
+				</view>
+
+				<!-- 玩法发起配置面板：猜厨师含有效期，猜评分/猜日期无需有效期 -->
+			<view v-if="modeConfigVisible" class="wj-card chef-config-card">
+				<view class="chef-config-title">发起{{ modeLabel(pendingMode) }}挑战</view>
+				<view v-if="pendingMode === 'chef'" class="form-item">
+					<text class="form-label">有效期</text>
+					<view class="expire-options">
+						<view
+							v-for="d in expireDayOptions"
+							:key="d"
+							class="expire-option"
+							:class="{ active: chefExpireDays === d }"
+							@click="chefExpireDays = d"
+						>{{ d }} 天</view>
+					</view>
+					<text class="form-hint">到期后活动自动关闭，可再发起新一轮；同一家庭同一时间仅允许一个未完成的猜厨师活动</text>
+				</view>
+				<view v-else class="form-item">
+					<text class="form-hint">{{ modeConfigHint }}</text>
+				</view>
+				<view class="chef-config-actions">
+					<button class="wj-btn wj-btn-ghost" @click="modeConfigVisible = false">取消</button>
+					<button
+						class="wj-btn"
+						:disabled="modeLoading"
+						:loading="modeLoading"
+						@click="startModeRound"
+					>开始挑战</button>
+				</view>
+			</view>
+
+				<!-- 未完成活动冲突提示 -->
+				<view v-if="conflictRound" class="modal-mask" @click="conflictRound = null">
+					<view class="conflict-modal" @click.stop>
+						<text class="conflict-title">存在未完成的猜厨师活动</text>
+						<text class="conflict-desc">
+							「{{ conflictRound.roundName || '盲猜挑战' }}」仍未揭晓，请先揭晓上一轮后再发起新活动。
+						</text>
+						<view class="conflict-actions">
+							<button class="wj-btn wj-btn-ghost" @click="conflictRound = null">稍后再说</button>
+							<button class="wj-btn" @click="goConflictRound">去揭晓</button>
+						</view>
+					</view>
 				</view>
 
 				<view v-if="modeLoading" class="empty-tip">加载中...</view>
@@ -155,60 +199,98 @@
 					<view v-if="modeRound.options && modeRound.options.length" class="mode-options">
 						<button
 							v-for="opt in modeRound.options"
-							:key="opt"
+							:key="opt.value"
 							class="wj-btn wj-btn-ghost mode-option"
-							:disabled="!!modeSelectedAnswer || modeSubmitting"
+							:disabled="modeGuessSubmitted || modeRevealed || modeSubmitting || isModeRoundExpired"
 							:class="{
-								selected: modeSelectedAnswer === opt,
-								correct: modeRevealed && opt === revealData?.answer,
-								wrong: modeRevealed && modeSelectedAnswer === opt && opt !== modeRound.answer
+								selected: modeSelectedAnswer === opt.value,
+								correct: modeRevealed && opt.value === modeCorrectAnswer,
+								wrong: modeRevealed && modeSelectedAnswer === opt.value && opt.value !== modeCorrectAnswer
 							}"
-							@click="selectModeAnswer(opt)"
-						>{{ opt }}</button>
+							@click="selectModeAnswer(opt.value)"
+						>{{ opt.label }}</button>
 					</view>
 					<button
-						v-if="modeSelectedAnswer && !modeRevealed"
+						v-if="modeSelectedAnswer !== '' && !modeGuessSubmitted && !modeRevealed"
 						class="wj-btn mode-submit-btn"
 						:disabled="modeSubmitting"
 						:loading="modeSubmitting"
 						@click="submitModeGuess"
 					>提交猜测</button>
+					<!-- 已提交、等待发起人揭晓 -->
+				<view v-if="modeGuessSubmitted && !modeRevealed" class="mode-pending">
+					<text class="mode-pending-text">已提交，等待发起人揭晓</text>
+					<button
+						v-if="isModeRoundCreator"
+						class="wj-btn mode-reveal-btn"
+						:disabled="modeSubmitting"
+						:loading="modeSubmitting"
+						@click="handleModeReveal"
+					>揭晓结果</button>
+				</view>
+				<!-- 活动已过期：不再接受猜测，发起人仍可揭晓查看结果 -->
+				<view v-if="isModeRoundExpired && !modeRevealed" class="mode-pending">
+					<text class="mode-pending-text">活动已过期</text>
+					<button
+						v-if="isModeRoundCreator"
+						class="wj-btn mode-reveal-btn"
+						:disabled="modeSubmitting"
+						:loading="modeSubmitting"
+						@click="handleModeReveal"
+					>揭晓结果</button>
+				</view>
 					<view v-if="modeRevealed" class="mode-result">
 						<text class="mode-result-text">
 							{{ modeIsCorrect ? "✅ 猜对了！" : "❌ 猜错了" }}
 						</text>
-						<text class="mode-answer-text">正确答案：{{ revealData?.answer || '—' }}</text>
+						<text class="mode-answer-text">正确答案：{{ modeCorrectAnswerLabel ?? '—' }}</text>
 					</view>
 					<button
 						v-if="modeRevealed"
 						class="wj-btn wj-btn-ghost mode-restart-btn"
 						@click="resetModeGuess"
-					>再玩一局</button>
+					>返回列表</button>
 				</view>
 				<view v-else-if="modeFallback" class="empty-tip">
 					数据不足，建议先记录更多美食
 				</view>
 
-				<!-- 查看轮次 -->
-				<view class="section-title">查看盲猜轮次</view>
-				<view class="round-search">
-					<input
-						class="round-input"
-						v-model="roundIdInput"
-						placeholder="输入轮次 ID"
-						placeholder-class="ph"
-					/>
-					<button class="wj-btn round-btn" :disabled="roundLoading" @click="loadRound">查看</button>
+				<!-- 盲猜轮次列表 -->
+				<view class="section-title">盲猜轮次</view>
+				<view v-if="roundsLoading" class="empty-tip">加载中...</view>
+				<view v-else-if="roundsList.length" class="round-list">
+					<view
+						v-for="r in roundsList"
+						:key="r.id"
+						class="round-list-item"
+						@click="onRoundItemClick(r)"
+					>
+						<view class="round-list-info">
+						<view class="round-list-title">
+							<text class="round-list-name">{{ r.roundName || '盲猜挑战' }}</text>
+							<text v-if="r.mode" class="mode-tag">{{ modeLabel(r.mode) }}</text>
+							<text v-if="expireTag(r)" class="expire-tag" :class="{ expired: expireTag(r)?.expired }">{{ expireTag(r)?.text }}</text>
+						</view>
+						<text class="round-list-meta">
+							{{ roundStatusText(r) }} · {{ r.creatorName || '未知' }} · {{ r.participantCount || 0 }} 人参与
+						</text>
+					</view>
+					<text v-if="r.hasMyGuess" class="guessed-tag">已猜</text>
+					</view>
 				</view>
+				<view v-else class="empty-tip clickable" @click="scrollToCreate">暂无进行中的盲猜，去发起一轮</view>
 
 				<view v-if="roundLoading" class="empty-tip">加载中...</view>
 				<view v-else-if="round" class="wj-card round-card">
 					<view class="round-header">
 						<text class="round-name">{{ round.roundName || '本轮盲猜' }}</text>
 						<text class="round-status" :class="{ revealed: round.status === 'revealed' }">
-							{{ round.status === 'revealed' ? '已揭晓' : '进行中' }}
+							{{ roundStatusText(round) }}
 						</text>
 					</view>
+					<text v-if="expireTag(round)" class="round-expire-tip" :class="{ expired: expireTag(round)?.expired }">
+						{{ expireTag(round)?.text }}
+					</text>
 
 					<view v-if="round.items && round.items.length" class="round-items">
 						<view
@@ -245,12 +327,16 @@
 										placeholder="猜菜名"
 										placeholder-class="ph"
 									/>
-									<input
-										class="guess-input author"
-										v-model="guessForms[item.recordId].authorId"
-										placeholder="作者 ID"
-										placeholder-class="ph"
-									/>
+									<picker
+										class="guess-picker"
+										:range="familyMembers"
+										range-key="nickName"
+										@change="(e: any) => onAuthorPick(item.recordId, e)"
+									>
+										<view class="guess-input author author-pick">
+											{{ guessForms[item.recordId].authorName || '选择作者' }}
+										</view>
+									</picker>
 									<button
 										class="wj-btn guess-btn"
 										:disabled="guessLoading === item.recordId"
@@ -293,7 +379,7 @@
 				</view>
 
 				<!-- 发起新轮次 -->
-				<view class="section-title">发起新轮次</view>
+				<view id="create-round-section" class="section-title">发起新轮次</view>
 				<view class="wj-card create-form">
 					<view class="form-item">
 						<text class="form-label">家庭组</text>
@@ -307,59 +393,60 @@
 					</view>
 					<view class="form-item">
 						<text class="form-label">轮次名称</text>
-						<input class="form-input" v-model="createForm.roundName" placeholder="如：周末盲猜" placeholder-class="ph" />
+						<input class="form-input" v-model="createForm.roundName" placeholder="选填，留空自动生成" placeholder-class="ph" />
+						<text class="form-hint">用于区分不同轮次，不填将自动生成默认名称</text>
 					</view>
 					<view class="form-item">
-						<text class="form-label">参与记录（3-10 条）</text>
-						<button class="wj-btn wj-btn-ghost pick-btn" @click="openRecordPicker">
-							{{
-								createForm.recordIds.length
-									? `已选 ${createForm.recordIds.length} 条，点击修改`
-									: "选择记录"
-							}}
-						</button>
-					</view>
-					<button class="wj-btn create-btn" :disabled="creating" :loading="creating" @click="handleCreate">
-						发起轮次
+					<text class="form-label">参与菜品（3-10 道）</text>
+					<button class="wj-btn wj-btn-ghost pick-btn" @click="openRecordPicker">
+						{{
+							createForm.recordIds.length
+								? `已选 ${createForm.recordIds.length} 道，点击修改`
+								: "选择菜品"
+						}}
 					</button>
 				</view>
+				<button class="wj-btn create-btn" :disabled="creating" :loading="creating" @click="handleCreate">
+					发起轮次
+				</button>
+			</view>
 
-				<!-- 记录选择器弹窗 -->
-				<view v-if="recordPickerVisible" class="modal-mask" @click="recordPickerVisible = false">
-					<view class="record-picker" @click.stop>
-						<view class="picker-header">
-							<text class="picker-title">选择记录</text>
-							<text class="picker-close" @click="recordPickerVisible = false">×</text>
-						</view>
-						<scroll-view scroll-y class="picker-list">
-							<view v-if="recordPickerLoading" class="picker-empty">加载中...</view>
-							<view v-else-if="familyRecords.length">
-								<view
-									v-for="r in familyRecords"
-									:key="r.id"
-									class="picker-item"
-									:class="{ selected: isSelected(r.id) }"
-									@click="toggleRecord(r.id)"
-								>
-									<view class="picker-checkbox">
-										<text v-if="isSelected(r.id)" class="check-mark">✓</text>
-									</view>
-									<view class="picker-info">
-										<text class="picker-dish">{{ r.dishName || "未知菜品" }}</text>
-										<text class="picker-author">
-											{{ r.userNickname || "未知" }}{{ r.recordDate ? " · " + r.recordDate : "" }}
-										</text>
-									</view>
+			<!-- 菜品选择器弹窗 -->
+			<view v-if="recordPickerVisible" class="modal-mask" @click="recordPickerVisible = false">
+				<view class="record-picker" @click.stop>
+					<view class="picker-header">
+						<text class="picker-title">选择菜品</text>
+						<text class="picker-close" @click="recordPickerVisible = false">×</text>
+					</view>
+					<scroll-view scroll-y class="picker-list">
+						<view v-if="recordPickerLoading" class="picker-empty">加载中...</view>
+						<view v-else-if="familyRecords.length">
+							<view
+								v-for="r in familyRecords"
+								:key="r.id"
+								class="picker-item"
+								:class="{ selected: isSelected(r.id) }"
+								@click="toggleRecord(r.id)"
+							>
+								<view class="picker-checkbox">
+									<text v-if="isSelected(r.id)" class="check-mark">✓</text>
+								</view>
+								<view class="picker-info">
+									<text class="picker-dish">{{ r.dishName || "未知菜品" }}</text>
+									<text class="picker-author">
+										{{ r.userNickname || "未知" }}{{ r.recordDate ? " · " + r.recordDate : "" }}
+									</text>
 								</view>
 							</view>
-							<view v-else class="picker-empty">暂无家庭动态记录</view>
-						</scroll-view>
-						<view class="picker-footer">
-							<text class="picker-count">已选 {{ createForm.recordIds.length }} / 10 条</text>
-							<button class="wj-btn picker-confirm" @click="confirmRecords">确认</button>
 						</view>
+						<view v-else class="picker-empty">暂无家庭菜品记录</view>
+					</scroll-view>
+					<view class="picker-footer">
+						<text class="picker-count">已选 {{ createForm.recordIds.length }} / 10 道</text>
+						<button class="wj-btn picker-confirm" @click="confirmRecords">确认</button>
 					</view>
 				</view>
+			</view>
 			</view>
 		</view>
 	</cl-page>
@@ -392,12 +479,17 @@ const timemachine = ref<any>({});
 const roundIdInput = ref("");
 const round = ref<any>(null);
 const roundLoading = ref(false);
-const guessForms = reactive<Record<string, { dish: string; authorId: string }>>({});
+const guessForms = reactive<Record<string, { dish: string; authorId: string; authorName: string }>>({});
 const guessLoading = ref<any>("");
 const roundRanking = ref<any[]>([]);
 const revealing = ref(false);
 // 家庭组信息（用于自动填充 familyId 与展示名称）
 const familyInfo = ref<any>({});
+// 家庭成员列表（用于传统轮次猜作者选择器）
+const familyMembers = ref<any[]>([]);
+// 盲猜轮次列表
+const roundsList = ref<any[]>([]);
+const roundsLoading = ref(false);
 // 记录选择器
 const recordPickerVisible = ref(false);
 const familyRecords = ref<any[]>([]);
@@ -412,15 +504,30 @@ const creating = ref(false);
 // 盲猜玩法（猜厨师/猜评分/猜日期）
 type BlindGuessMode = "chef" | "rating" | "date";
 const currentMode = ref<BlindGuessMode>("chef");
+// 配置面板中"待发起"的玩法模式，与 currentMode 解耦：currentMode 跟随当前答题轮次，
+// pendingMode 仅用于发起配置面板，取消不再影响答题区文案
+const pendingMode = ref<BlindGuessMode>("chef");
 const modeLoading = ref(false);
 const modeRound = ref<any>(null);
 const modeFallback = ref(false);
-const modeSelectedAnswer = ref<string>("");
+const modeSelectedAnswer = ref<string | number>("");
 const modeSubmitting = ref(false);
 const modeRevealed = ref(false);
 const modeIsCorrect = ref(false);
 const modeGuessSubmitted = ref(false);
 const revealData = ref<any>(null);
+// 玩法发起配置：猜厨师含有效期，猜评分/猜日期仅确认；未完成活动冲突提示
+const modeConfigVisible = ref(false);
+const chefExpireDays = ref(7);
+const expireDayOptions = [1, 3, 7, 14, 30];
+const conflictRound = ref<any>(null);
+
+// 非猜厨师模式的配置提示文案
+const modeConfigHint = computed(() => {
+	if (pendingMode.value === "rating") return "系统将随机抽取一道有评论的菜品，让你猜它的评分";
+	if (pendingMode.value === "date") return "系统将随机抽取一道菜品，让你猜它的记录时间所属区间";
+	return "";
+});
 
 const pokedexCompletion = computed(() => {
 	const r = Number(pokedex.value.completionRate || 0);
@@ -465,6 +572,36 @@ const isRoundCreator = computed(() => {
 	return !!uid && String(round.value?.creatorId || "") === String(uid);
 });
 
+// mode 轮次：当前用户是否为发起人（用于显示"揭晓结果"按钮）
+const isModeRoundCreator = computed(() => {
+	const uid = user.info?.id;
+	return !!uid && String(modeRound.value?.creatorId || "") === String(uid);
+});
+
+// mode 轮次是否已过期（猜厨师活动到期自动关闭，不再接受猜测）
+const isModeRoundExpired = computed(() => {
+	return modeRound.value?.status === "expired";
+});
+
+// mode 轮次揭晓后的正确答案（兼容 answer / items[0].correctAnswer / revealData.answer）
+const modeCorrectAnswer = computed<any>(() => {
+	if (!modeRevealed.value) return undefined;
+	return modeRound.value?.answer
+		?? modeRound.value?.items?.[0]?.correctAnswer
+		?? revealData.value?.answer;
+});
+
+// 揭晓后正确答案的展示文案：从 options 反查 label（厨师昵称/中文区间），
+// 避免直接渲染 cookId 数字或 'this_week' 等内部枚举
+const modeCorrectAnswerLabel = computed(() => {
+	if (!modeRevealed.value) return undefined;
+	const raw = modeCorrectAnswer.value;
+	if (raw == null) return undefined;
+	const opts: any[] = modeRound.value?.options || [];
+	const hit = opts.find((o: any) => String(o.value) === String(raw));
+	return hit?.label ?? raw;
+});
+
 function rarityEmoji(rarity: string) {
 	if (rarity === "legendary") return "🌟";
 	if (rarity === "epic") return "💎";
@@ -487,8 +624,10 @@ async function loadTab() {
 			personality.value = (await api.getPersonality()) || {};
 		} else if (activeTab.value === "timemachine") {
 			timemachine.value = (await api.getTimemachine()) || {};
+		} else if (activeTab.value === "blindguess") {
+			// 盲猜 Tab：自动加载轮次列表
+			await loadRounds();
 		}
-		// blindguess 不自动加载，等待用户输入轮次 ID
 	} catch {
 		// api.ts 已统一 toast
 	} finally {
@@ -504,9 +643,56 @@ async function loadFamilyInfo() {
 		if (data && (data.id || data.familyId)) {
 			createForm.familyId = data.id || data.familyId;
 		}
+		// 同时加载家庭成员列表，用于传统轮次猜作者选择器
+		try {
+			const members: any = await api.getFamilyMembers();
+			familyMembers.value = Array.isArray(members) ? members : (members?.list || []);
+		} catch {
+			familyMembers.value = [];
+		}
 	} catch {
 		// api.ts 已统一 toast
 	}
+}
+
+// 加载盲猜轮次列表
+async function loadRounds() {
+	roundsLoading.value = true;
+	try {
+		const data: any = await api.getBlindGuessRounds();
+		roundsList.value = Array.isArray(data) ? data : (data?.list || []);
+	} catch {
+		roundsList.value = [];
+	} finally {
+		roundsLoading.value = false;
+	}
+}
+
+// mode 轮次模式标签文本
+function modeLabel(mode: string) {
+	if (mode === "chef") return "猜厨师";
+	if (mode === "rating") return "猜评分";
+	if (mode === "date") return "猜日期";
+	return "传统盲猜";
+}
+
+// 轮次列表项点击：mode 轮次进入 mode 答题；传统轮次进入详情
+function onRoundItemClick(r: any) {
+	if (!r) return;
+	if (r.mode) {
+		loadModeRoundFromList(r);
+	} else {
+		roundIdInput.value = String(r.id || r.roundId || "");
+		loadRound();
+	}
+}
+
+// 滚动到发起新轮次区域
+function scrollToCreate() {
+	uni.pageScrollTo({
+		selector: "#create-round-section",
+		duration: 300,
+	});
 }
 
 // 主动拉取用户资料，确保 user.info 可用（gamification 依赖 userId 等字段）
@@ -555,16 +741,16 @@ function toggleRecord(id: number | string) {
 		createForm.recordIds.splice(idx, 1);
 	} else {
 		if (createForm.recordIds.length >= 10) {
-			uni.showToast({ title: "最多选择 10 条", icon: "none" });
-			return;
-		}
+		uni.showToast({ title: "最多选择 10 道", icon: "none" });
+		return;
+	}
 		createForm.recordIds.push(numId);
 	}
 }
 
 function confirmRecords() {
 	if (createForm.recordIds.length < 3) {
-		uni.showToast({ title: "至少选择 3 条", icon: "none" });
+		uni.showToast({ title: "至少选择 3 道", icon: "none" });
 		return;
 	}
 	recordPickerVisible.value = false;
@@ -578,6 +764,11 @@ async function loadRound() {
 	}
 	// 切换轮次前清空旧的猜测表单，避免上一轮残留数据污染本轮
 	Object.keys(guessForms).forEach((k) => delete guessForms[k]);
+	// 切换到传统轮次时清空 mode 轮次详情，避免两个卡片同时显示
+	modeRound.value = null;
+	modeFallback.value = false;
+	modeRevealed.value = false;
+	modeGuessSubmitted.value = false;
 	roundLoading.value = true;
 	try {
 		const data: any = await api.getBlindGuessRoundDetail(id);
@@ -596,7 +787,7 @@ async function loadRound() {
 		if (data && Array.isArray(data.items)) {
 			data.items.forEach((it: any) => {
 				if (!guessForms[it.recordId]) {
-					guessForms[it.recordId] = { dish: "", authorId: "" };
+					guessForms[it.recordId] = { dish: "", authorId: "", authorName: "" };
 				}
 			});
 		}
@@ -606,6 +797,19 @@ async function loadRound() {
 	} finally {
 		roundLoading.value = false;
 	}
+}
+
+// 传统轮次：作者选择器回调
+function onAuthorPick(recordId: number | string, e: any) {
+	const idx = Number(e?.detail?.value);
+	if (isNaN(idx) || idx < 0 || idx >= familyMembers.value.length) return;
+	const member = familyMembers.value[idx];
+	if (!member) return;
+	if (!guessForms[recordId]) {
+		guessForms[recordId] = { dish: "", authorId: "", authorName: "" };
+	}
+	guessForms[recordId].authorId = String(member.userId ?? member.id ?? "");
+	guessForms[recordId].authorName = member.nickName || member.nickname || "";
 }
 
 function extractRanking(data: any): any[] {
@@ -620,11 +824,11 @@ function extractRanking(data: any): any[] {
 async function handleSubmitGuess(item: any) {
 	if (!round.value) return;
 	const roundId = round.value.id || round.value.roundId;
-	const form = guessForms[item.recordId] || { dish: "", authorId: "" };
+	const form = guessForms[item.recordId] || { dish: "", authorId: "", authorName: "" };
 	const dish = (form.dish || "").trim();
 	const authorId = (form.authorId || "").trim();
 	if (!dish || !authorId) {
-		uni.showToast({ title: "请填写菜名与作者 ID", icon: "none" });
+		uni.showToast({ title: "请填写菜名并选择作者", icon: "none" });
 		return;
 	}
 	guessLoading.value = item.recordId;
@@ -632,11 +836,14 @@ async function handleSubmitGuess(item: any) {
 		await api.submitBlindGuess(roundId, {
 			itemId: item.recordId,
 			guessAuthorId: authorId,
+			guessAuthorName: form.authorName || "",
 			guessDishName: dish,
 		});
 		uni.showToast({ title: "已提交猜测", icon: "success" });
-		guessForms[item.recordId] = { dish: "", authorId: "" };
+		guessForms[item.recordId] = { dish: "", authorId: "", authorName: "" };
 		await loadRound();
+		// 刷新轮次列表，更新 hasMyGuess
+		await loadRounds();
 	} catch {
 		// api.ts 已统一 toast
 	} finally {
@@ -652,6 +859,8 @@ async function handleReveal() {
 		await api.revealBlindGuessRound(roundId);
 		uni.showToast({ title: "已揭晓", icon: "success" });
 		await loadRound();
+		// 刷新轮次列表，更新状态
+		await loadRounds();
 	} catch {
 		// api.ts 已统一 toast
 	} finally {
@@ -664,23 +873,20 @@ async function handleCreate() {
 		uni.showToast({ title: "请先创建或加入家庭组", icon: "none" });
 		return;
 	}
-	const roundName = createForm.roundName.trim();
-	if (!roundName) {
-		uni.showToast({ title: "请填写轮次名称", icon: "none" });
-		return;
-	}
 	if (createForm.recordIds.length < 3 || createForm.recordIds.length > 10) {
-		uni.showToast({ title: "记录需 3-10 条", icon: "none" });
+		uni.showToast({ title: "菜品需 3-10 道", icon: "none" });
 		return;
 	}
 	creating.value = true;
 	try {
 		const data: any = await api.createBlindGuessRound({
 			familyId: createForm.familyId,
-			roundName,
+			roundName: createForm.roundName.trim(),
 			recordIds: createForm.recordIds,
 		});
 		uni.showToast({ title: "已发起轮次", icon: "success" });
+		// 刷新轮次列表
+		await loadRounds();
 		// 跳转到新轮次详情
 		if (data && (data.id || data.roundId)) {
 			roundIdInput.value = String(data.id || data.roundId);
@@ -689,40 +895,159 @@ async function handleCreate() {
 		createForm.roundName = "";
 		createForm.recordIds = [];
 	} catch {
-		// api.ts 已统一 toast
+		// createBlindGuessRound 为 showError:false（mode 创建有多种非错误返回需前端特判），
+		// 传统 handleCreate 失败需自行提示
+		uni.showToast({ title: "发起失败，请重试", icon: "none" });
 	} finally {
 		creating.value = false;
 	}
 }
 
 // ===== 盲猜单题玩法（猜厨师/猜评分/猜日期） =====
-async function startModeGuess(mode: BlindGuessMode) {
+
+// 轮次状态文本：revealed/expired/active
+function roundStatusText(r: any) {
+	if (!r) return "";
+	if (r.status === "revealed") return "已揭晓";
+	if (r.status === "expired") return "已过期";
+	return "进行中";
+}
+
+// 猜厨师轮次有效期标签：进行中显示倒计时，过期显示"已过期"
+function expireTag(r: any): { text: string; expired: boolean } | null {
+	if (!r) return null;
+	// 仅猜厨师模式有有效期概念
+	if (r.mode && r.mode !== "chef") return null;
+	if (r.status === "revealed") return null;
+	if (!r.expiresAt) {
+		// 无 expiresAt 但状态为 expired（兼容历史数据）
+		if (r.status === "expired") return { text: "已过期", expired: true };
+		return null;
+	}
+	const ms = new Date(r.expiresAt).getTime() - Date.now();
+	if (r.status === "expired" || ms <= 0) {
+		return { text: "已过期", expired: true };
+	}
+	// 不足 1 天按小时显示，否则按天（原 Math.ceil 会让 <1 天误进"剩 1 天"）
+	const days = Math.floor(ms / (24 * 60 * 60 * 1000));
+	if (days >= 1) {
+		return { text: `剩 ${days} 天`, expired: false };
+	}
+	const hours = Math.max(1, Math.ceil(ms / (60 * 60 * 1000)));
+	return { text: `剩 ${hours} 小时`, expired: false };
+}
+
+// 打开发起配置面板（仅设置模式与默认值，不创建轮次）
+function openModeConfig(mode: BlindGuessMode) {
 	if (!createForm.familyId) {
 		uni.showToast({ title: "请先创建或加入家庭组", icon: "none" });
 		return;
 	}
-	currentMode.value = mode;
+	pendingMode.value = mode;
+	if (mode === "chef") chefExpireDays.value = 7;
+	modeConfigVisible.value = true;
+}
+
+// 发起挑战：用户在配置面板点"开始挑战"后才调用后端创建轮次
+async function startModeRound() {
+	if (!createForm.familyId) {
+		uni.showToast({ title: "请先创建或加入家庭组", icon: "none" });
+		return;
+	}
+	const mode = pendingMode.value;
 	modeLoading.value = true;
 	modeFallback.value = false;
-	modeRound.value = null;
+	try {
+		const payload: any = { familyId: createForm.familyId, mode };
+		// 仅猜厨师模式支持有效期
+		if (mode === "chef") payload.expireDays = chefExpireDays.value;
+		const data: any = await api.createBlindGuessRound(payload);
+		// 未完成活动冲突：提示先揭晓上一轮（仅猜厨师模式）
+		if (data && data.conflict) {
+			conflictRound.value = data.activeRound || null;
+			uni.showToast({ title: data.message || "存在未完成的活动", icon: "none" });
+		} else if (!data || data.fallback) {
+			modeFallback.value = true;
+			uni.showToast({ title: "数据不足，建议先记录更多美食", icon: "none" });
+		} else {
+			uni.showToast({ title: "已创建新挑战", icon: "success" });
+			modeConfigVisible.value = false;
+			// 创建成功：直接进入新轮次答题
+			if (data && (data.id || data.roundId)) {
+				await loadModeRoundFromList({ id: data.id || data.roundId, mode });
+			}
+		}
+		// 刷新轮次列表
+		await loadRounds();
+	} catch {
+		uni.showToast({ title: "发起失败，请重试", icon: "none" });
+	} finally {
+		modeLoading.value = false;
+	}
+}
+
+// 跳转到冲突轮次（未完成的猜厨师活动），便于发起人去揭晓
+async function goConflictRound() {
+	const r = conflictRound.value;
+	conflictRound.value = null;
+	if (!r) return;
+	modeConfigVisible.value = false;
+	await loadModeRoundFromList({ id: r.id, mode: "chef" });
+}
+
+// 从轮次列表加载 mode 轮次详情到 modeRound
+async function loadModeRoundFromList(item: any) {
+	const id = item?.id || item?.roundId;
+	if (!id) return;
+	const m = item?.mode;
+	if (m === "chef" || m === "rating" || m === "date") {
+		currentMode.value = m;
+	}
+	// 切换到 mode 轮次时清空传统轮次详情，避免两个卡片同时显示
+	round.value = null;
+	roundRanking.value = [];
+	modeLoading.value = true;
+	modeFallback.value = false;
 	modeSelectedAnswer.value = "";
 	modeRevealed.value = false;
 	modeIsCorrect.value = false;
 	modeGuessSubmitted.value = false;
 	revealData.value = null;
 	try {
-		const data: any = await api.createBlindGuessRound({
-			familyId: createForm.familyId,
-			mode,
-		});
-		// fallback 判定：后端显式 fallback 标志，或缺少 options 视为数据不足
-		if (!data || data.fallback || !data.options || !data.options.length) {
+		const data: any = await api.getBlindGuessRoundDetail(id);
+		// 后端 sanitizeRound 返回 { items: [{ recordId, dishName, coverUrl, options }] }
+		// mode 轮次仅 1 道题，从 items[0] 提取展示字段到顶层
+		const firstItem = data?.items?.[0];
+		if (!data || !firstItem || !firstItem.options || !firstItem.options.length) {
 			modeFallback.value = true;
 			modeRound.value = null;
 		} else {
 			// 前端防御：删除 answer 字段，避免抓包作弊
 			const { answer, ...safeRound } = data;
-			modeRound.value = safeRound;
+			modeRound.value = {
+				...safeRound,
+				coverUrl: firstItem.coverUrl,
+				dishName: firstItem.dishName,
+				options: firstItem.options,
+				recordId: firstItem.recordId,
+			};
+			// 已揭晓的轮次：直接进入揭晓态展示结果
+			if (data.status === "revealed") {
+				modeRevealed.value = true;
+				// 恢复当前用户的选择与正误，避免揭晓态恒显示"猜错"
+				const myGuess = (Array.isArray(data.guesses) ? data.guesses : [])
+					.find((g: any) => Number(g.userId) === Number(user.info?.id));
+				if (myGuess && myGuess.guessAnswer != null) {
+					modeSelectedAnswer.value = myGuess.guessAnswer;
+				}
+				modeIsCorrect.value =
+					modeCorrectAnswer.value != null &&
+					String(modeSelectedAnswer.value) === String(modeCorrectAnswer.value);
+			}
+			// 当前用户已猜测：进入"等待揭晓"态
+			if (item.hasMyGuess || data.hasMyGuess) {
+				modeGuessSubmitted.value = true;
+			}
 		}
 	} catch {
 		modeFallback.value = true;
@@ -731,13 +1056,13 @@ async function startModeGuess(mode: BlindGuessMode) {
 	}
 }
 
-function selectModeAnswer(opt: string) {
-	if (modeRevealed.value || modeSubmitting.value) return;
+function selectModeAnswer(opt: string | number) {
+	if (modeRevealed.value || modeSubmitting.value || modeGuessSubmitted.value) return;
 	modeSelectedAnswer.value = opt;
 }
 
 async function submitModeGuess() {
-	if (!modeRound.value || !modeSelectedAnswer.value) return;
+	if (!modeRound.value || modeSelectedAnswer.value === "") return;
 	if (modeGuessSubmitted.value) return;
 	const roundId = modeRound.value.id || modeRound.value.roundId;
 	if (!roundId) {
@@ -746,20 +1071,45 @@ async function submitModeGuess() {
 	}
 	modeSubmitting.value = true;
 	try {
-		const guessResult: any = await api.guessBlindGuess(roundId, { guessAnswer: modeSelectedAnswer.value });
+		await api.guessBlindGuess(roundId, {
+			itemId: modeRound.value.recordId,
+			guessAnswer: modeSelectedAnswer.value,
+		});
+		// 提交后仅设置 submitted，等待发起人揭晓
 		modeGuessSubmitted.value = true;
-		// 如果后端返回中已包含揭晓数据（score/correct/revealed 等），直接使用，避免重复调用 reveal 导致重复发奖
-		if (guessResult && (guessResult.revealed || guessResult.answer !== undefined || guessResult.correct !== undefined)) {
-			revealData.value = guessResult;
-		} else {
-			revealData.value = await api.revealBlindGuess(roundId);
+		uni.showToast({ title: "已提交，等待发起人揭晓", icon: "none" });
+		// 刷新轮次列表，更新 hasMyGuess
+		await loadRounds();
+	} catch {
+		// api.ts 已统一 toast
+	} finally {
+		modeSubmitting.value = false;
+	}
+}
+
+// mode 轮次：发起人点击揭晓
+async function handleModeReveal() {
+	if (!modeRound.value) return;
+	const roundId = modeRound.value.id || modeRound.value.roundId;
+	if (!roundId) return;
+	modeSubmitting.value = true;
+	try {
+		await api.revealBlindGuessRound(roundId);
+		// 揭晓后重新拉取轮次详情，获取 revealed 状态的完整数据（含 correctAnswer / ranking）
+		const fresh: any = await api.getBlindGuessRoundDetail(roundId);
+		if (fresh) {
+			// 保留展示用的 options（fresh 也应包含，兜底用旧值）
+			const oldOptions = modeRound.value?.options;
+			modeRound.value = { ...fresh, options: fresh.options || oldOptions };
 		}
 		modeRevealed.value = true;
-		const correctAnswer = revealData.value?.answer ?? modeRound.value.answer;
-		modeIsCorrect.value = String(modeSelectedAnswer.value) === String(correctAnswer);
-		if (revealData.value) {
-			modeRound.value = { ...modeRound.value, ...revealData.value };
-		}
+		// 对比用户选择与正确答案判断是否猜对
+		const correctAnswer = modeCorrectAnswer.value;
+		modeIsCorrect.value = correctAnswer !== undefined
+			? String(modeSelectedAnswer.value) === String(correctAnswer)
+			: false;
+		// 刷新轮次列表
+		await loadRounds();
 	} catch {
 		// api.ts 已统一 toast
 	} finally {
@@ -789,12 +1139,10 @@ function copyShareText() {
 	});
 }
 
-const tabLoadedOnce = ref(false);
 onMounted(() => {
-	loadTab();
+	// 仅初始化家庭/用户信息；列表加载统一交给 onShow，避免 onMounted 与首次 onShow 双触发
 	loadFamilyInfo();
 	loadUserProfile();
-	tabLoadedOnce.value = true;
 });
 
 onLoad((options: any) => {
@@ -811,7 +1159,8 @@ onLoad((options: any) => {
 });
 
 onShow(() => {
-	if (tabLoadedOnce.value && activeTab.value !== "blindguess") loadTab();
+	// 首次显示与每次返回均刷新当前 tab（替代原 onMounted 的 loadTab，杜绝重复请求）
+	loadTab();
 });
 </script>
 
@@ -989,28 +1338,63 @@ onShow(() => {
 	color: var(--wj-text-muted);
 }
 
-.round-search {
+/* 盲猜轮次列表 */
+.round-list {
 	display: flex;
+	flex-direction: column;
 	gap: 16rpx;
 	margin-bottom: 16rpx;
 }
-.round-input {
-	flex: 1;
-	height: 72rpx;
-	font-size: 28rpx;
-	padding: 0 20rpx;
+.round-list-item {
+	display: flex;
+	align-items: center;
+	gap: 16rpx;
+	padding: 24rpx 28rpx;
 	background: #fff;
-	border-radius: 12rpx;
-	border: 2rpx solid var(--wj-border);
-	color: var(--wj-text);
+	border-radius: var(--wj-radius);
+	box-shadow: var(--wj-shadow);
 }
-.round-btn {
+.round-list-info {
+	flex: 1;
+	min-width: 0;
+}
+.round-list-title {
+	display: flex;
+	align-items: center;
+	gap: 12rpx;
+	margin-bottom: 8rpx;
+}
+.round-list-name {
+	font-size: 28rpx;
+	font-weight: 600;
+	color: var(--wj-text);
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+.mode-tag {
+	font-size: 20rpx;
+	color: var(--wj-primary);
+	background: rgba(255, 107, 53, 0.08);
+	padding: 2rpx 12rpx;
+	border-radius: 8rpx;
 	flex-shrink: 0;
-	height: 72rpx;
-	line-height: 72rpx;
-	padding: 0 28rpx;
-	font-size: 26rpx;
+}
+.round-list-meta {
+	display: block;
+	font-size: 22rpx;
+	color: var(--wj-text-muted);
+}
+.guessed-tag {
+	font-size: 20rpx;
+	color: #fff;
+	background: var(--wj-primary);
+	padding: 4rpx 14rpx;
 	border-radius: 12rpx;
+	flex-shrink: 0;
+}
+.empty-tip.clickable {
+	color: var(--wj-primary);
 }
 
 .round-card {
@@ -1099,6 +1483,15 @@ onShow(() => {
 .guess-input.author {
 	max-width: 180rpx;
 }
+.guess-input.author-pick {
+	display: flex;
+	align-items: center;
+	color: var(--wj-text-muted);
+}
+.guess-picker {
+	max-width: 220rpx;
+	flex-shrink: 0;
+}
 .guess-btn {
 	flex-shrink: 0;
 	height: 64rpx;
@@ -1184,6 +1577,12 @@ onShow(() => {
 	font-size: 28rpx;
 	background: #fff;
 	color: var(--wj-text);
+}
+.form-hint {
+	display: block;
+	font-size: 22rpx;
+	color: var(--wj-text-muted);
+	margin-top: 8rpx;
 }
 .form-input.readonly {
 	display: flex;
@@ -1474,6 +1873,31 @@ onShow(() => {
 	border-radius: 12rpx;
 	margin-top: 16rpx;
 }
+/* mode 轮次：已提交等待揭晓 */
+.mode-pending {
+	margin-top: 16rpx;
+	padding: 20rpx 24rpx;
+	background: var(--wj-bg);
+	border-radius: 12rpx;
+	width: 100%;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 16rpx;
+}
+.mode-pending-text {
+	display: block;
+	font-size: 28rpx;
+	font-weight: 600;
+	color: var(--wj-text);
+}
+.mode-reveal-btn {
+	width: 100%;
+	height: 80rpx;
+	line-height: 80rpx;
+	font-size: 28rpx;
+	border-radius: 12rpx;
+}
 .mode-result {
 	margin-top: 24rpx;
 	padding: 20rpx 24rpx;
@@ -1500,5 +1924,102 @@ onShow(() => {
 	font-size: 28rpx;
 	border-radius: 12rpx;
 	margin-top: 20rpx;
+}
+
+/* 猜厨师发起配置面板 */
+.chef-config-card {
+	padding: 28rpx;
+	margin: 20rpx 0;
+}
+.chef-config-title {
+	font-size: 30rpx;
+	font-weight: 600;
+	color: var(--wj-text);
+	margin-bottom: 20rpx;
+}
+.expire-options {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16rpx;
+	margin: 16rpx 0 8rpx;
+}
+.expire-option {
+	min-width: 120rpx;
+	text-align: center;
+	padding: 14rpx 24rpx;
+	border-radius: 12rpx;
+	font-size: 26rpx;
+	color: var(--wj-text);
+	background: rgba(0, 0, 0, 0.04);
+	border: 2rpx solid transparent;
+}
+.expire-option.active {
+	color: var(--wj-primary);
+	background: rgba(255, 107, 53, 0.08);
+	border-color: var(--wj-primary);
+	font-weight: 600;
+}
+.chef-config-actions {
+	display: flex;
+	gap: 20rpx;
+	margin-top: 24rpx;
+}
+.chef-config-actions .wj-btn {
+	flex: 1;
+}
+
+/* 未完成活动冲突弹窗 */
+.conflict-modal {
+	width: 580rpx;
+	background: #fff;
+	border-radius: 20rpx;
+	padding: 40rpx 36rpx;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+.conflict-title {
+	font-size: 32rpx;
+	font-weight: 600;
+	color: var(--wj-text);
+	margin-bottom: 20rpx;
+}
+.conflict-desc {
+	font-size: 26rpx;
+	color: var(--wj-text-muted);
+	line-height: 1.6;
+	margin-bottom: 32rpx;
+	text-align: center;
+}
+.conflict-actions {
+	display: flex;
+	gap: 20rpx;
+	width: 100%;
+}
+.conflict-actions .wj-btn {
+	flex: 1;
+}
+
+/* 有效期标签 */
+.expire-tag {
+	font-size: 20rpx;
+	color: var(--wj-primary);
+	background: rgba(255, 107, 53, 0.08);
+	padding: 2rpx 12rpx;
+	border-radius: 8rpx;
+	flex-shrink: 0;
+}
+.expire-tag.expired {
+	color: #999;
+	background: rgba(0, 0, 0, 0.05);
+}
+.round-expire-tip {
+	display: block;
+	font-size: 22rpx;
+	color: var(--wj-primary);
+	margin-bottom: 16rpx;
+}
+.round-expire-tip.expired {
+	color: #999;
 }
 </style>

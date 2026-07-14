@@ -1,9 +1,11 @@
 <template>
 	<cl-page>
 		<view class="page-content">
+			<cl-sticky background-color="#FFFBF5">
 			<view class="page-header">
 				<text class="page-title">发现</text>
 			</view>
+			</cl-sticky>
 
 			<!-- 今日家庭挑战聚合卡 -->
 			<view class="wj-card challenge-card">

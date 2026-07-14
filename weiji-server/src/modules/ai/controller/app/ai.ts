@@ -1,9 +1,7 @@
-import { Body, Files, Get, Inject, Post, Provide } from '@midwayjs/core';
+import { Body, Files, Inject, Post, Provide } from '@midwayjs/core';
 import {
   CoolController,
   BaseController,
-  CoolTag,
-  TagTypes,
 } from '@cool-midway/core';
 import { Context } from '@midwayjs/koa';
 import { AiProxyService } from '../../service/ai_proxy';
@@ -157,48 +155,4 @@ export class AppAiController extends BaseController {
     }
   }
 
-  /**
-   * AI 静态资源代理：将 /app/ai/static/xxx 流式转发到 weiji-ai /static/xxx。
-   * 统一走 weiji-server 暴露 AI 生成的美化图/贴纸图，避免多端（H5/小程序/App）
-   * 直连 weiji-ai 带来的端口/Referer/CORS 问题。
-   *
-   * 路由通配符 :path(.*) 匹配 /static/ 后任意字符（含子路径）。
-   * 标记 IGNORE_TOKEN：静态资源无需登录鉴权，且便于 <img> 直接引用。
-   */
-  @CoolTag(TagTypes.IGNORE_TOKEN)
-  @Get('/static/:path(.*)', { summary: 'AI静态资源代理' })
-  async staticProxy() {
-    const filePath = (this.ctx as any).params?.path ?? '';
-    try {
-      const resp = await this.aiProxyService.fetchStaticFile(filePath);
-      // 透传 Content-Type / Content-Length / Cache-Control
-      const headers = resp.headers || {};
-      const contentType = String(headers['content-type'] || 'application/octet-stream');
-      const cacheControl = String(headers['cache-control'] || 'public, max-age=31536000, immutable');
-      const contentLength = headers['content-length'];
-      this.ctx.set('Content-Type', contentType);
-      this.ctx.set('Cache-Control', cacheControl);
-      if (contentLength != null) {
-        this.ctx.set('Content-Length', String(contentLength));
-      }
-      this.ctx.status = resp.status || 200;
-      // 将上游流 pipe 到响应，请求结束时自动关闭
-      this.ctx.body = resp.data;
-      return;
-    } catch (err: any) {
-      const status = err?.response?.status;
-      if (status === 404) {
-        this.ctx.status = 404;
-        this.ctx.body = 'Not Found';
-        return;
-      }
-      this.ctx.logger?.error(
-        '[ai-proxy] static proxy failed',
-        filePath,
-        err?.message ?? String(err)
-      );
-      this.ctx.status = 502;
-      this.ctx.body = 'Bad Gateway';
-    }
-  }
 }

@@ -2,6 +2,7 @@
 	<cl-page>
 		<view class="page-content">
 			<!-- 1. 顶部标题 + 家庭今日状态（Task 6） -->
+			<cl-sticky background-color="#FFFBF5">
 			<view class="page-header">
 				<view class="header-left">
 					<text class="page-title">味记</text>
@@ -28,6 +29,7 @@
 					</view>
 				</view>
 			</view>
+			</cl-sticky>
 
 			<!-- 2. 连续打卡卡片 + 徽章进度（Task 7） -->
 			<view class="wj-card checkin-card">
@@ -71,10 +73,11 @@
 					<text v-if="familyLevel" class="tasks-level">Lv{{ familyLevel.level }} · {{ familyLevel.currentTitle }}</text>
 				</view>
 				<view class="tasks-list">
-					<view v-for="(t, i) in todayTasks" :key="i" class="task-item">
-						<view class="task-check" :class="{ 'is-done': t.done }">{{ t.done ? '✓' : '' }}</view>
-						<text class="task-name" :class="{ 'is-done': t.done }">{{ t.name }}</text>
-					</view>
+					<view v-for="(t, i) in todayTasks" :key="i" class="task-item" hover-class="task-item-hover" :hover-stay-time="80" @click="t.action">
+					<view class="task-check" :class="{ 'is-done': t.done }">{{ t.done ? '✓' : '' }}</view>
+					<text class="task-name" :class="{ 'is-done': t.done }">{{ t.name }}</text>
+					<text class="task-arrow">›</text>
+				</view>
 				</view>
 				<view v-if="allTasksDone" class="tasks-complete">今日家庭挑战全部完成 🎉</view>
 			</view>
@@ -329,9 +332,9 @@ const todayTasks = computed(() => {
 	const hasBlindguess = feed.some((f: any) => f.eventType === 'blindguess');
 	const hasLike = feed.some((f: any) => f.eventType === 'like');
 	const tasks = [
-		{ name: '上传一餐记录', done: hasRecord },
-		{ name: '完成一次盲猜', done: hasBlindguess },
-		{ name: '给家人点赞', done: hasLike },
+		{ name: '上传一餐记录', done: hasRecord, action: goAiRecord },
+		{ name: '完成一次盲猜', done: hasBlindguess, action: goBlindGuess },
+		{ name: '给家人点赞', done: hasLike, action: goRecords },
 	];
 	return tasks;
 });
@@ -1358,6 +1361,16 @@ onUnmounted(() => {
 	display: flex;
 	align-items: center;
 	gap: 12rpx;
+	padding: 6rpx 8rpx;
+	border-radius: 8rpx;
+}
+.task-item-hover {
+	background: rgba(255, 107, 53, 0.06);
+}
+.task-arrow {
+	margin-left: auto;
+	font-size: 28rpx;
+	color: var(--wj-text-muted);
 }
 .task-check {
 	width: 36rpx;

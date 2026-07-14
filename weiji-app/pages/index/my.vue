@@ -1,9 +1,11 @@
 <template>
 	<cl-page>
 		<view class="page-content">
+			<cl-sticky background-color="#FFFBF5">
 			<view class="page-header">
 				<text class="page-title">家庭成长中心</text>
 			</view>
+			</cl-sticky>
 
 			<!-- 用户信息卡片（家庭角色身份） -->
 			<view class="wj-card profile-card">

@@ -88,22 +88,46 @@
 					<input class="form-input" v-model="form.dishName" placeholder="请输入菜品名称" placeholder-class="ph" />
 				</view>
 				<view class="form-item">
-					<text class="form-label">评分（1-5）</text>
-					<view class="rating-row">
-						<text
-							v-for="n in 5"
-							:key="n"
-							class="star"
-							:class="{ active: n <= form.rating }"
-							@click="form.rating = n"
-						>★</text>
+				<text class="form-label">评分（1-5）</text>
+				<view class="rating-row">
+					<text
+						v-for="n in 5"
+						:key="n"
+						class="star"
+						:class="{ active: n <= form.rating }"
+						@click="form.rating = n"
+					>★</text>
+				</view>
+			</view>
+			<view class="form-item" v-if="familyMembers.length">
+				<text class="form-label">厨师</text>
+				<picker
+					class="form-picker"
+					range-key="nickName"
+					:range="familyMembers"
+					:value="cookIndex < 0 ? 0 : cookIndex"
+					@change="onCookPick"
+				>
+					<view class="form-input readonly">
+						{{ cookIndex >= 0 ? (familyMembers[cookIndex]?.nickName || '请选择') : '请选择' }}
+					</view>
+				</picker>
+			</view>
+			<view class="form-item">
+				<text class="form-label">备注</text>
+				<textarea class="form-textarea" v-model="form.note" placeholder="记下今天的感受..." placeholder-class="ph" />
+			</view>
+			<view class="form-item">
+				<text class="form-label">标签</text>
+				<view v-if="form.tags.length" class="tag-list">
+					<view v-for="(tag, idx) in form.tags" :key="idx" class="tag-chip">
+						<text class="tag-chip-text">{{ tag }}</text>
+						<text class="tag-chip-close" @click="removeTag(idx)">×</text>
 					</view>
 				</view>
-				<view class="form-item">
-					<text class="form-label">备注</text>
-					<textarea class="form-textarea" v-model="form.note" placeholder="记下今天的感受..." placeholder-class="ph" />
-				</view>
-				<button class="wj-btn save-btn" :disabled="saving" :loading="saving" @click="handleSave">
+				<input class="form-input" v-model="tagInput" placeholder="输入标签后按回车添加" placeholder-class="ph" @confirm="addTag" />
+			</view>
+			<button class="wj-btn save-btn" :disabled="saving" :loading="saving" @click="handleSave">
 					保存记录
 				</button>
 			</view>
@@ -121,8 +145,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from "vue";
+import { ref, reactive, computed, onMounted } from "vue";
 import { api, resolveImg } from "/@/utils/api";
+import { useStore } from "/@/cool";
 
 // imageUrl：用于 <image :src> 显示，裁剪后是本地临时路径，美化后是 resolveImg 处理后的可访问 URL
 const imageUrl = ref('');
@@ -147,10 +172,72 @@ const saving = ref(false);
 const cropSrc = ref(''); // 待裁剪原图路径（选图后、裁剪前）
 const cropperVisible = ref(false); // 裁剪弹层显隐
 
+const { user } = useStore();
+
 const form = reactive({
 	dishName: '',
 	rating: 0,
 	note: '',
+	tags: [] as string[],
+});
+
+// 标签输入：回车/完成添加，点击 × 删除
+const tagInput = ref('');
+function addTag() {
+	const v = tagInput.value.trim();
+	if (v && !form.tags.includes(v)) {
+		form.tags.push(v);
+	}
+	tagInput.value = '';
+}
+function removeTag(idx: number) {
+	form.tags.splice(idx, 1);
+}
+
+// 家庭信息与成员（用于厨师选择）
+const familyInfo = ref<any>({});
+const familyMembers = ref<any[]>([]);
+const cookId = ref<number | string>("");
+
+// 加载家庭信息与成员列表，用于厨师 picker
+async function loadFamilyInfo() {
+	try {
+		const data: any = await api.getFamilyInfo();
+		familyInfo.value = data || {};
+		// 默认厨师为当前用户
+		const uid = user.info?.id;
+		if (uid) cookId.value = uid;
+		if (data && (data.id || data.familyId)) {
+			const members: any = await api.getFamilyMembers();
+			familyMembers.value = Array.isArray(members) ? members : (members?.list || []);
+		}
+	} catch {
+		// 未加入家庭组时不阻塞，cookId 默认当前用户
+		const uid = user.info?.id;
+		if (uid) cookId.value = uid;
+	}
+}
+
+// onMounted 时加载家庭信息
+onMounted(() => {
+	loadFamilyInfo();
+});
+
+// 厨师 picker 回调
+function onCookPick(e: any) {
+	const idx = Number(e?.detail?.value);
+	if (isNaN(idx) || idx < 0 || idx >= familyMembers.value.length) return;
+	const member = familyMembers.value[idx];
+	if (member) {
+		cookId.value = member.userId ?? member.id ?? "";
+	}
+}
+
+// 当前选中厨师的 picker 索引（用于 picker 显示）
+const cookIndex = computed(() => {
+	const cid = cookId.value;
+	if (!cid) return -1;
+	return familyMembers.value.findIndex((m: any) => String(m.userId ?? m.id) === String(cid));
 });
 
 // 营养四指标（weiji-ai 实际返回嵌套 nutrition 对象，兼容历史顶层字段命名）
@@ -196,6 +283,7 @@ function onCropped(path: string) {
 	form.dishName = '';
 	form.rating = 0;
 	form.note = '';
+	form.tags = [];
 }
 
 // 确保 src 是本地路径：若为远程 URL 则先下载到本地临时文件，避免 uploadFile 失败
@@ -353,10 +441,13 @@ async function handleSave() {
 			dishName: form.dishName.trim(),
 			rating: form.rating,
 			note: form.note,
+			tags: form.tags,
 			imageUrl: finalImageUrl,
 			beautifiedUrl: persistImageUrl.value,
 			ingredients: ingredients.value,
 			nutrition: nutrition.value,
+			cookId: cookId.value || user.info?.id || undefined,
+			familyId: familyInfo.value?.id || familyInfo.value?.familyId || undefined,
 		});
 		uni.hideLoading();
 		uni.showToast({ title: '保存成功', icon: 'success' });
@@ -371,6 +462,8 @@ async function handleSave() {
 			form.dishName = '';
 			form.rating = 0;
 			form.note = '';
+			form.tags = [];
+			cookId.value = user.info?.id || "";
 			uni.navigateBack();
 		}, 600);
 	} catch {
@@ -504,6 +597,31 @@ async function handleSave() {
 	border-radius: 24rpx;
 }
 
+.tag-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12rpx;
+	margin-bottom: 12rpx;
+}
+.tag-chip {
+	display: flex;
+	align-items: center;
+	gap: 8rpx;
+	font-size: 24rpx;
+	color: var(--wj-primary);
+	background: rgba(255, 107, 53, 0.08);
+	padding: 6rpx 12rpx 6rpx 20rpx;
+	border-radius: 24rpx;
+}
+.tag-chip-text {
+	color: var(--wj-primary);
+}
+.tag-chip-close {
+	font-size: 28rpx;
+	color: var(--wj-text-muted);
+	padding: 0 4rpx;
+}
+
 .save-form .form-item {
 	margin-bottom: 24rpx;
 }
@@ -557,5 +675,14 @@ async function handleSave() {
 /* 页面底部留白，确保保存按钮完全可见 */
 .save-form {
 	margin-bottom: 48rpx;
+}
+.form-picker {
+	width: 100%;
+}
+.form-input.readonly {
+	color: var(--wj-text);
+	background: rgba(0, 0, 0, 0.04);
+	padding: 20rpx 24rpx;
+	border-radius: 12rpx;
 }
 </style>

@@ -260,16 +260,24 @@ function copyInviteCode() {
 	});
 }
 
-// 可见性切换
-async function toggleVisibility(r: any) {
-	const next = r.visibility === "private" ? "family" : "private";
-	try {
-		await api.updateRecipeVisibility(r.id, next);
-		r.visibility = next;
-		uni.showToast({ title: "已更新可见性", icon: "success" });
-	} catch {
-		// 静默
-	}
+// 可见性切换（仅作者）：弹出 ActionSheet 选择
+const visLabels = ["👨‍👩‍👧 家庭可见", "🌍 公开", "🔒 仅自己"];
+const visValues = ["family", "public", "private"];
+function toggleVisibility(r: any) {
+	uni.showActionSheet({
+		itemList: visLabels,
+		success: async (res) => {
+			const next = visValues[res.tapIndex];
+			if (next === r.visibility) return;
+			try {
+				await api.updateRecipeVisibility(r.id, next);
+				r.visibility = next;
+				uni.showToast({ title: "已更新可见性", icon: "success" });
+			} catch {
+				// 静默
+			}
+		},
+	});
 }
 
 function goDetail(id: string) {

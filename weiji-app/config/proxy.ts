@@ -37,7 +37,7 @@ const proxy = {
 	},
 
 	// AI 生成图片不直接走 /static，而是通过 weiji-server /app/ai/static/* 流式代理到 weiji-ai
-	// （见 weiji-server/ai/controller/app/ai.ts staticProxy），自动被 /app 代理捕获转发。
+	// （见 weiji-server/ai/middleware/staticProxy.ts AiStaticProxyMiddleware），自动被 /app 代理捕获转发。
 	// 此处必须注释掉 /static 的代理，否则会导致本地 (如 /static/icon/tabbar/*) 的图片被 Vite 错误地转发到后端
 	// "/static": {
 	// 	target: DEV_SERVER,

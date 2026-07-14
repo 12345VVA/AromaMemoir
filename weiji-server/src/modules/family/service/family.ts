@@ -639,6 +639,8 @@ export class FamilyService extends BaseService {
     } else if (query.visibility === 'private') {
       where.visibility = 'private';
       where.authorId = userId;
+    } else if (query.visibility === 'public') {
+      where.visibility = 'public';
     }
     // 作者过滤（visibility=private 时强制 authorId = userId，不可被 query.authorId 覆盖，避免越权查看他人私有菜谱）
     if (query.authorId && query.visibility !== 'private') {
@@ -830,7 +832,7 @@ export class FamilyService extends BaseService {
     if (recipe.authorId !== userId) {
       throw new CoolCommException('无权限操作');
     }
-    if (body.visibility !== 'family' && body.visibility !== 'private') {
+    if (!['family', 'public', 'private'].includes(body.visibility)) {
       throw new CoolCommException('visibility 参数不合法');
     }
     await this.familyRecipeEntity.update(id, { visibility: body.visibility });

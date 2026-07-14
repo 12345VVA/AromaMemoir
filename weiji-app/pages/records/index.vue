@@ -1,8 +1,27 @@
 <template>
 	<cl-page>
 		<view class="page-content">
+			<cl-sticky background-color="#FFFBF5">
 			<view class="page-header">
 				<text class="page-title">{{ pageTitle }}</text>
+				<view class="view-switch">
+					<text
+						class="switch-btn"
+						:class="{ active: viewMode === 'list' }"
+						@click="setViewMode('list')"
+					>列表</text>
+					<text
+						class="switch-btn"
+						:class="{ active: viewMode === 'grid' }"
+						@click="setViewMode('grid')"
+					>宫格</text>
+				</view>
+			</view>
+
+			<!-- 记录来源切换：我的记录 / 家庭动态 -->
+			<view v-if="!targetUserId" class="source-tabs">
+				<text class="source-tab" :class="{ active: recordSource === 'mine' }" @click="switchSource('mine')">我的记录</text>
+				<text class="source-tab" :class="{ active: recordSource === 'family' }" @click="switchSource('family')">家庭动态</text>
 			</view>
 
 			<view class="search-bar">
@@ -15,35 +34,61 @@
 					@confirm="loadRecords(true)"
 				/>
 			</view>
+			</cl-sticky>
 
 			<view v-if="recordsLoading" class="empty-tip">加载中...</view>
-			<view v-else-if="records.length" class="record-list">
-				<view v-for="item in records" :key="item.id" class="wj-card record-card" @click="goDetail(item.id)">
-					<image v-if="item.imageUrl || item.image" class="record-cover" :src="resolveImg(item.imageUrl || item.image)" mode="aspectFill" />
-					<view class="record-content">
+			<view v-else-if="records.length" :class="viewMode === 'grid' ? 'record-grid' : 'record-list'">
+				<view
+					v-for="item in records"
+					:key="item.id"
+					class="wj-card"
+					:class="viewMode === 'grid' ? 'grid-card' : 'record-card'"
+					@click="goDetail(item.id)"
+				>
+					<image
+						v-if="item.imageUrl || item.image"
+						class="record-cover"
+						:class="{ 'grid-cover': viewMode === 'grid' }"
+						:src="resolveImg(item.imageUrl || item.image)"
+						mode="aspectFill"
+					/>
+					<view class="record-content" :class="{ 'grid-content': viewMode === 'grid' }">
 						<view class="record-header">
 							<view class="record-name-wrap">
 								<text class="record-name">{{ item.dishName || item.title || "未命名" }}</text>
 								<text v-if="Number(item.cookCount) >= 2" class="cook-count-badge">做过{{ item.cookCount }}次</text>
 							</view>
-							<text class="record-time">{{ formatTime(item.createdAt || item.time) }}</text>
+							<text v-if="viewMode === 'list'" class="record-time">{{ formatTime(item.createTime || item.recordDate) }}</text>
 						</view>
-						<view v-if="item.cookName || item.cookId" class="record-cook">👩 {{ item.cookName || '家人' }} 制作</view>
-						<view v-if="toArray(item.ingredients).length" class="record-tags">
-							<text
-								v-for="(ing, idx) in toArray(item.ingredients).slice(0, 4)"
-								:key="idx"
-								class="tag"
-							>{{ formatIngredient(ing) }}</text>
+						<!-- 宫格模式：精简为评分 + 时间 -->
+						<view v-if="viewMode === 'grid'" class="grid-meta">
+							<text v-if="item.rating" class="stars">{{ "★".repeat(Number(item.rating) || 0) }}</text>
+							<text class="record-time">{{ formatTime(item.createTime || item.recordDate) }}</text>
 						</view>
-						<view v-if="item.rating" class="record-rating">
-							<text class="stars">{{ "★".repeat(Number(item.rating) || 0) }}</text>
-						</view>
-						<view v-if="Number(item.likeCount) > 0 || Number(item.commentCount) > 0 || Number(item.cookCount) >= 2" class="record-interaction">
-							<text v-if="Number(item.likeCount) > 0" class="interaction-item">❤️ {{ item.likeCount }}</text>
-							<text v-if="Number(item.commentCount) > 0" class="interaction-item">💬 {{ item.commentCount }}</text>
-							<text v-if="Number(item.cookCount) >= 2" class="interaction-item">🔁 {{ item.cookCount }}</text>
-						</view>
+						<!-- 列表模式：完整信息 -->
+						<template v-else>
+							<view v-if="item.userNickname" class="record-author">👤 {{ item.userNickname }}</view>
+							<view v-if="item.cookName || item.cookId" class="record-cook">👩 {{ item.cookName || '家人' }} 制作</view>
+							<view v-if="toArray(item.ingredients).length" class="record-tags">
+								<text
+									v-for="(ing, idx) in toArray(item.ingredients).slice(0, 4)"
+									:key="idx"
+									class="tag"
+								>{{ formatIngredient(ing) }}</text>
+							</view>
+							<view v-if="item.rating" class="record-rating">
+								<text class="stars">{{ "★".repeat(Number(item.rating) || 0) }}</text>
+							</view>
+							<view v-if="item.likedByMe !== undefined || Number(item.commentCount) > 0 || Number(item.cookCount) >= 2" class="record-interaction">
+								<view v-if="item.likedByMe !== undefined" class="like-btn" :class="{ liked: item.likedByMe }" @click.stop="handleLike(item)">
+									<text class="like-icon">{{ item.likedByMe ? '❤️' : '🤍' }}</text>
+									<text v-if="Number(item.likeCount) > 0" class="like-count">{{ item.likeCount }}</text>
+								</view>
+								<text v-else-if="Number(item.likeCount) > 0" class="interaction-item">❤️ {{ item.likeCount }}</text>
+								<text v-if="Number(item.commentCount) > 0" class="interaction-item">💬 {{ item.commentCount }}</text>
+								<text v-if="Number(item.cookCount) >= 2" class="interaction-item">🔁 {{ item.cookCount }}</text>
+							</view>
+						</template>
 					</view>
 				</view>
 				<!-- 加载更多状态：进行中显示加载中，已全部加载显示没有更多 -->
@@ -69,8 +114,31 @@ import Tabbar from "/@/pages/index/components/tabbar.vue";
 
 const records = ref<any[]>([]);
 const recordsLoading = ref(false);
+// reset 加载的请求序列号：每次 reset 自增，旧请求返回时若 seq 不匹配则丢弃，
+// 避免切换来源/搜索时旧的在途请求覆盖最新数据
+const loadSeq = ref(0);
 const loadingMore = ref(false);
 const keyword = ref("");
+
+// 视图模式：列表 / 宫格，默认列表；读取本地存储以保持用户上次选择
+const viewMode = ref<'list' | 'grid'>(
+	(uni.getStorageSync('records_view_mode') as 'list' | 'grid') || 'list'
+);
+
+function setViewMode(mode: 'list' | 'grid') {
+	if (viewMode.value === mode) return;
+	viewMode.value = mode;
+	uni.setStorageSync('records_view_mode', mode);
+}
+
+// 记录来源：我的记录 / 家庭动态
+const recordSource = ref<'mine' | 'family'>('mine');
+
+function switchSource(source: 'mine' | 'family') {
+	if (recordSource.value === source) return;
+	recordSource.value = source;
+	loadRecords(true);
+}
 
 // 目标成员过滤：贡献榜点击跳转时传入 userId + name
 const targetUserId = ref<number | null>(null);
@@ -85,7 +153,9 @@ const hasMore = computed(() => records.value.length < total.value);
 
 // 页面标题与占位文案随模式变化
 const pageTitle = computed(() =>
-	targetUserId.value ? `${targetName.value || '家人'}的记录` : "美食记录"
+	targetUserId.value
+		? `${targetName.value || '家人'}的记录`
+		: recordSource.value === 'family' ? '家庭动态' : '美食记录'
 );
 const searchPlaceholder = computed(() =>
 	targetUserId.value ? "搜索该成员记录" : "搜索美食记录"
@@ -93,7 +163,9 @@ const searchPlaceholder = computed(() =>
 const emptyText = computed(() =>
 	targetUserId.value
 		? `${targetName.value || '该成员'}还没有记录`
-		: "还没有美食记录，快去AI记录添加吧~"
+		: recordSource.value === 'family'
+			? '家里还没有动态，快去记录吧~'
+			: '还没有美食记录，快去AI记录添加吧~'
 );
 
 function toArray(val: any): any[] {
@@ -139,8 +211,13 @@ async function loadRecords(reset = true) {
 		await loadMemberRecords(reset);
 		return;
 	}
+	if (recordSource.value === 'family') {
+		// 家庭动态模式：拉取全部家庭成员记录（含点赞/评论数据）
+		await loadFamilyRecords(reset);
+		return;
+	}
+	const mySeq = reset ? ++loadSeq.value : 0;
 	if (reset) {
-		if (recordsLoading.value) return;
 		recordsLoading.value = true;
 		page.value = 1;
 	} else {
@@ -153,11 +230,13 @@ async function loadRecords(reset = true) {
 		const params: Record<string, any> = { page: page.value, pageSize: PAGE_SIZE };
 		if (keyword.value.trim()) params.keyword = keyword.value.trim();
 		const data: any = await api.getRecords(params);
+		if (reset && mySeq !== loadSeq.value) return; // 已被新请求覆盖，丢弃旧结果
 		const list = Array.isArray(data) ? data : data?.list || data?.records || [];
 		// total 取后端返回；兼容历史直接返回数组的形态（此时 total = 当次条数）
 		total.value = Array.isArray(data) ? list.length : Number(data?.total) || 0;
 		records.value = reset ? list : [...records.value, ...list];
 	} catch {
+		if (reset && mySeq !== loadSeq.value) return;
 		if (reset) {
 			records.value = [];
 			total.value = 0;
@@ -167,15 +246,75 @@ async function loadRecords(reset = true) {
 		}
 		// api.ts 已统一 toast，此处静默
 	} finally {
-		recordsLoading.value = false;
-		loadingMore.value = false;
+		if (reset) {
+			if (mySeq === loadSeq.value) recordsLoading.value = false;
+		} else {
+			loadingMore.value = false;
+		}
+	}
+}
+
+// 家庭动态模式：拉取全部家庭成员记录（后端 listFamilyRecords 返回含 likeCount/likedByMe）
+async function loadFamilyRecords(reset: boolean) {
+	const mySeq = reset ? ++loadSeq.value : 0;
+	if (reset) {
+		recordsLoading.value = true;
+		page.value = 1;
+	} else {
+		if (loadingMore.value || !hasMore.value) return;
+		loadingMore.value = true;
+		page.value += 1;
+	}
+	try {
+		const data: any = await api.getFamilyFeed({
+			page: page.value,
+			pageSize: PAGE_SIZE,
+			keyword: keyword.value.trim() || undefined,
+		});
+		if (reset && mySeq !== loadSeq.value) return; // 已被新请求覆盖，丢弃旧结果
+		const list = Array.isArray(data) ? data : data?.list || data?.records || [];
+		total.value = Array.isArray(data) ? list.length : Number(data?.total) || 0;
+		records.value = reset ? list : [...records.value, ...list];
+	} catch {
+		if (reset && mySeq !== loadSeq.value) return;
+		if (reset) {
+			records.value = [];
+			total.value = 0;
+		} else {
+			page.value -= 1;
+		}
+	} finally {
+		if (reset) {
+			if (mySeq === loadSeq.value) recordsLoading.value = false;
+		} else {
+			loadingMore.value = false;
+		}
+	}
+}
+
+// 点赞/取消点赞（toggle）：仅家庭动态记录可点赞
+async function handleLike(item: any) {
+	if (item.likedByMe === undefined) return;
+	// 乐观更新：先切换本地状态，失败时回滚
+	const prevLiked = item.likedByMe;
+	const prevCount = Number(item.likeCount) || 0;
+	item.likedByMe = !prevLiked;
+	item.likeCount = prevLiked ? prevCount - 1 : prevCount + 1;
+	try {
+		const res: any = await api.likeFamilyRecord(item.id);
+		item.likedByMe = res.liked;
+		item.likeCount = res.likes;
+	} catch {
+		// 回滚
+		item.likedByMe = prevLiked;
+		item.likeCount = prevCount;
 	}
 }
 
 // 成员模式：服务端按 userId/cookId 过滤 + 标准分页（后端 listFamilyRecords 已支持）
 async function loadMemberRecords(reset: boolean) {
+	const mySeq = reset ? ++loadSeq.value : 0;
 	if (reset) {
-		if (recordsLoading.value) return;
 		recordsLoading.value = true;
 		page.value = 1;
 	} else {
@@ -188,11 +327,14 @@ async function loadMemberRecords(reset: boolean) {
 			userId: targetUserId.value,
 			page: page.value,
 			pageSize: PAGE_SIZE,
+			keyword: keyword.value.trim() || undefined,
 		});
+		if (reset && mySeq !== loadSeq.value) return; // 已被新请求覆盖，丢弃旧结果
 		const list = Array.isArray(data) ? data : data?.list || data?.records || [];
 		total.value = Array.isArray(data) ? list.length : Number(data?.total) || 0;
 		records.value = reset ? list : [...records.value, ...list];
 	} catch {
+		if (reset && mySeq !== loadSeq.value) return;
 		if (reset) {
 			records.value = [];
 			total.value = 0;
@@ -201,8 +343,11 @@ async function loadMemberRecords(reset: boolean) {
 			page.value -= 1;
 		}
 	} finally {
-		recordsLoading.value = false;
-		loadingMore.value = false;
+		if (reset) {
+			if (mySeq === loadSeq.value) recordsLoading.value = false;
+		} else {
+			loadingMore.value = false;
+		}
 	}
 }
 
@@ -250,7 +395,50 @@ onReachBottom(() => {
 }
 
 .page-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
 	padding: 16rpx 4rpx 12rpx;
+}
+
+.view-switch {
+	display: flex;
+	background: var(--wj-card-bg);
+	border-radius: 12rpx;
+	padding: 4rpx;
+	box-shadow: var(--wj-shadow);
+}
+
+.switch-btn {
+	font-size: 24rpx;
+	padding: 8rpx 24rpx;
+	border-radius: 8rpx;
+	color: var(--wj-text-muted);
+}
+
+.switch-btn.active {
+	background: var(--wj-primary);
+	color: #fff;
+}
+
+.source-tabs {
+	display: flex;
+	gap: 16rpx;
+	padding: 0 4rpx 12rpx;
+}
+
+.source-tab {
+	font-size: 26rpx;
+	padding: 8rpx 28rpx;
+	border-radius: 24rpx;
+	color: var(--wj-text-muted);
+	background: var(--wj-card-bg);
+	box-shadow: var(--wj-shadow);
+}
+
+.source-tab.active {
+	color: #fff;
+	background: var(--wj-primary);
 }
 
 .page-title {
@@ -286,6 +474,34 @@ onReachBottom(() => {
 	display: flex;
 	flex-direction: column;
 	gap: 0;
+}
+
+.record-grid {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 20rpx;
+}
+
+.grid-card {
+	width: calc((100% - 20rpx) / 2);
+	padding: 0;
+	overflow: hidden;
+}
+
+.grid-cover {
+	height: 240rpx;
+}
+
+.grid-content {
+	padding: 16rpx 20rpx;
+}
+
+.grid-meta {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-top: 8rpx;
+	gap: 8rpx;
 }
 
 .record-card {
@@ -370,8 +586,17 @@ onReachBottom(() => {
 	margin-bottom: 8rpx;
 }
 
+.record-author {
+	font-size: 24rpx;
+	color: var(--wj-text);
+	margin-top: 4rpx;
+	margin-bottom: 4rpx;
+	font-weight: 500;
+}
+
 .record-interaction {
 	display: flex;
+	align-items: center;
 	gap: 24rpx;
 	margin-top: 16rpx;
 	padding-top: 16rpx;
@@ -381,6 +606,27 @@ onReachBottom(() => {
 .interaction-item {
 	font-size: 24rpx;
 	color: var(--wj-text-muted);
+}
+
+.like-btn {
+	display: flex;
+	align-items: center;
+	gap: 6rpx;
+	padding: 4rpx 8rpx;
+	border-radius: 8rpx;
+}
+
+.like-icon {
+	font-size: 28rpx;
+}
+
+.like-count {
+	font-size: 24rpx;
+	color: var(--wj-text-muted);
+}
+
+.like-btn.liked .like-count {
+	color: var(--wj-primary);
 }
 
 .load-tip {

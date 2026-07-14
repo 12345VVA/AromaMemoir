@@ -40,6 +40,7 @@
         "下饭"
       ],
       "mealType": "lunch",
+      "cookId": 1,
       "recordDate": "2026-06-30",
       "imageUrl": "/upload/demo/beef-noodle-s4.png",
       "beautifiedUrl": "",
@@ -81,6 +82,7 @@
         "家常"
       ],
       "mealType": "dinner",
+      "cookId": 2,
       "recordDate": "2026-06-29",
       "imageUrl": "/upload/demo/tomato-egg.jpg",
       "beautifiedUrl": "",
@@ -122,11 +124,148 @@
         "轻食"
       ],
       "mealType": "breakfast",
+      "cookId": 3,
       "recordDate": "2026-06-28",
       "imageUrl": "/upload/demo/broccoli.jpg",
       "beautifiedUrl": "",
       "source": "manual",
       "familyId": 1
+    },
+    {
+      "id": 4,
+      "userId": 4,
+      "dishName": "糖醋里脊",
+      "cookingMethod": "炸",
+      "rating": 5,
+      "note": "外酥里嫩，孙子孙女的最爱",
+      "nutrition": {
+        "calories": 380,
+        "protein": 22.0,
+        "fat": 19.5,
+        "carbs": 32.0
+      },
+      "ingredients": [
+        {
+          "name": "里脊肉",
+          "amount": "300g",
+          "unit": "g"
+        },
+        {
+          "name": "白糖",
+          "amount": "40g",
+          "unit": "g"
+        },
+        {
+          "name": "醋",
+          "amount": "30ml",
+          "unit": "ml"
+        },
+        {
+          "name": "番茄酱",
+          "amount": "20g",
+          "unit": "g"
+        }
+      ],
+      "tags": [
+        "下饭",
+        "家的味道"
+      ],
+      "mealType": "dinner",
+      "cookId": 4,
+      "recordDate": "2026-07-10",
+      "imageUrl": "/upload/demo/beef-noodle-s4.png",
+      "beautifiedUrl": "",
+      "source": "manual",
+      "familyId": 1
+    },
+    {
+      "id": 5,
+      "userId": 1,
+      "dishName": "桂花糕",
+      "cookingMethod": "蒸",
+      "rating": 4,
+      "note": "清甜软糯，妈妈亲手做的茶点",
+      "nutrition": {
+        "calories": 210,
+        "protein": 4.0,
+        "fat": 2.5,
+        "carbs": 45.0
+      },
+      "ingredients": [
+        {
+          "name": "糯米粉",
+          "amount": "150g",
+          "unit": "g"
+        },
+        {
+          "name": "桂花",
+          "amount": "20g",
+          "unit": "g"
+        },
+        {
+          "name": "白糖",
+          "amount": "40g",
+          "unit": "g"
+        },
+        {
+          "name": "水",
+          "amount": "120ml",
+          "unit": "ml"
+        }
+      ],
+      "tags": [
+        "甜品",
+        "家常"
+      ],
+      "mealType": "snack",
+      "cookId": 2,
+      "recordDate": "2026-07-11",
+      "imageUrl": "/upload/demo/tomato-egg.jpg",
+      "beautifiedUrl": "",
+      "source": "manual",
+      "familyId": 1
+    }
+  ],
+  "weiji_record_comment": [
+    {
+      "id": 1,
+      "recordId": 1,
+      "userId": 2,
+      "content": "汤头浓郁，比上一次更入味了，牛肉炖得刚好",
+      "nickName": "妈妈",
+      "avatarUrl": "/upload/avatar/avatar-mom.jpg",
+      "createTime": "2026-07-01 09:30:00",
+      "updateTime": "2026-07-01 09:30:00"
+    },
+    {
+      "id": 2,
+      "recordId": 1,
+      "userId": 3,
+      "content": "牛肉软烂入味，面条也吸饱了汤汁，给满分",
+      "nickName": "爸爸",
+      "avatarUrl": "/upload/avatar/avatar-dad.jpg",
+      "createTime": "2026-07-01 12:15:00",
+      "updateTime": "2026-07-01 12:15:00"
+    },
+    {
+      "id": 3,
+      "recordId": 2,
+      "userId": 1,
+      "content": "酸甜可口，鸡蛋嫩滑，妈妈的拿手菜没跑了",
+      "nickName": "演示账号",
+      "avatarUrl": "/upload/avatar/avatar-me.jpg",
+      "createTime": "2026-06-30 18:45:00",
+      "updateTime": "2026-06-30 18:45:00"
+    },
+    {
+      "id": 4,
+      "recordId": 2,
+      "userId": 4,
+      "content": "家里的味道，孙子最爱吃这口，下次多做点",
+      "nickName": "奶奶",
+      "avatarUrl": "/upload/avatar/avatar-grandma.jpg",
+      "createTime": "2026-06-30 19:20:00",
+      "updateTime": "2026-06-30 19:20:00"
     }
   ]
 }
